@@ -300,3 +300,21 @@ User can:
 - Process 20 podcasts
 - Accumulate 300+ expressions
 - Review weekly learning reports
+
+
+
+
+# Risks and Recommendations
+Key missing decisions:
+Whether Notion stores expressions as page blocks only, or as a separate reusable vocabulary database.
+How to handle duplicate expressions across podcasts.
+Whether transcript highlighting should preserve timestamps.
+Whether weekly review is generated from local files, Notion queries, or both.
+How to recover from partial failures, such as transcription succeeds but Notion publishing fails.
+Whether OpenAI output must be strictly schema-validated before publishing.
+Recommendations:
+Use Pydantic models early. This project has many handoffs, so typed contracts will prevent messy downstream bugs.
+Treat Notion publishing as the final projection layer, not the source of truth during processing.
+Save intermediate artifacts locally: audio, transcript.json, learning.json, highlighted.json.
+Start with one complete happy path: local audio file to Notion page.
+Use separate Notion databases for long-term learning if review quality matters: Podcasts, Expressions, Vocabulary, and Weekly Reviews.
