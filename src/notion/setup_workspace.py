@@ -1,17 +1,19 @@
 """Initialize the Notion workspace databases for English Podcast Learning Agent.
 
 Usage:
-    python -m src.notion.setup_workspace --parent-page-id <notion_page_id>
+    python -m src.notion.setup_workspace --parent-page-id <notion_page_id_or_url>
 
 Environment:
     NOTION_TOKEN is required.
-    NOTION_PARENT_PAGE_ID can be used instead of the CLI argument.
+    NOTION_PARENT_PAGE_ID can be used instead of the CLI argument. It may be a
+    raw Notion page ID or a copied Notion page URL.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -30,6 +32,38 @@ from src.notion.schema import EXPRESSION_CATEGORIES, REVIEW_STATUSES, SOURCE_TYP
 
 class WorkspaceSetupError(RuntimeError):
     """Raised when the Notion workspace cannot be initialized."""
+
+
+NOTION_ID_PATTERN = re.compile(r"([a-fA-F0-9]{32})")
+
+
+def normalize_notion_id(value: str) -> str:
+    """Return a dashed Notion ID from a raw ID or copied Notion URL.
+
+    Notion page URLs usually contain a 32-character hex ID, while API calls
+    accept either dashed or undashed IDs. We normalize to the dashed form to
+    keep .env readable and consistent.
+    """
+    cleaned = value.strip()
+    if not cleaned:
+        raise WorkspaceSetupError("A Notion page ID or page URL is required.")
+
+    compact = cleaned.replace("-", "")
+    if re.fullmatch(r"[a-fA-F0-9]{32}", compact):
+        raw_id = compact
+    else:
+        match = NOTION_ID_PATTERN.search(cleaned.replace("-", ""))
+        if not match:
+            raise WorkspaceSetupError(
+                "Could not find a Notion page ID. Paste either the raw page ID "
+                "or a copied Notion page URL."
+            )
+        raw_id = match.group(1)
+
+    return (
+        f"{raw_id[0:8]}-{raw_id[8:12]}-{raw_id[12:16]}-"
+        f"{raw_id[16:20]}-{raw_id[20:32]}"
+    ).lower()
 
 
 def create_notion_client(token: str | None = None) -> Client:
@@ -201,7 +235,9 @@ def update_env_file(values: dict[str, str], path: Path = ENV_PATH) -> None:
 
 def setup_workspace(parent_page_id: str, notion: Client | None = None) -> dict[str, str]:
     notion_client = notion or create_notion_client()
-    database_ids = create_base_databases(notion_client, parent_page_id)
+    normalized_parent_page_id = normalize_notion_id(parent_page_id)
+    update_env_file({NOTION_PARENT_PAGE_ID_ENV: normalized_parent_page_id})
+    database_ids = create_base_databases(notion_client, normalized_parent_page_id)
     wire_database_relations(notion_client, database_ids)
     update_env_file(database_ids)
     return database_ids
@@ -214,9 +250,43 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--parent-page-id",
         default=os.getenv(NOTION_PARENT_PAGE_ID_ENV),
-        help="Notion page ID where the databases should be created.",
+        help=(
+            "Notion parent page ID or copied page URL where the databases "
+            "should be created."
+        ),
+    )
+    parser.add_argument(
+        "--print-onboarding",
+        action="store_true",
+        help="Print the recommended two-mode Notion onboarding flow and exit.",
     )
     return parser.parse_args()
+
+
+def print_onboarding() -> None:
+    """Print the supported Notion onboarding modes for new users."""
+    print(
+        "\n".join(
+            [
+                "Notion onboarding modes:",
+                "",
+                "Mode 1: Guided Local Setup",
+                "1. Install dependencies: pip install -r requirements.txt",
+                "2. Create a Notion internal integration and copy its token.",
+                "3. Create a parent Notion page and share it with the integration.",
+                "4. Add NOTION_TOKEN to .env.",
+                "5. Run: python -m src.notion.setup_workspace --parent-page-id <page_url_or_id>",
+                "6. Run: python -m src.notion.check_workspace",
+                "",
+                "Mode 2: Codex Assisted Setup",
+                "1. Connect the Notion plugin in Codex.",
+                "2. Ask Codex to create or inspect the Notion workspace.",
+                "3. Sync the resulting database IDs into .env for local CLI runs.",
+                "",
+                "The local Python project still needs NOTION_TOKEN for independent CLI execution.",
+            ]
+        )
+    )
 
 
 def main() -> int:
@@ -224,9 +294,14 @@ def main() -> int:
     args = parse_args()
 
     try:
+        if args.print_onboarding:
+            print_onboarding()
+            return 0
+
         if not args.parent_page_id:
             raise WorkspaceSetupError(
-                "A parent Notion page ID is required. Pass --parent-page-id or set "
+                "A parent Notion page ID or URL is required. Pass "
+                "--parent-page-id with a copied Notion page URL, or set "
                 "NOTION_PARENT_PAGE_ID in .env."
             )
 

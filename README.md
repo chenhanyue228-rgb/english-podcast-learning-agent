@@ -5,6 +5,20 @@ materials stored in Notion.
 
 ## Notion Setup
 
+The project supports two onboarding modes:
+
+- **Mode 1: Guided Local Setup** is the recommended path for users who want to
+  run the Python CLI independently. It uses the official Notion API SDK and a
+  `NOTION_TOKEN` stored in `.env`.
+- **Mode 2: Codex Assisted Setup** is useful while working inside Codex with the
+  Notion plugin connected. Codex can help create or inspect the workspace, but
+  the local Python project still needs `.env` values for independent CLI runs.
+
+The Notion plugin and the Python `notion-client` SDK are different layers. The
+plugin helps Codex act on your workspace interactively. The SDK is what this
+project uses when you run commands such as `python -m src.notion.setup_workspace`
+or `python -m src.workflow...`.
+
 Data model principle:
 
 - Database properties store metadata for filtering, relations, and statistics.
@@ -38,19 +52,21 @@ See [docs/Notion_Data_Model.md](docs/Notion_Data_Model.md) for the full data
 model contract used by setup, validation, sample data, and the podcast
 pipeline.
 
-### 1. Install dependencies
+### Mode 1: Guided Local Setup
+
+#### 1. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Create a Notion integration
+#### 2. Create a Notion integration
 
 Create an internal Notion integration, copy its secret token, and share the
 parent Notion page with that integration. The initializer creates databases
 inside that parent page.
 
-### 3. Configure environment variables
+#### 3. Configure environment variables
 
 Copy the example file and fill in your token:
 
@@ -70,12 +86,13 @@ You can also add the parent page ID to `.env`:
 NOTION_PARENT_PAGE_ID=
 ```
 
-Or pass it directly on the command line.
+`NOTION_PARENT_PAGE_ID` accepts either a raw Notion page ID or the full copied
+Notion page URL. You can also pass it directly on the command line.
 
-### 4. Initialize the Notion workspace
+#### 4. Initialize the Notion workspace
 
 ```bash
-python -m src.notion.setup_workspace --parent-page-id <notion_page_id>
+python -m src.notion.setup_workspace --parent-page-id <notion_page_url_or_id>
 ```
 
 The script creates:
@@ -92,7 +109,59 @@ NOTION_EXPRESSION_DATABASE_ID=
 NOTION_WEEKLY_REVIEW_DATABASE_ID=
 ```
 
-### 5. Load Notion configuration in code
+#### 5. Validate the Notion workspace
+
+Run the read-only workspace checker after initialization:
+
+```bash
+python -m src.notion.check_workspace
+```
+
+Expected successful output:
+
+```text
+✓ Podcast Library
+✓ Expression Database
+✓ Weekly Review
+
+Missing:
+None
+```
+
+#### 6. Create sample learning data
+
+Create one sample podcast and three linked expressions:
+
+```bash
+python -m src.notion.create_example_data
+```
+
+The script creates a podcast titled `AI Transformation in Business` and links
+these expressions to it:
+
+- `take ownership`
+- `move the needle`
+- `operational leverage`
+
+### Mode 2: Codex Assisted Setup
+
+Use this path when you are developing inside Codex and have connected the Notion
+plugin.
+
+1. Connect the Notion plugin in Codex.
+2. Ask Codex to create or inspect the English Podcast Learning workspace.
+3. Let Codex create the three Notion databases and validate their properties.
+4. Copy the resulting database IDs into `.env` if you want to run the local CLI.
+5. Run `python -m src.notion.check_workspace` to confirm the local project can
+   access the same workspace.
+
+You can print the onboarding checklist from the CLI:
+
+```bash
+python -m src.notion.setup_workspace --print-onboarding
+```
+
+### Load Notion Configuration In Code
 
 Use the shared config module for all Notion integrations:
 
@@ -115,40 +184,6 @@ The mapping format is:
 
 If required values are missing, the config module raises a clear
 `NotionConfigError` with the missing variable name and next step.
-
-### 6. Validate the Notion workspace
-
-Run the read-only workspace checker after initialization:
-
-```bash
-python -m src.notion.check_workspace
-```
-
-Expected successful output:
-
-```text
-✓ Podcast Library
-✓ Expression Database
-✓ Weekly Review
-
-Missing:
-None
-```
-
-### 7. Create sample learning data
-
-Create one sample podcast and three linked expressions:
-
-```bash
-python -m src.notion.create_example_data
-```
-
-The script creates a podcast titled `AI Transformation in Business` and links
-these expressions to it:
-
-- `take ownership`
-- `move the needle`
-- `operational leverage`
 
 ## Transcript Highlight Mapping
 
