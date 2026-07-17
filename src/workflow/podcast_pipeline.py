@@ -1,8 +1,8 @@
-"""CLI podcast processing pipeline for Notion publishing.
+"""Legacy CLI publisher for precomputed podcast learning JSON.
 
-The pipeline is intentionally modular: audio extraction, transcription, and AI
-analysis are represented as replaceable stages, while the Notion publishing
-workflow is implemented end to end.
+The canonical user-facing entrypoint is ``python3 src/main.py``. This module is
+kept as a small development tool for publishing already prepared transcript and
+learning-analysis JSON fixtures.
 
 Current CLI usage expects precomputed transcript and analysis JSON files:
 
@@ -22,7 +22,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Any, Protocol, Sequence, TYPE_CHECKING
+from typing import Any, Optional, Protocol, Sequence, TYPE_CHECKING
 
 from src.notion.config import NotionConfigError, load_notion_config
 from src.notion.renderers import (
@@ -41,11 +41,10 @@ class PipelineError(RuntimeError):
 @dataclass(frozen=True)
 class PodcastMetadata:
     title: str
-    source_url: str | None
+    source_url: Optional[str]
     source_type: str
-    topic: str | None = None
-    difficulty: str | None = None
-    media_url: str | None = None
+    topic: Optional[str] = None
+    difficulty: Optional[str] = None
     processed_date: str = field(default_factory=lambda: date.today().isoformat())
 
 
@@ -70,15 +69,14 @@ class LearningExpression:
 class LearningAnalysis:
     summary: str
     expressions: list[LearningExpression]
-    short_summary: str | None = None
-    ai_summary: str | None = None
+    short_summary: Optional[str] = None
+    ai_summary: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class PipelineResult:
     podcast_page_id: str
     expression_page_ids: list[str]
-    weekly_review_page_id: str
 
 
 class AudioExtractor(Protocol):
@@ -156,7 +154,7 @@ def rich_text_value(text: str) -> dict[str, Any]:
     return {"rich_text": [{"type": "text", "text": {"content": text[:2000]}}]}
 
 
-def select_value(name: str | None) -> dict[str, Any]:
+def select_value(name: Optional[str]) -> dict[str, Any]:
     return {"select": {"name": name}} if name else {"select": None}
 
 
@@ -164,7 +162,7 @@ def date_value(value: str) -> dict[str, Any]:
     return {"date": {"start": value}}
 
 
-def url_value(value: str | None) -> dict[str, Any]:
+def url_value(value: Optional[str]) -> dict[str, Any]:
     return {"url": value}
 
 
@@ -261,13 +259,12 @@ def expression_payload(expression: LearningExpression) -> dict[str, str]:
 
 
 class NotionPodcastPublisher:
-    """Publish podcast learning output to the configured Notion workspace."""
+    """Publish precomputed podcast learning output to Notion."""
 
-    def __init__(self, notion: "Client", podcast_db_id: str, expression_db_id: str, weekly_db_id: str):
+    def __init__(self, notion: "Client", podcast_db_id: str, expression_db_id: str):
         self.notion = notion
         self.podcast_db_id = podcast_db_id
         self.expression_db_id = expression_db_id
-        self.weekly_db_id = weekly_db_id
 
     def create_podcast_page(
         self,
@@ -336,70 +333,8 @@ class NotionPodcastPublisher:
                 summary=analysis.summary,
                 transcript=transcript.text,
                 expressions=[expression_payload(expression) for expression in expressions],
-                media_url=metadata.media_url or metadata.source_url,
-                media_type=metadata.source_type,
             ),
         )
-
-    def find_weekly_review_page(self, week_title: str) -> str | None:
-        response = self.notion.databases.query(
-            database_id=self.weekly_db_id,
-            filter={"property": "Week", "title": {"equals": week_title}},
-            page_size=1,
-        )
-        results = response.get("results", [])
-        if not results:
-            return None
-        return results[0].get("id")
-
-    def upsert_weekly_review(
-        self,
-        metadata: PodcastMetadata,
-        podcast_page_id: str,
-        expression_count: int,
-        analysis: LearningAnalysis,
-    ) -> str:
-        week_title = iso_week_title(metadata.processed_date)
-        existing_page_id = self.find_weekly_review_page(week_title)
-        summary = analysis.ai_summary or analysis.summary
-
-        if existing_page_id:
-            existing_podcast_ids = self.get_relation_page_ids(
-                existing_page_id, "Podcasts"
-            )
-            merged_ids = list(dict.fromkeys([*existing_podcast_ids, podcast_page_id]))
-            self.notion.pages.update(
-                page_id=existing_page_id,
-                properties={
-                    "Podcasts": relation_value(merged_ids),
-                    "Expression Count": {"number": expression_count},
-                    "Vocabulary Count": {"number": expression_count},
-                    "AI Summary": rich_text_value(
-                        f"Updated with {metadata.title}. "
-                        f"New expressions this run: {expression_count}. {summary}"
-                    ),
-                },
-            )
-            return existing_page_id
-
-        response = self.notion.pages.create(
-            parent={"data_source_id": self.weekly_db_id},
-            properties={
-                "Week": title_value(week_title),
-                "Date": date_value(metadata.processed_date),
-                "Podcasts": relation_value([podcast_page_id]),
-                "Expression Count": {"number": expression_count},
-                "Vocabulary Count": {"number": expression_count},
-                "AI Summary": rich_text_value(
-                    f"Processed {metadata.title}. "
-                    f"New expressions this run: {expression_count}. {summary}"
-                ),
-            },
-        )
-        page_id = response.get("id")
-        if not page_id:
-            raise PipelineError("Notion did not return an ID for the weekly review.")
-        return page_id
 
     def get_relation_page_ids(self, page_id: str, property_name: str) -> list[str]:
         page = self.notion.pages.retrieve(page_id=page_id)
@@ -409,11 +344,6 @@ class NotionPodcastPublisher:
             .get("relation", [])
         )
         return [item["id"] for item in relation if "id" in item]
-
-def iso_week_title(date_string: str) -> str:
-    year, week_number, _ = date.fromisoformat(date_string).isocalendar()
-    return f"{year}-W{week_number:02d}"
-
 
 def create_notion_publisher() -> NotionPodcastPublisher:
     try:
@@ -429,7 +359,6 @@ def create_notion_publisher() -> NotionPodcastPublisher:
         notion=Client(auth=config.token),
         podcast_db_id=config.podcast_database_id,
         expression_db_id=config.expression_database_id,
-        weekly_db_id=config.weekly_database_id,
     )
 
 
@@ -446,13 +375,9 @@ def publish_learning_result(
     publisher.insert_highlighted_transcript(
         podcast_page_id, transcript, analysis, analysis.expressions
     )
-    weekly_review_page_id = publisher.upsert_weekly_review(
-        metadata, podcast_page_id, len(analysis.expressions), analysis
-    )
     return PipelineResult(
         podcast_page_id=podcast_page_id,
         expression_page_ids=expression_page_ids,
-        weekly_review_page_id=weekly_review_page_id,
     )
 
 
@@ -480,7 +405,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--topic", help="Podcast topic.")
     parser.add_argument("--difficulty", help="Learning difficulty.")
-    parser.add_argument("--media-url", help="Audio or video URL to show in the page body.")
     parser.add_argument(
         "--date",
         default=date.today().isoformat(),
@@ -511,7 +435,6 @@ def main() -> int:
             source_type=args.source_type,
             topic=args.topic,
             difficulty=args.difficulty,
-            media_url=args.media_url,
             processed_date=args.date,
         )
         transcript = load_transcript(args.transcript_file)
@@ -527,7 +450,6 @@ def main() -> int:
 
     print("Podcast pipeline completed:")
     print(f"Podcast page: {result.podcast_page_id}")
-    print(f"Weekly review page: {result.weekly_review_page_id}")
     print("Expression pages:")
     for page_id in result.expression_page_ids:
         print(f"- {page_id}")

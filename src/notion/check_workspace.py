@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from src.notion.config import NotionConfigError, load_notion_config
 from src.notion.schema import REQUIRED_DATABASE_PROPERTIES
@@ -29,7 +29,7 @@ class DatabaseValidationResult:
     exists: bool = False
     missing_properties: list[str] = field(default_factory=list)
     type_mismatches: list[str] = field(default_factory=list)
-    error: str | None = None
+    error: Optional[str] = None
 
     @property
     def is_valid(self) -> bool:

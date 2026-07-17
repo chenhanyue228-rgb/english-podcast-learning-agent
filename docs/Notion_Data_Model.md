@@ -29,9 +29,8 @@ Page body order:
 
 1. `Summary`
 2. `Expressions`
-3. `Media`
-4. `Highlight Legend`
-5. `Highlighted Transcript`
+3. `Highlight Legend`
+4. `Highlighted Transcript`
 
 `Short Summary` is a compact database-level summary for scanning. Body
 `Summary` is the structured article-level summary.
@@ -42,9 +41,7 @@ highlighted with its category color. Each table has:
 - `Expression`
 - `Meaning`
 - `Usage Context`
-
-`Media` is reserved for the source audio/video file or URL. If unavailable, it
-shows `Not provided yet`.
+- `Commonness`
 
 ## Expression Database
 
@@ -52,6 +49,7 @@ Properties:
 
 - `Expression`
 - `Category`
+- `Commonness`
 - `Source Podcast`
 - `Review Status`
 
@@ -59,9 +57,10 @@ Page body order:
 
 1. `Meaning`
 2. `Usage Context`
-3. `Context Sentence`
-4. `Example`
-5. `Highlight Color`
+3. `Commonness`
+4. `Context Sentence`
+5. `Example`
+6. `Highlight Color`
 
 `Source Podcast` is the only relation needed between Expression records and the
 Podcast Library. The Podcast page body already displays extracted expressions,
@@ -78,9 +77,8 @@ Properties:
 - `Vocabulary Count`
 - `AI Summary`
 
-Weekly review statistics are written by the workflow. They are not rollups from
-Podcast Library because Podcast pages intentionally do not expose expression
-relations as properties.
+Weekly Review is kept in the workspace schema for future review features. The
+current main pipeline does not write weekly review pages.
 
 ## Highlight Colors
 
@@ -90,8 +88,8 @@ relations as properties.
 - Purple: Collocations
 - Orange: Sentence patterns
 
-Only Green, Blue, and Yellow are shown in the default Podcast `Highlight Legend`
-for now, because those are the primary transcript highlight categories.
+The Podcast `Highlight Legend` should show all five categories so it matches
+the Expression Database categories and transcript highlights.
 
 ## Implementation Files
 
@@ -102,5 +100,7 @@ for now, because those are the primary transcript highlight categories.
   canonical schema.
 - `src/notion/create_example_data.py`: creates sample data using the canonical
   schema and renderers.
-- `src/workflow/podcast_pipeline.py`: orchestrates podcast processing and
-  delegates all page layout to the renderers.
+- `src/notion/learning_publisher.py`: creates complete Podcast Library pages
+  and linked Expression Database pages.
+- `src/main.py`: canonical CLI entrypoint for extraction, transcription, Codex
+  analysis handoff, and complete Notion publishing.

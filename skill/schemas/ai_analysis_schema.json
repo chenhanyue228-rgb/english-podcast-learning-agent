@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "English Podcast AI Analysis Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "podcast_metadata", "learning_items", "learning_notes"],
+  "properties": {
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["english", "chinese", "key_points"],
+      "properties": {
+        "english": { "type": "string" },
+        "chinese": { "type": "string" },
+        "key_points": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "podcast_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "topic", "difficulty", "short_summary"],
+      "properties": {
+        "title": { "type": "string" },
+        "topic": { "type": "string" },
+        "difficulty": {
+          "type": "string",
+          "enum": ["Beginner", "Intermediate", "Advanced"]
+        },
+        "short_summary": { "type": "string" }
+      }
+    },
+    "learning_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "category",
+          "meaning",
+          "chinese_meaning",
+          "usage_context",
+          "context_sentence",
+          "example_sentence",
+          "commonness",
+          "highlight_color"
+        ],
+        "properties": {
+          "text": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": [
+              "Native Expression",
+              "Business Phrase",
+              "Industry Term",
+              "Collocation",
+              "Sentence Pattern"
+            ]
+          },
+          "meaning": { "type": "string" },
+          "chinese_meaning": { "type": "string" },
+          "usage_context": { "type": "string" },
+          "context_sentence": { "type": "string" },
+          "example_sentence": { "type": "string" },
+          "commonness": {
+            "type": "string",
+            "enum": ["High", "Medium", "Low"]
+          },
+          "highlight_color": {
+            "type": "string",
+            "enum": ["green", "blue", "yellow", "purple", "orange"]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "learning_notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "note", "chinese_note"],
+        "properties": {
+          "title": { "type": "string" },
+          "note": { "type": "string" },
+          "chinese_note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from src.analyzer.highlight_mapper import map_highlights_to_paragraph_blocks
 from src.notion.schema import HIGHLIGHT_LEGEND, category_color
@@ -10,6 +10,14 @@ from src.notion.schema import HIGHLIGHT_LEGEND, category_color
 
 def plain_text(text: str) -> dict[str, Any]:
     return {"type": "text", "text": {"content": text}}
+
+
+def bold_text(text: str) -> dict[str, Any]:
+    return {
+        "type": "text",
+        "text": {"content": text},
+        "annotations": {"bold": True},
+    }
 
 
 def highlighted_label(text: str, color: str) -> dict[str, Any]:
@@ -73,7 +81,10 @@ def expression_table_block(expressions: Sequence[Mapping[str, Any]]) -> dict[str
                 "cells": [
                     table_cell(plain_text("Expression")),
                     table_cell(plain_text("Meaning")),
+                    table_cell(plain_text("Chinese Meaning")),
                     table_cell(plain_text("Usage Context")),
+                    table_cell(plain_text("Commonness")),
+                    table_cell(plain_text("Example")),
                 ]
             },
         }
@@ -86,14 +97,29 @@ def expression_table_block(expressions: Sequence[Mapping[str, Any]]) -> dict[str
                 "table_row": {
                     "cells": [
                         table_cell(
-                            plain_text(
+                            bold_text(
                                 expression_value(expression, "expression", "text")
                             )
                         ),
                         table_cell(plain_text(expression_value(expression, "meaning"))),
                         table_cell(
+                            plain_text(expression_value(expression, "chinese_meaning"))
+                        ),
+                        table_cell(
                             plain_text(
                                 expression_value(expression, "usage_context", "usage")
+                            )
+                        ),
+                        table_cell(
+                            plain_text(expression_value(expression, "commonness"))
+                        ),
+                        table_cell(
+                            plain_text(
+                                expression_value(
+                                    expression,
+                                    "example_sentence",
+                                    "example",
+                                )
                             )
                         ),
                     ]
@@ -105,7 +131,7 @@ def expression_table_block(expressions: Sequence[Mapping[str, Any]]) -> dict[str
         "object": "block",
         "type": "table",
         "table": {
-            "table_width": 3,
+            "table_width": 6,
             "has_column_header": True,
             "has_row_header": False,
             "children": rows,
@@ -167,8 +193,6 @@ def podcast_body_blocks(
     summary: str,
     transcript: str,
     expressions: Sequence[Mapping[str, Any]],
-    media_url: str | None = None,
-    media_type: str | None = None,
 ) -> list[dict[str, Any]]:
     blocks = [
         heading(2, [plain_text("Summary")]),
@@ -176,15 +200,6 @@ def podcast_body_blocks(
         heading(2, [plain_text("Expressions")]),
         *expression_category_table_blocks(expressions),
     ]
-
-    media_label = media_type or "Media"
-    media_text = f"{media_label}: {media_url}" if media_url else "Not provided yet"
-    blocks.extend(
-        [
-            heading(2, [plain_text("Media")]),
-            paragraph([plain_text(media_text)]),
-        ]
-    )
 
     blocks.extend(
         [
@@ -212,6 +227,8 @@ def expression_body_blocks(
     return [
         heading(2, [plain_text("Meaning")]),
         paragraph([plain_text(expression_value(expression, "meaning"))]),
+        heading(2, [plain_text("Chinese Meaning")]),
+        paragraph([plain_text(expression_value(expression, "chinese_meaning"))]),
         heading(2, [plain_text("Usage Context")]),
         paragraph(
             [
@@ -221,6 +238,8 @@ def expression_body_blocks(
                 )
             ]
         ),
+        heading(2, [plain_text("Commonness")]),
+        paragraph([plain_text(expression_value(expression, "commonness"))]),
         heading(2, [plain_text("Context Sentence")]),
         quote([plain_text(context_sentence)]),
         heading(2, [plain_text("Example")]),

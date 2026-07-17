@@ -1,1 +1,5 @@
 notion-client>=2.2.1
+yt-dlp>=2025.1.15
+faster-whisper>=1.1.0
+feedparser>=6.0.11
+pytest>=8.0.0

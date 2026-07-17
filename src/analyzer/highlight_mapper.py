@@ -137,7 +137,7 @@ def highlighted_rich_text(text: str, color: str) -> dict[str, Any]:
     return {
         "type": "text",
         "text": {"content": text},
-        "annotations": {"color": color},
+        "annotations": {"color": color, "bold": True},
     }
 
 

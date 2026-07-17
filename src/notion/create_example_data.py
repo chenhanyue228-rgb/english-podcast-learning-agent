@@ -41,6 +41,7 @@ SAMPLE_EXPRESSIONS = [
         "context": SAMPLE_TRANSCRIPT,
         "example": SAMPLE_TRANSCRIPT,
         "color": "Blue",
+        "commonness": "High",
     },
     {
         "expression": "move the needle",
@@ -50,6 +51,7 @@ SAMPLE_EXPRESSIONS = [
         "context": SAMPLE_TRANSCRIPT,
         "example": SAMPLE_TRANSCRIPT,
         "color": "Green",
+        "commonness": "High",
     },
     {
         "expression": "operational leverage",
@@ -59,6 +61,7 @@ SAMPLE_EXPRESSIONS = [
         "context": SAMPLE_TRANSCRIPT,
         "example": SAMPLE_TRANSCRIPT,
         "color": "Yellow",
+        "commonness": "Medium",
     },
 ]
 
@@ -111,7 +114,6 @@ def create_podcast_page(notion: "Client", podcast_database_id: str) -> str:
                 summary=SAMPLE_SUMMARY,
                 transcript=SAMPLE_TRANSCRIPT,
                 expressions=SAMPLE_EXPRESSIONS,
-                media_url=None,
             ),
         )
     except Exception as exc:

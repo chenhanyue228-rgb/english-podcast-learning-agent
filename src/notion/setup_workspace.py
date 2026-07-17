@@ -16,7 +16,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from notion_client import APIResponseError, Client
 
@@ -27,7 +27,12 @@ from src.notion.config import (
     NotionConfigError,
     load_dotenv,
 )
-from src.notion.schema import EXPRESSION_CATEGORIES, REVIEW_STATUSES, SOURCE_TYPES
+from src.notion.schema import (
+    COMMONNESS_LEVELS,
+    EXPRESSION_CATEGORIES,
+    REVIEW_STATUSES,
+    SOURCE_TYPES,
+)
 
 
 class WorkspaceSetupError(RuntimeError):
@@ -66,7 +71,7 @@ def normalize_notion_id(value: str) -> str:
     ).lower()
 
 
-def create_notion_client(token: str | None = None) -> Client:
+def create_notion_client(token: Optional[str] = None) -> Client:
     notion_token = token or os.getenv(NOTION_TOKEN_ENV)
     if not notion_token:
         raise WorkspaceSetupError(
@@ -164,6 +169,7 @@ def create_base_databases(notion: Client, parent_page_id: str) -> dict[str, str]
                     *EXPRESSION_CATEGORIES,
                 ]
             ),
+            "Commonness": select_property(COMMONNESS_LEVELS),
             "Review Status": select_property(REVIEW_STATUSES),
         },
     )
@@ -233,7 +239,7 @@ def update_env_file(values: dict[str, str], path: Path = ENV_PATH) -> None:
     path.write_text(f"{content}\n", encoding="utf-8")
 
 
-def setup_workspace(parent_page_id: str, notion: Client | None = None) -> dict[str, str]:
+def setup_workspace(parent_page_id: str, notion: Optional[Client] = None) -> dict[str, str]:
     notion_client = notion or create_notion_client()
     normalized_parent_page_id = normalize_notion_id(parent_page_id)
     update_env_file({NOTION_PARENT_PAGE_ID_ENV: normalized_parent_page_id})

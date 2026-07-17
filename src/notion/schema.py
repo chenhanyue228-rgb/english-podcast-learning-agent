@@ -21,6 +21,7 @@ EXPRESSION_CATEGORIES = [
     "Sentence Pattern",
 ]
 REVIEW_STATUSES = ["New", "Learning", "Mastered"]
+COMMONNESS_LEVELS = ["High", "Medium", "Low"]
 
 CATEGORY_COLORS = {
     "Native Expression": "Green",
@@ -34,6 +35,8 @@ HIGHLIGHT_LEGEND = [
     ("Green", "Native expressions"),
     ("Blue", "Business phrases"),
     ("Yellow", "Industry terms"),
+    ("Purple", "Collocations"),
+    ("Orange", "Sentence patterns"),
 ]
 
 REQUIRED_DATABASE_PROPERTIES: dict[str, dict[str, str]] = {
@@ -49,6 +52,7 @@ REQUIRED_DATABASE_PROPERTIES: dict[str, dict[str, str]] = {
     EXPRESSION_DATABASE: {
         "Expression": "title",
         "Category": "select",
+        "Commonness": "select",
         "Source Podcast": "relation",
         "Review Status": "select",
     },

@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "required": ["week", "date", "statistics", "summary", "key_learning_points", "recommended_review"],
+  "properties": {
+    "week": { "type": "string" },
+    "date": { "type": "string" },
+    "statistics": {
+      "type": "object",
+      "required": ["podcast_count", "expression_count", "category_distribution"],
+      "properties": {
+        "podcast_count": { "type": "integer" },
+        "expression_count": { "type": "integer" },
+        "category_distribution": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["english", "chinese"],
+      "properties": {
+        "english": { "type": "string" },
+        "chinese": { "type": "string" }
+      }
+    },
+    "key_learning_points": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "recommended_review": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["expression", "reason"],
+        "properties": {
+          "expression": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  }
+}

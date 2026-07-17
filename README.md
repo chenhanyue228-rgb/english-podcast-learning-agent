@@ -1,123 +1,109 @@
 # English Podcast Learning Agent
 
-AI agent for converting English podcasts into structured English learning
-materials stored in Notion.
+Codex Skill for turning English podcasts, YouTube videos, direct audio links,
+or local audio files into structured English learning materials in Notion.
 
-## Notion Setup
+The project has two layers:
 
-The project supports two onboarding modes:
+- Python handles source detection, audio download, transcription, JSON
+  validation, and Notion publishing.
+- Codex handles AI learning analysis with local prompt and schema files. Python
+  does not call OpenAI or any external LLM API directly.
 
-- **Mode 1: Guided Local Setup** is the recommended path for users who want to
-  run the Python CLI independently. It uses the official Notion API SDK and a
-  `NOTION_TOKEN` stored in `.env`.
-- **Mode 2: Codex Assisted Setup** is useful while working inside Codex with the
-  Notion plugin connected. Codex can help create or inspect the workspace, but
-  the local Python project still needs `.env` values for independent CLI runs.
+Execution modes:
 
-The Notion plugin and the Python `notion-client` SDK are different layers. The
-plugin helps Codex act on your workspace interactively. The SDK is what this
-project uses when you run commands such as `python -m src.notion.setup_workspace`
-or `python -m src.workflow...`.
+- If you run the local Python CLI or tests, the project behaves like a normal
+  backend app and only uses the files and APIs you already configured.
+- If you ask Codex to fetch real podcast URLs, download audio, or publish to
+  Notion from inside the Codex environment, that action may trigger Codex
+  approval checks. Those checks are about the runtime environment, not the
+  project code.
+- If an approval check fails, it usually means the Codex/OpenAI organization
+  permissions are not ready yet, or the approval path has not propagated. The
+  local project may still work normally when you run it directly in your own
+  terminal.
 
-Data model principle:
+## Current Flow
 
-- Database properties store metadata for filtering, relations, and statistics.
-- Long transcript content lives in the podcast page body, not in database properties.
-- Highlighted expressions, business phrases, and industry terms are annotated in
-  the transcript body with Notion background colors.
-- Expression records remain in `Expression Database` so they can be reviewed,
-  counted, and related across podcasts.
-- Expression page properties are limited to review metadata. Meaning, context
-  sentence, example, and highlight color live in the expression page body.
-
-Canonical databases:
-
-- `Podcast Library`
-  - Properties: `Title`, `URL`, `Source Type`, `Date`, `Topic`, `Difficulty`, `Short Summary`
-  - Body order: `Summary`, `Expressions`, `Media`, `Highlight Legend`, `Highlighted Transcript`
-  - `Short Summary` is a compact database-level summary for scanning.
-  - Body `Summary` is the structured article-level summary.
-  - `Media` is reserved for the source audio/video file or URL.
-  - `Expressions` is rendered as one table per category. Category headings carry
-    the same highlight color used in the transcript.
-- `Expression Database`
-  - Properties: `Expression`, `Category`, `Source Podcast`, `Review Status`
-  - Body: `Meaning`, `Usage Context`, `Context Sentence`, `Example`, `Highlight Color`
-  - `Context Sentence` means the local sentence where the expression appears,
-    not the full transcript.
-- `Weekly Review`
-  - Properties: `Week`, `Date`, `Podcasts`, `Expression Count`, `Vocabulary Count`, `AI Summary`
-
-See [docs/Notion_Data_Model.md](docs/Notion_Data_Model.md) for the full data
-model contract used by setup, validation, sample data, and the podcast
-pipeline.
-
-### Mode 1: Guided Local Setup
-
-#### 1. Install dependencies
-
-```bash
-pip install -r requirements.txt
+```text
+User source
+-> Source router
+-> Source resolver / audio downloader
+-> Audio validation
+-> Whisper transcript
+-> Codex AI analysis request JSON
+-> Codex-generated analysis JSON
+-> Complete Notion Podcast Library page
+-> Linked Expression Database pages
 ```
 
-#### 2. Create a Notion integration
+Supported user inputs:
 
-Create an internal Notion integration, copy its secret token, and share the
-parent Notion page with that integration. The initializer creates databases
-inside that parent page.
+- YouTube URL
+- Apple Podcasts episode URL
+- Podcast RSS URL
+- Direct audio URL
+- Local audio file
 
-#### 3. Configure environment variables
+Generic podcast platform pages are not supported yet. Podcast page URL support
+currently means Apple Podcasts episode URLs.
 
-Copy the example file and fill in your token:
+## Setup
+
+Install dependencies:
+
+```bash
+python3 scripts/bootstrap_environment.py
+```
+
+To only install dependencies:
+
+```bash
+python3 scripts/bootstrap_environment.py --skip-tests
+```
+
+Copy the environment template:
 
 ```bash
 cp .env.example .env
 ```
 
-Required before initialization:
+Fill in Notion values:
 
 ```bash
 NOTION_TOKEN=
-```
-
-You can also add the parent page ID to `.env`:
-
-```bash
 NOTION_PARENT_PAGE_ID=
-```
-
-`NOTION_PARENT_PAGE_ID` accepts either a raw Notion page ID or the full copied
-Notion page URL. You can also pass it directly on the command line.
-
-#### 4. Initialize the Notion workspace
-
-```bash
-python -m src.notion.setup_workspace --parent-page-id <notion_page_url_or_id>
-```
-
-The script creates:
-
-- Podcast Library
-- Expression Database
-- Weekly Review
-
-After creation, the script prints the database IDs and saves them into `.env`:
-
-```bash
 NOTION_PODCAST_LIBRARY_DATABASE_ID=
 NOTION_EXPRESSION_DATABASE_ID=
 NOTION_WEEKLY_REVIEW_DATABASE_ID=
 ```
 
-#### 5. Validate the Notion workspace
+`NOTION_PARENT_PAGE_ID` is only needed when creating the workspace. It accepts a
+raw Notion page ID or a copied Notion page URL.
 
-Run the read-only workspace checker after initialization:
+## Notion Workspace
+
+Initialize the Notion databases:
 
 ```bash
-python -m src.notion.check_workspace
+python3 -m src.notion.setup_workspace --parent-page-id <notion_page_url_or_id>
 ```
 
-Expected successful output:
+The initializer creates:
+
+- `Podcast Library`
+- `Expression Database`
+- `Weekly Review`
+
+It prints the database IDs and saves them into `.env`.
+
+Validate the workspace:
+
+```bash
+python3 -m src.notion.check_workspace
+```
+
+Expected output:
 
 ```text
 ✓ Podcast Library
@@ -128,88 +114,130 @@ Missing:
 None
 ```
 
-#### 6. Create sample learning data
-
-Create one sample podcast and three linked expressions:
+Create sample learning data:
 
 ```bash
-python -m src.notion.create_example_data
+python3 -m src.notion.create_example_data
 ```
 
-The script creates a podcast titled `AI Transformation in Business` and links
-these expressions to it:
+## Run The Main Pipeline
 
-- `take ownership`
-- `move the needle`
-- `operational leverage`
-
-### Mode 2: Codex Assisted Setup
-
-Use this path when you are developing inside Codex and have connected the Notion
-plugin.
-
-1. Connect the Notion plugin in Codex.
-2. Ask Codex to create or inspect the English Podcast Learning workspace.
-3. Let Codex create the three Notion databases and validate their properties.
-4. Copy the resulting database IDs into `.env` if you want to run the local CLI.
-5. Run `python -m src.notion.check_workspace` to confirm the local project can
-   access the same workspace.
-
-You can print the onboarding checklist from the CLI:
+Step 1: extract audio, transcribe, and create a Codex analysis request.
 
 ```bash
-python -m src.notion.setup_workspace --print-onboarding
+python3 src/main.py "<source>"
 ```
 
-### Load Notion Configuration In Code
+This writes:
 
-Use the shared config module for all Notion integrations:
+- transcript JSON under `data/transcripts/`
+- analysis request JSON under `data/analysis_requests/`
 
-```python
-from src.notion.config import load_notion_config
+It does not create a partial Notion learning page. A Notion page should only be
+created after Codex has produced complete AI analysis JSON.
 
-config = load_notion_config()
-database_ids = config.database_mapping
-```
+Step 2: Codex reads the generated analysis request, uses the Skill prompts and
+schema, and saves analysis JSON under `data/analysis/`.
 
-The mapping format is:
+Relevant files:
 
-```python
-{
-    "podcast_database_id": "...",
-    "expression_database_id": "...",
-    "weekly_database_id": "...",
-}
-```
+- `skill/prompts/metadata_prompt.md`
+- `skill/prompts/summary_prompt.md`
+- `skill/prompts/expression_prompt.md`
+- `skill/schemas/ai_analysis_schema.json`
 
-If required values are missing, the config module raises a clear
-`NotionConfigError` with the missing variable name and next step.
-
-## Transcript Highlight Mapping
-
-Use the analyzer highlight mapper to convert extracted expressions into Notion
-rich text:
-
-```python
-from src.analyzer.highlight_mapper import map_highlights_to_rich_text
-
-rich_text = map_highlights_to_rich_text(
-    "Companies need to take ownership of AI adoption.",
-    [{"text": "take ownership", "type": "Business Phrase", "color": "blue"}],
-)
-```
-
-The mapper supports multiple phrases, preserves the original transcript, avoids
-embedded substring matches, and returns rich text items that can be passed to
-Notion block/page APIs.
-
-## Podcast Pipeline CLI
-
-Run the modular podcast-to-Notion workflow with precomputed transcript and
-analysis JSON:
+Step 3: publish the complete learning page.
 
 ```bash
-python -m src.workflow.podcast_pipeline \
+python3 src/main.py "<source>" \
+  --transcript-json data/transcripts/<file>.json \
+  --analysis-json data/analysis/<file>.json
+```
+
+Using `--transcript-json` avoids rerunning audio extraction and Whisper.
+
+## Weekly Review Workflow
+
+Generate a Weekly Review request from the current week of Notion data:
+
+```bash
+python3 src/main.py --weekly-review
+```
+
+This creates a request file under `data/weekly_review_requests/` for Codex to
+turn into `weekly_review.json`.
+
+After Codex generates the weekly review JSON, publish it to Notion:
+
+```bash
+python3 src/main.py --weekly-review \
+  --weekly-review-json data/analysis/<week>.json
+```
+
+The Weekly Review workflow uses the existing `Weekly Review` database schema.
+No schema migration is needed for this phase.
+
+## Notion Data Model
+
+`Podcast Library` properties:
+
+- `Title`
+- `URL`
+- `Source Type`
+- `Date`
+- `Topic`
+- `Difficulty`
+- `Short Summary`
+
+Podcast page body order:
+
+1. `Summary`
+2. `Expressions`
+3. `Highlight Legend`
+4. `Highlighted Transcript`
+
+`Expression Database` properties:
+
+- `Expression`
+- `Category`
+- `Commonness`
+- `Source Podcast`
+- `Review Status`
+
+Expression page body:
+
+- `Meaning`
+- `Chinese Meaning`
+- `Usage Context`
+- `Commonness`
+- `Context Sentence`
+- `Example`
+- `Highlight Color`
+
+`Weekly Review` exists in the workspace schema for future review features, but
+the current main pipeline does not update it.
+
+See [docs/Notion_Data_Model.md](docs/Notion_Data_Model.md) for the full schema
+contract.
+
+## Developer Notes
+
+Run tests:
+
+```bash
+python3 -m pytest
+```
+
+Print runtime configuration without secrets:
+
+```bash
+python3 src/main.py --print-config
+```
+
+Use the legacy precomputed publisher only for development fixtures:
+
+```bash
+python3 -m src.workflow.podcast_pipeline \
   --title "AI Transformation in Business" \
   --source-type Podcast \
   --source-url "https://example.com/podcast" \
@@ -219,31 +247,4 @@ python -m src.workflow.podcast_pipeline \
   --analysis-file learning.json
 ```
 
-`transcript.json`:
-
-```json
-{
-  "text": "Companies need to take ownership of AI adoption."
-}
-```
-
-`learning.json`:
-
-```json
-{
-  "summary": "A business English podcast about AI adoption.",
-  "expressions": [
-    {
-      "text": "take ownership",
-      "type": "Business Phrase",
-      "meaning": "Accept responsibility",
-      "usage_context": "Used when accepting accountability for a task or outcome.",
-      "color": "blue"
-    }
-  ]
-}
-```
-
-The pipeline publishes the podcast page body, creates expression entries,
-relates each expression back to its source podcast, and creates or updates the
-weekly review page.
+The canonical user-facing entrypoint is `python3 src/main.py`.
