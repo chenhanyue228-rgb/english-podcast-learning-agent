@@ -111,14 +111,17 @@ Codex should be used for reasoning and content generation.
 
 ### Step 1: Install the Skill
 
-In Codex, use the supported Skill installer:
+Install this Skill via the Codex Skills UI or a supported installer. For the
+primary user path:
 
-```text
-Use $skill-installer to install english-audio-learning-agent from https://github.com/chenhanyue228-rgb/english-podcast-learning-agent/tree/main/skill
-```
+1. Open the **Skills** panel.
+2. Click **Create**.
+3. Choose **Upload from your computer** and select the repository's `skill/`
+   directory.
+4. Save the Skill.
+5. Open a new task. If discovery does not refresh, fully quit and restart
+   Codex.
 
-The Skill becomes available on the next Codex turn. If Codex does not discover
-it, fully quit and reopen Codex, then start a new task in this repository.
 Verify discovery with:
 
 ```text
@@ -127,11 +130,6 @@ Use $english-audio-learning-agent to list supported inputs
 
 The expected inputs are Apple Podcasts episode URLs, podcast RSS feeds, and
 local audio files.
-
-Developer-only fallback: repository contributors may link `skill/` to
-`$HOME/.codex/skills/english-audio-learning-agent` when they need working-tree
-edits to appear immediately. This is not the primary end-user installation
-path, and an existing destination must be inspected before replacement.
 
 ### Step 2: Configure the Environment
 

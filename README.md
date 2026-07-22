@@ -71,15 +71,17 @@ If you only want dependencies:
 
 ### 2. Install the Codex Skill
 
-In Codex, use the supported Skill installer with this exact request:
+#### Primary (User Path)
 
-```text
-Use $skill-installer to install english-audio-learning-agent from https://github.com/chenhanyue228-rgb/english-podcast-learning-agent/tree/main/skill
-```
+Use the Codex Skills UI:
 
-The installer copies the repository's `skill/` directory into the Codex user
-Skill directory. The Skill becomes available on the next Codex turn. If it is
-not discovered, fully quit and reopen Codex, then start a new task.
+1. Open the **Skills** panel in Codex.
+2. Click **Create**.
+3. Choose **Upload from your computer** and select this repository's `skill/`
+   directory.
+4. Save the Skill.
+5. Open a new Codex task. If the Skill is not discovered, fully quit and
+   restart Codex before trying again.
 
 Verify discovery with:
 
@@ -90,7 +92,7 @@ Use $english-audio-learning-agent to list supported inputs
 Codex should list Apple Podcasts episode URLs, podcast RSS feeds, and local
 audio files.
 
-#### Developer-only local fallback
+#### Advanced / Developer Setup
 
 Repository contributors who need local edits to appear immediately may expose
 the working tree with a symbolic link:
@@ -100,8 +102,9 @@ mkdir -p "$HOME/.codex/skills"
 ln -s "$(pwd)/skill" "$HOME/.codex/skills/english-audio-learning-agent"
 ```
 
-This symlink is not the primary end-user installation path. Inspect an existing
-destination before replacing it.
+This Developer-only symlink is not the default onboarding path and does not
+replace the Skills UI flow. Inspect an existing destination before replacing
+it.
 
 ### 3. Configure Notion
 

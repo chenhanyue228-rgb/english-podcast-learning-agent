@@ -31,7 +31,7 @@ personal learning data, or a live Notion workspace.
 ### PV-001: Skill installation and discovery
 
 - Added valid Skill frontmatter and regression coverage.
-- Made `$skill-installer` the primary user-facing installation route.
+- Defined the Codex Skills UI as the primary user-facing installation route.
 - Added explicit next-turn/restart guidance and the
   `$english-audio-learning-agent` discovery check.
 - Moved the local symbolic-link method to a Developer-only fallback.
@@ -75,26 +75,39 @@ Canonical status files were not modified. `ARCHITECTURE.md` was inspected and
 already states that Weekly Review stores the final Weekly Reflection, so no
 architecture edit was required.
 
-## Skill Installation Decision and Evidence
+## Skill Installation Contract
 
-The current Codex environment includes the system `$skill-installer`. Its
-documented helper supports installation from a GitHub repository path.
+The primary product path uses the Codex Skills UI: open Skills, choose Create,
+upload the local `skill/` directory, save, and open a new task or restart
+Codex. No file format or unverified command syntax is assumed.
 
-The helper was executed through Python against this repository's `skill/`
-directory on `fix/phase-4.1-onboarding-blockers`, using a temporary destination
-and the name `english-audio-learning-agent`. Installation completed and the
-installed manifest passed `quick_validate.py`.
-
-Equivalent helper invocation used for the technical check:
+The canonical discovery and invocation name is:
 
 ```text
-python $CODEX_HOME/skills/.system/skill-installer/scripts/install-skill-from-github.py --repo chenhanyue228-rgb/english-podcast-learning-agent --path skill --ref fix/phase-4.1-onboarding-blockers --dest <temporary-directory> --name english-audio-learning-agent
+$english-audio-learning-agent
 ```
 
-This is technical installation evidence, not Owner Acceptance. The README
-uses the product-level `$skill-installer` invocation rather than exposing the
-internal helper. The owner must still install from merged `main`, start the
-next Codex turn or restart Codex, and verify explicit Skill discovery.
+The symbolic-link instructions remain only as an Advanced / Developer Setup
+fallback. They are not the default user onboarding path.
+
+Installation path defined; verification pending Owner Acceptance. A prior
+helper-level copy and manifest check did not exercise the real Codex Skills UI
+end to end and is not treated as product installation verification.
+
+### Verification Status
+
+```text
+Skill installation:
+- method defined
+- not yet validated in real Codex UI
+
+Discovery:
+- command defined
+- requires owner confirmation
+
+Status:
+PENDING OWNER ACCEPTANCE
+```
 
 ## Weekly Review and Weekly Reflection Naming Contract
 
@@ -138,8 +151,8 @@ warnings**.
 
 ## Remaining Owner Acceptance Steps
 
-1. Install `english-audio-learning-agent` from merged `main` through
-   `$skill-installer`.
+1. Install `english-audio-learning-agent` from merged `main` through the Codex
+   Skills UI.
 2. Start the next Codex turn or restart Codex and verify
    `$english-audio-learning-agent` discovery.
 3. Create a disposable, non-production Notion parent page.
