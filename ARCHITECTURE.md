@@ -5,7 +5,9 @@ is implemented after the v1.1 runtime migration, not a future target design.
 
 ## 1. Architecture Status
 
-- Product phase: Phase 3 — Product Stabilization / Post v1.1
+- Stable baseline: v1.1.0
+- Stable baseline commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
+- Product phase: Phase 4 — Product Validation
 - Production AI runtime: Codex Artifact Runtime
 - Python role: deterministic orchestration and validation
 - Persistence layer: Notion
@@ -15,6 +17,11 @@ is implemented after the v1.1 runtime migration, not a future target design.
 Direct OpenAI providers may remain importable as deprecated compatibility
 paths. They are not the default production reasoning runtime and
 `OPENAI_API_KEY` is not required for the Codex Skill workflow.
+
+Phase 4 does not introduce an architecture change. The v1.1.0 architecture is
+frozen during initial Product Validation. User feedback may produce future
+proposals, but a proposal is not accepted until it passes Product and
+Architecture review.
 
 ## 2. System Purpose
 
@@ -241,19 +248,32 @@ The following behavior is stable and should remain protected:
 
 Experimental code must not be presented as the default production workflow.
 
-## 10. Current Development Direction
+## 10. Product Validation Boundary
 
-The current priority is creating a safe local v1.1 release baseline.
-Appropriate work includes:
+The current priority is Phase 4 clean-clone onboarding and first-user journey
+validation. The architecture remains unchanged.
 
-- excluding generated and local-only artifacts without deleting user data
-- classifying experimental and legacy paths without changing behavior
-- keeping documentation and runtime contracts aligned
-- organizing completed v1.1 work into reviewable local commits
+Allowed during Phase 4:
 
-New learning features, schema expansion, or Weekly Reflection redesign are not
-part of the stabilization phase. After the release baseline is reviewed, the
-next product phase is Phase 4 — Product Validation.
+- onboarding documentation improvement
+- usability fixes supported by observed user evidence
+- localized error-message improvement
+- diagnostic visibility
+- low-risk bug fixes supported by user evidence
+
+Not allowed without an explicit Architecture Decision:
+
+- new runtime providers
+- a new storage layer
+- automatic Vocabulary discovery as the primary workflow
+- returning YouTube to the v1 core scope
+- schema redesign
+- major workflow rewrites
+- Web application or cloud backend development
+
+Phase 3 stabilization remains a completed historical milestone. Product
+Validation findings may inform later proposals, but new feature development is
+not the default Phase 4 action.
 
 ## 11. References
 

@@ -2,38 +2,83 @@
 
 ## Phase
 
-Phase 3 — Product Stabilization / Post v1.1
+Phase 4 — Product Validation
 
-## Current Task
+## Stable Baseline
 
-Create a safe, reviewable local v1.1 release baseline. Classify the accumulated
-working tree, exclude private and generated files, organize completed work into
-logical local commits, and prepare a human-review report. Do not push or tag.
+- Release: v1.1.0
+- Main commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
+- Tests: 345 passed
+- Architecture: Stable
 
-## Completed
+## Current Sprint
+
+Phase 4.1 — Clean-Clone Onboarding Validation
+
+## Goal
+
+Determine whether a new user can independently complete:
+
+```text
+Repository access
+↓
+Environment setup
+↓
+Notion setup
+↓
+First audio input
+↓
+Codex artifact generation
+↓
+Notion learning-page publishing
+```
+
+## Current Tasks
+
+1. Test installation from a clean clone.
+2. Record every undocumented dependency or manual step.
+3. Validate Notion workspace setup.
+4. Validate the first Podcast or Local Audio journey.
+5. Measure time to the first successful Notion learning page.
+6. Create a first-user issue log.
+7. Prioritize only evidence-backed UX fixes.
+
+## Out of Scope
+
+- new major features
+- architecture redesign
+- YouTube support
+- cloud hosting
+- user accounts
+- payment
+- Web UI
+- automatic Vocabulary discovery
+- Weekly Reflection redesign
+
+## Completion Criteria
+
+- A clean clone can bootstrap successfully.
+- First-use instructions match actual behavior.
+- No real credentials are committed.
+- At least three external users are tested.
+- At least two users complete the core flow without developer intervention.
+- No unresolved P0 or P1 usability blocker remains.
+- Findings are recorded before the next feature sprint.
+
+## Completed Phase 3 Milestones
 
 - Pure Codex Runtime migration
-- Weekly Reflection redesign
-- Notion publishing stabilization
+- Weekly Reflection redesign and product acceptance
+- Notion publishing stabilization and idempotent PATCH verification
 - Podcast/RSS/Local Audio input validation
 - Human Highlight + AI Processing vocabulary workflow
 - Input scope freeze
 - Codex Skill and artifact contract documentation
-- Night stabilization audit
-- Documentation consistency review
-- 344-test regression verification
+- stabilization and release-baseline audits
+- documentation consistency review
+- v1.1.0 release verification: 345 tests, CLI smoke check, annotated tag
 
-## Next Phase
-
-Phase 4 — Product Validation
-
-## Future Priorities
-
-1. Skill UX validation
-2. Product onboarding refinement
-3. Learning asset reuse improvement
-
-## Vocabulary Database Strategy
+## Stable Product Boundary
 
 ```text
 Human Highlight
@@ -41,44 +86,23 @@ Human Highlight
 AI Processing
 ↓
 Vocabulary Database
-↓
-Future Review / Reuse
 ```
 
 The user decides what is personally worth learning. AI enriches, structures,
 and stores that selection; it must not automatically discover vocabulary as
 the primary workflow.
 
-## Stabilization Scope
+## Next Decision
 
-- Classify source, tests, documentation, generated artifacts, local-only files,
-  experimental code, and ambiguous files.
-- Audit all commit candidates for secrets and personal learning data.
-- Create logical local commits on the release-baseline branch.
-- Keep runtime documentation aligned with the actual Codex Artifact Runtime.
-- Identify duplicate or legacy modules without removing them prematurely.
-- Preserve the accepted Podcast, Vocabulary, Weekly Reflection, and Notion
-  behavior.
-- Produce `docs/release_baseline_report.md` before any push or tag.
+After Product Validation evidence is collected, choose one:
 
-## Do Not Change During Stabilization
+A. Continue improving Skill onboarding
 
-- Notion database schema
-- Weekly Reflection output and page structure
-- Codex artifact schemas
-- Podcast Library page structure
-- exact pink-highlight vocabulary capture behavior
-- production provider defaults
-- supported v1 input scope
+B. Prioritize Learning Asset Reuse
 
-## Definition of Done
+C. Prepare a broader beta
 
-- Repository status is understood and local artifacts are protected.
-- Completed v1.1 work is represented by reviewable local commits.
-- Documentation names one production runtime and one set of supported inputs.
-- Remaining compatibility paths are labeled clearly.
-- Full regression tests pass at the verified baseline.
-- The release baseline report documents exclusions and review-required files.
+D. Request an Architecture Decision
 
 ## Handoff
 
@@ -86,6 +110,8 @@ Read in this order:
 
 1. `PROJECT_CONTEXT.md`
 2. `ARCHITECTURE.md`
-3. `skill/SKILL.md`
-4. `docs/codex_skill_contract.md`
-5. `DECISION_LOG.md`
+3. `CURRENT_TASK.md`
+4. `docs/product_validation_plan.md`
+5. `skill/SKILL.md`
+6. `docs/codex_skill_contract.md`
+7. `DECISION_LOG.md`

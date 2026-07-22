@@ -110,3 +110,32 @@ should enrich, structure, and store the selected learning assets.
 - AI enrichment runs only after an explicit user highlight.
 - Python handles detection, validation, dedupe, and Notion persistence.
 - Automatic vocabulary discovery must not become the primary workflow.
+
+## DEC-005: Enter Phase 4 Product Validation After v1.1.0
+
+- Date: 2026-07-22
+- Status: Accepted
+
+### Decision
+
+After releasing and verifying v1.1.0, move the project from Product
+Stabilization to Product Validation.
+
+### Reason
+
+The core technical workflows, architecture, documentation baseline, and tests
+are stable. The main remaining uncertainty is whether new users can install,
+understand, and obtain value from the product without developer assistance.
+
+### Consequences
+
+- Architecture remains frozen during initial validation.
+- New feature development is not the default priority.
+- Onboarding and first-user evidence take precedence.
+- Product changes must be based on observed user problems.
+- Major workflow or architecture changes still require explicit review.
+
+### Exit Condition
+
+Phase 4 ends only after external-user evidence supports the next product
+direction.
