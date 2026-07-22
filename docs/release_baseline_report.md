@@ -4,13 +4,14 @@
 
 The local English Audio Learning Agent repository is ready for human review
 before push. Completed v1.1 implementation, tests, documentation, and repository
-hygiene are organized into four local commits on a dedicated branch. No remote
-push, tag, or GitHub release was created.
+hygiene are organized into five baseline commits on a dedicated branch. The
+final release gate was verified from a clean detached worktree containing only
+committed files. No remote push, tag, or GitHub release was created.
 
-The working tree is intentionally not completely clean. Four ambiguous or
-outdated diagnostic/design files remain untracked as `REVIEW_REQUIRED`; they
-were preserved and excluded instead of being deleted or committed
-automatically.
+The four previously untracked `REVIEW_REQUIRED` files were audited in full.
+Each was confirmed to be unreferenced legacy or local diagnostic material,
+backed up outside the repository, and removed from the working tree. No required
+v1.1 source remains untracked.
 
 ## Branch
 
@@ -30,8 +31,8 @@ Initial inventory:
 
 Final classification:
 
-- 149 files committed as completed v1.1 work
-- 4 files left untracked as `REVIEW_REQUIRED`
+- 150 files committed as completed v1.1 work
+- 0 files left untracked
 - generated and private runtime directories remain local and ignored
 - no staged or committed secret-bearing file was detected
 
@@ -41,6 +42,7 @@ Committed categories:
 - tests and read-only diagnostics: 51 files
 - canonical and historical documentation: 19 files
 - environment template and repository hygiene: 2 files
+- release baseline report: 1 file
 
 Experimental and legacy code was retained when it was already part of the
 tested v1.1 implementation or imported by compatibility commands. It is not
@@ -141,25 +143,80 @@ The following local/private categories remain ignored and were not committed:
 - cookie files and partial downloader output
 - coverage, editor, and operating-system metadata
 
-No local generated file was deleted during this task.
+No private or generated runtime data was deleted during release preparation.
+The four release-review files listed below were copied to a timestamped backup
+outside the repository before their untracked working-tree copies were removed.
 
-## Review Required
+## Resolved Review Items
 
-The following files remain untracked and were not committed:
+The following files were excluded from the release after full reference and
+content review:
 
 - `skill/schemas/weekly_review_v2_schema.json`
-  - Unreferenced pre-curation database/page design schema that conflicts with
-    the accepted Weekly Reflection product contract.
+  - Classification: `OBSOLETE_OR_DUPLICATE`.
+  - No filename, schema identifier, dynamic loader, test, or documentation
+    reference requires it. The committed canonical schemas are
+    `weekly_review_v2_analysis_schema.json` and
+    `weekly_review_generator_schema.json`.
 - `src/weekly_review/models.py`
-  - Unreferenced legacy dataclasses for the pre-curation WeeklyReview shape.
+  - Classification: `OBSOLETE_OR_DUPLICATE`.
+  - None of its dataclasses are imported. Active extraction and generation use
+    committed mapping-based validators and current schemas.
 - `src/notion/debug_network.py`
-  - Read-only diagnostic module with stale `NotionConfig` attribute names.
+  - Classification: `LOCAL_DIAGNOSTIC_ONLY`.
+  - It has no callers and references stale `NotionConfig` attribute names, so it
+    cannot serve as release-critical functionality.
 - `tests/debug_notion_connection.py`
-  - Standalone diagnostic script using the old `databases.query()` SDK path and
-    printing broad live response details.
+  - Classification: `LOCAL_DIAGNOSTIC_ONLY`.
+  - It is not an automated test dependency, requires live credentials/network,
+    and uses the obsolete `databases.query()` SDK path.
 
-The repository owner should decide whether to repair, archive, or delete these
-files in a separate task. They must not be force-added to this baseline.
+All four files were backed up under
+`/private/tmp/english-audio-v1.1-release-review-20260722-143145/` before removal.
+The backup is local, temporary, and intentionally not committed.
+
+## Final Release Gate Review
+
+### Clean Worktree Verification
+
+- Source commit: `2f6b9a3a57d4c55804fab7c50c0d79fbcdbaf086`
+- Worktree mode: detached, created directly from release `HEAD`
+- Initial and final worktree status: clean
+- `git diff --check`: passed
+- Full suite: 344 passed, 0 failed, 3 expected deprecation warnings
+- Test runtime: 0.73 seconds
+- No-side-effect CLI smoke check: `python -m src.main --help` exited 0
+- Network, Notion publishing, and media download operations were not invoked
+
+This proves the committed branch does not depend on the four removed untracked
+files.
+
+### Commit Scope Audit
+
+- Runtime commit `f7c0aa7`: v1.1 Codex artifact runtime, deterministic
+  workflows, validation, Notion publishers, prompts, schemas, and explicit
+  compatibility paths. Experimental YouTube code is labelled outside v1.
+- Test commit `03b7dc4`: regression tests, fixtures, and read-only scripts. Test
+  page IDs are synthetic; no live credentials or personal page content is
+  tracked.
+- Documentation commit `69c4add`: current product scope, Codex/Python/Notion
+  boundaries, historical decisions, and user/developer guidance.
+- Repository hygiene commit `a173e57`: `.gitignore` and secret-free
+  `.env.example` only.
+- Release report commit `2f6b9a3`: this report only.
+
+Repository-wide checks found no tracked `.env`, generated `data/`, `output/`, or
+`logs/` content; no downloaded media or transcript artifacts; no binary changes;
+no hardcoded personal filesystem paths; and no token-like credential values.
+The largest tracked file is under 50 KB.
+
+### Final Readiness Decision
+
+`READY_FOR_PUSH`
+
+The release branch is complete using committed files alone, passes the full
+regression suite from a clean worktree, has a clean original working tree, and
+contains no identified release-blocking scope or privacy issue.
 
 ## Remaining Technical Risks
 
@@ -178,9 +235,9 @@ none was expanded into unscheduled refactoring during baseline preparation.
 
 ## Recommended Human Review
 
-- [ ] Inspect all four baseline commits by purpose.
+- [ ] Inspect all five baseline commits by purpose.
 - [ ] Review `main...chore/v1.1-release-baseline` for scope and private data.
-- [ ] Confirm the four `REVIEW_REQUIRED` files should remain excluded.
+- [x] Confirm the four former `REVIEW_REQUIRED` files are safely excluded.
 - [ ] Run the full test suite in the owner's terminal.
 - [ ] Verify README and Skill first-use instructions from a new-user viewpoint.
 - [ ] Approve the branch before any push or tag.
