@@ -79,8 +79,8 @@ def enrich_vocabulary_candidates(
         )
         enriched.append(
             VocabularyEnrichmentItem(
-                word=_clean_text(enriched_data.get("word") or word),
-                original_context=_clean_text(enriched_data.get("original_context") or context),
+                word=word,
+                original_context=context,
                 meaning=_clean_text(enriched_data.get("meaning")),
                 chinese_meaning=_clean_text(enriched_data.get("chinese_meaning")),
                 part_of_speech=_clean_text(enriched_data.get("part_of_speech")),

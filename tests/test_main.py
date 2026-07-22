@@ -177,6 +177,63 @@ def test_run_pipeline_publishes_highlight_vocabulary(
     assert calls["page_id"] == "11111111111111111111111111111111"
 
 
+def test_run_pipeline_previews_highlight_vocabulary_without_writing(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    settings = AppSettings(
+        environment="test",
+        log_level="INFO",
+        data_dir=tmp_path,
+        audio_output_dir=tmp_path / "audio",
+        transcript_output_dir=tmp_path / "transcripts",
+        notion_token="secret",
+        notion_parent_page_id=None,
+        notion_podcast_database_id="podcast_db",
+    )
+    calls = {}
+
+    def fake_build_vocabulary_learning_preview(page_id: str):
+        calls["page_id"] = page_id
+        return {
+            "page_id": page_id,
+            "approved_vocabulary": [{"word": "fundraising"}],
+            "rejected_candidates": [{"word": "Christensen", "reason": "proper name"}],
+        }
+
+    monkeypatch.setattr(app_main, "load_settings", lambda: settings)
+    monkeypatch.setattr(
+        app_main,
+        "build_vocabulary_learning_preview",
+        fake_build_vocabulary_learning_preview,
+    )
+    monkeypatch.setattr(
+        app_main,
+        "publish_highlight_vocabulary",
+        lambda page_id: pytest.fail("Dry run must not publish or upsert vocabulary."),
+    )
+
+    result = app_main.run_pipeline(
+        app_main.parse_args(
+            [
+                "--publish-highlight-vocab",
+                "11111111111111111111111111111111",
+                "--dry-run",
+            ]
+        )
+    )
+
+    captured = capsys.readouterr()
+    assert result is not None
+    assert result.kind == "highlight_vocab_dry_run"
+    assert result.value == "approved=1, rejected=1"
+    assert calls["page_id"] == "11111111111111111111111111111111"
+    assert "Highlight vocabulary dry run" in captured.out
+    assert "Approved: 1" in captured.out
+    assert "Rejected: 1" in captured.out
+
+
 def test_run_pipeline_runs_vocabulary_sync_agent(monkeypatch, tmp_path: Path) -> None:
     settings = AppSettings(
         environment="test",

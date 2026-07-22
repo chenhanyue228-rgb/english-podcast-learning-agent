@@ -21,10 +21,11 @@ def test_placeholder_provider_returns_empty_enrichment_fields() -> None:
 
 def test_enrich_vocabulary_candidates_uses_provider() -> None:
     class CustomProvider:
-        def enrich(self, word: str, context: str) -> dict[str, str]:
+        def enrich(self, word: str, context: str) -> dict[str, object]:
             return {
-                "word": word.upper(),
-                "original_context": context,
+                "word": "provider replacement",
+                "original_context": "Provider-generated context must be ignored.",
+                "source_page_id": "provider_page",
                 "meaning": "meaning",
                 "chinese_meaning": "中文",
                 "part_of_speech": "noun",
@@ -44,7 +45,10 @@ def test_enrich_vocabulary_candidates_uses_provider() -> None:
         provider=CustomProvider(),
     )
 
-    assert enriched[0]["word"] == "CONVERSATION"
+    assert enriched[0]["word"] == "conversation"
+    assert enriched[0]["original_context"] == (
+        "The conversation also shows how to negotiate with investors."
+    )
     assert enriched[0]["meaning"] == "meaning"
     assert enriched[0]["chinese_meaning"] == "中文"
     assert enriched[0]["part_of_speech"] == "noun"

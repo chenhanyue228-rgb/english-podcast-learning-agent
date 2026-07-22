@@ -218,6 +218,25 @@ The release branch is complete using committed files alone, passes the full
 regression suite from a clean worktree, has a clean original working tree, and
 contains no identified release-blocking scope or privacy issue.
 
+## Pull Request Merge Gate Fixes
+
+The final PR merge gate added two narrow release-blocking safeguards without
+changing architecture, schemas, prompts, providers, or product scope:
+
+- Human Highlight preservation: vocabulary enrichment now always retains the
+  exact candidate word, original context, and source page ID supplied by the
+  pink-highlight workflow. Provider output is limited to enrichment fields.
+- Highlight Vocabulary dry-run safety: `--publish-highlight-vocab PAGE_ID
+  --dry-run` builds and prints the read-only learning preview while bypassing
+  the publish and Vocabulary Database upsert path.
+- README onboarding: the canonical Weekly Reflection environment variable is
+  documented, with the old Weekly Review name identified as a legacy alias;
+  Podcast publishing now reuses `--transcript-json` to avoid repeating audio
+  extraction and Whisper transcription.
+- Validation: targeted regression tests passed 39/39; the complete suite passed
+  345 tests with the same 3 expected deprecated OpenAI compatibility-provider
+  warnings and zero failures.
+
 ## Remaining Technical Risks
 
 1. Vocabulary duplicate lookup may treat a Notion query error as no match,

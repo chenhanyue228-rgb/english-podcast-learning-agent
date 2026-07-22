@@ -78,9 +78,12 @@ NOTION_TOKEN=
 NOTION_PARENT_PAGE_ID=
 NOTION_PODCAST_LIBRARY_DATABASE_ID=
 NOTION_EXPRESSION_DATABASE_ID=
-NOTION_WEEKLY_REVIEW_DATABASE_ID=
+NOTION_WEEKLY_REFLECTION_DATABASE_ID=
 NOTION_VOCABULARY_DATABASE_ID=
 ```
+
+`NOTION_WEEKLY_REVIEW_DATABASE_ID` remains accepted only as a legacy
+compatibility alias.
 
 ## First Use
 
@@ -96,8 +99,13 @@ Then Codex generates the AI JSON artifact, and Python publishes the final
 Notion page:
 
 ```bash
-python3 src/main.py "<source>" --analysis-json data/analysis/<file>.json
+python3 src/main.py "<source>" \
+  --transcript-json data/transcripts/<file>.json \
+  --analysis-json data/analysis/<file>.json
 ```
+
+Reusing the transcript JSON avoids running audio extraction and Whisper a
+second time.
 
 For weekly reflection:
 
@@ -192,7 +200,7 @@ Notion
 ## Core Commands
 
 - `python3 src/main.py "<source>"`
-- `python3 src/main.py "<source>" --analysis-json data/analysis/<file>.json`
+- `python3 src/main.py "<source>" --transcript-json data/transcripts/<file>.json --analysis-json data/analysis/<file>.json`
 - `python3 src/main.py --weekly-reflection`
 - `python3 src/main.py --weekly-reflection --dry-run`
 - `python3 src/main.py --publish-highlight-vocab PAGE_ID`

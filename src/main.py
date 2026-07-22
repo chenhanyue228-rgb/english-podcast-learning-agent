@@ -59,6 +59,7 @@ from src.workflow.highlight_vocabulary_publish_pipeline import (
     HighlightVocabularyPublishResult,
     publish_highlight_vocabulary,
 )
+from src.workflow.vocabulary_learning_pipeline import build_vocabulary_learning_preview
 from src.notion.weekly_review_publisher import (
     WeeklyReviewPublishPayload,
     WeeklyReviewPublisherError,
@@ -215,7 +216,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Preview vocabulary publishing without calling Notion.",
+        help="Preview vocabulary publishing without writing to Notion.",
     )
     parser.add_argument(
         "--debug-comments",
@@ -408,14 +409,34 @@ def sync_vocab_comments_from_cli(dry_run: bool = False) -> MainPipelineResult:
     )
 
 
-def publish_highlight_vocab_from_cli(page_id: str) -> MainPipelineResult:
+def publish_highlight_vocab_from_cli(
+    page_id: str,
+    dry_run: bool = False,
+) -> MainPipelineResult:
     settings = load_settings()
     configure_logging(settings.log_level)
     if not page_id.strip():
         raise MainPipelineError("--publish-highlight-vocab requires a page_id.")
 
+    normalized_page_id = page_id.strip()
     try:
-        result: HighlightVocabularyPublishResult = publish_highlight_vocabulary(page_id.strip())
+        if dry_run:
+            preview = build_vocabulary_learning_preview(normalized_page_id)
+            approved = preview.get("approved_vocabulary", [])
+            rejected = preview.get("rejected_candidates", [])
+            print("Highlight vocabulary dry run")
+            print(f"Page ID: {normalized_page_id}")
+            print(f"Approved: {len(approved)}")
+            print(f"Rejected: {len(rejected)}")
+            print(json.dumps(preview, ensure_ascii=False, indent=2))
+            return MainPipelineResult(
+                kind="highlight_vocab_dry_run",
+                value=f"approved={len(approved)}, rejected={len(rejected)}",
+            )
+
+        result: HighlightVocabularyPublishResult = publish_highlight_vocabulary(
+            normalized_page_id
+        )
     except Exception as exc:
         raise MainPipelineError(str(exc)) from exc
 
@@ -747,7 +768,10 @@ def run_pipeline(args: argparse.Namespace) -> Optional[MainPipelineResult]:
         return None
 
     if args.publish_highlight_vocab is not None:
-        return publish_highlight_vocab_from_cli(args.publish_highlight_vocab)
+        return publish_highlight_vocab_from_cli(
+            args.publish_highlight_vocab,
+            dry_run=args.dry_run,
+        )
 
     if args.run_vocabulary_agent:
         return run_vocabulary_agent_from_cli()
@@ -915,6 +939,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             print(f"Vocabulary Sync Agent: {result.value}")
         elif result.kind == "highlight_vocab_page":
             print(f"Published Highlight Vocabulary: {result.value}")
+        elif result.kind == "highlight_vocab_dry_run":
+            print(f"Highlight Vocabulary Dry Run: {result.value}")
         else:
             print(f"Created Notion Podcast Page: {result.value}")
     return 0
