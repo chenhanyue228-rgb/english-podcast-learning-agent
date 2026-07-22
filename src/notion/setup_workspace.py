@@ -178,7 +178,7 @@ def create_base_databases(notion: Client, parent_page_id: str) -> dict[str, str]
     weekly_review_id = create_database(
         notion=notion,
         parent_page_id=parent_page_id,
-        name="Weekly Review",
+        name="Weekly Reflection",
         properties={
             "Week": title_property(),
             "Date": {"date": {}},
@@ -231,7 +231,7 @@ def wire_database_relations(notion: Client, database_ids: dict[str, str]) -> Non
     update_database_properties(
         notion=notion,
         database_id=weekly_review_id,
-        database_name="Weekly Review",
+        database_name="Weekly Reflection",
         properties={
             "Podcasts": relation_property(podcast_library_id),
         },
@@ -293,32 +293,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--print-onboarding",
         action="store_true",
-        help="Print the recommended two-mode Notion onboarding flow and exit.",
+        help="Print the supported Notion onboarding flow and exit.",
     )
     return parser.parse_args()
 
 
 def print_onboarding() -> None:
-    """Print the supported Notion onboarding modes for new users."""
+    """Print the supported Notion onboarding flow for new users."""
     print(
         "\n".join(
             [
-                "Notion onboarding modes:",
+                "Notion onboarding:",
                 "",
-                "Mode 1: Guided Local Setup",
-                "1. Install dependencies: pip install -r requirements.txt",
-                "2. Create a Notion internal integration and copy its token.",
-                "3. Create a parent Notion page and share it with the integration.",
-                "4. Add NOTION_TOKEN to .env.",
-                "5. Run: python -m src.notion.setup_workspace --parent-page-id <page_url_or_id>",
-                "6. Run: python -m src.notion.check_workspace",
+                "1. Create .venv: python3 -m venv .venv",
+                "2. Install dependencies: ./.venv/bin/python scripts/bootstrap_environment.py",
+                "3. Copy .env.example to .env.",
+                "4. Create a Notion internal integration and copy its token.",
+                "5. Add NOTION_TOKEN to .env.",
+                "6. Create a parent Notion page and share it with the integration.",
+                "7. Run: ./.venv/bin/python -m src.notion.setup_workspace --parent-page-id <page_url_or_id>",
+                "8. Run: ./.venv/bin/python -m src.notion.check_workspace",
                 "",
-                "Mode 2: Codex Assisted Setup",
-                "1. Connect the Notion plugin in Codex.",
-                "2. Ask Codex to create or inspect the Notion workspace.",
-                "3. Sync the resulting database IDs into .env for local CLI runs.",
-                "",
-                "The local Python project still needs NOTION_TOKEN for independent CLI execution.",
+                "The setup creates Podcast Library, Expression Database, Weekly Reflection, and Vocabulary Database.",
             ]
         )
     )

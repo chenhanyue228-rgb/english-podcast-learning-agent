@@ -1,7 +1,7 @@
 # Notion Onboarding
 
-This document defines how new users connect English Audio Learning Agent to
-Notion after installing the skill.
+This document defines the single supported flow for connecting English Audio
+Learning Agent to Notion after installing the Skill.
 
 ## Goal
 
@@ -14,94 +14,81 @@ setup script should handle:
 - Creating optional sample data.
 - Giving the user the next command to run.
 
-## Mode 1: Guided Local Setup
-
-Use this mode when the user wants the Python project to run independently from
-Codex.
+## Setup Flow
 
 Required:
 
-- Python dependencies installed with `pip install -r requirements.txt`.
+- Project dependencies installed in `.venv`.
 - `NOTION_TOKEN` from an internal Notion integration.
 - A parent Notion page shared with that integration.
 
 Flow:
 
-1. User copies `.env.example` to `.env`.
-2. User adds `NOTION_TOKEN`.
-3. User runs:
+1. Create the project environment:
 
    ```bash
-   python -m src.notion.setup_workspace --parent-page-id <notion_page_url_or_id>
+   python3 -m venv .venv
+   ./.venv/bin/python scripts/bootstrap_environment.py
    ```
 
-4. The setup script normalizes the parent page URL or ID.
-5. The setup script creates:
+2. Create a Notion internal integration and copy its token.
+3. Create a parent page, such as `English Audio Learning Agent`.
+4. Share the parent page with the integration through the Notion page's
+   `Share` menu.
+5. Copy `.env.example` to `.env` and set `NOTION_TOKEN`.
+6. Run:
+
+   ```bash
+   ./.venv/bin/python -m src.notion.setup_workspace \
+     --parent-page-id "<notion-parent-page-url-or-id>"
+   ```
+
+7. The setup script normalizes the parent page URL or ID and creates:
    - `Podcast Library`
    - `Expression Database`
-   - `Weekly Review`
-6. The setup script writes database IDs back to `.env`.
-7. User runs:
+   - `Weekly Reflection`
+   - `Vocabulary Database`
+8. The setup script connects the required relations and writes the parent page
+   ID plus all four database IDs back to `.env`.
+9. Validate the workspace:
 
    ```bash
-   python -m src.notion.check_workspace
+   ./.venv/bin/python -m src.notion.check_workspace
    ```
 
-8. User can create sample data:
+10. Optional: create sample data:
 
    ```bash
-   python -m src.notion.create_example_data
-   ```
-
-## Mode 2: Codex Assisted Setup
-
-Use this mode when the user is working inside Codex and has connected the
-Notion plugin.
-
-Flow:
-
-1. User connects the Notion plugin in Codex.
-2. Codex creates or inspects the Notion workspace interactively.
-3. Codex validates that the three databases exist with the required properties.
-4. Codex returns database IDs.
-5. User syncs those database IDs into `.env` for local CLI execution.
-6. User runs:
-
-   ```bash
-   python -m src.notion.check_workspace
+   ./.venv/bin/python -m src.notion.create_example_data
    ```
 
 ## Boundary
 
-The Codex Notion plugin and the Python `notion-client` SDK are different
-integration layers.
-
-- The plugin lets Codex interact with Notion during assisted setup.
-- The local Python project uses `NOTION_TOKEN` and database IDs from `.env`.
-
-Installing the Notion plugin does not automatically expose a token to the local
-Python process. The local CLI still needs `.env` configuration unless all
-Notion actions are performed manually through Codex.
+The local Python project publishes through the `notion-client` SDK using
+`NOTION_TOKEN` and database IDs from `.env`. A Codex Notion connector, if
+installed, does not expose credentials to this local process and does not
+replace the setup above.
 
 ## First-Run Checklist
 
 The setup script can print the checklist:
 
 ```bash
-python -m src.notion.setup_workspace --print-onboarding
+./.venv/bin/python -m src.notion.setup_workspace --print-onboarding
 ```
 
 Expected completed state:
 
 - `.env` contains `NOTION_TOKEN`.
 - `.env` contains `NOTION_PARENT_PAGE_ID`.
-- `.env` contains all three Notion database IDs.
-- `python -m src.notion.check_workspace` reports:
+- `.env` contains all four Notion database IDs.
+- `./.venv/bin/python -m src.notion.check_workspace` reports:
 
   ```text
   ✓ Podcast Library
   ✓ Expression Database
   ✓ Weekly Review
+  ✓ Vocabulary Database
 
   Missing:
   None

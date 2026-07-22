@@ -1,3 +1,8 @@
+---
+name: english-audio-learning-agent
+description: Analyze Apple Podcasts episodes, podcast RSS feeds, and local English audio; generate learning artifacts with Codex; capture highlighted vocabulary; and publish validated learning notes and weekly reflections to Notion. Use when a user asks to analyze English audio, create learning notes, extract expressions, sync vocabulary, or generate a weekly reflection.
+---
+
 # English Audio Learning Agent Skill
 
 ## 1. Skill Identity
@@ -8,7 +13,7 @@ English Audio Learning Agent
 
 ### Purpose
 
-Turn English learning inputs such as podcast episode URLs, podcast RSS feeds,
+Turn English learning inputs such as Apple Podcasts episode URLs, podcast RSS feeds,
 local audio files, and user-highlighted vocabulary into structured learning
 assets stored in Notion.
 
@@ -19,7 +24,7 @@ results into Notion with minimal manual work.
 
 ### Supported Inputs
 
-- Podcast URL
+- Apple Podcasts episode URL
 - Podcast RSS feed
 - Local audio file
 - Highlight vocabulary input
@@ -46,7 +51,7 @@ Use this Skill when the user asks to:
 
 Use this Skill when the user provides:
 
-- a podcast URL
+- an Apple Podcasts episode URL
 - a podcast RSS feed
 - a local audio file
 - a Notion page containing vocabulary highlights
@@ -93,7 +98,7 @@ Notion is responsible for:
 - storing knowledge assets
 - presenting Podcast Library pages
 - storing Vocabulary Database records
-- storing Weekly Reflection / Weekly Review pages
+- storing Weekly Reflection pages
 
 ### Runtime Rule
 
@@ -106,20 +111,52 @@ Codex should be used for reasoning and content generation.
 
 ### Step 1: Install the Skill
 
-Install the Skill in the Codex environment so Codex can read `skill/SKILL.md`,
-`skill/prompts/`, and `skill/schemas/`.
+From the repository root, expose `skill/` in Codex's user Skill directory:
+
+```bash
+mkdir -p "$HOME/.codex/skills"
+ln -s "$(pwd)/skill" "$HOME/.codex/skills/english-audio-learning-agent"
+```
+
+If the destination already exists, inspect it before replacing it. Fully quit
+and reopen Codex, start a new task in this repository, and verify discovery:
+
+```text
+Use $english-audio-learning-agent to list supported inputs
+```
+
+The expected inputs are Apple Podcasts episode URLs, podcast RSS feeds, and
+local audio files.
 
 ### Step 2: Configure the Environment
 
-Prepare the local Python environment and add the required Notion values in
-`.env`.
+Prepare the local Python environment:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python scripts/bootstrap_environment.py
+cp .env.example .env
+```
+
+Create a Notion internal integration, create a parent page, share that page
+with the integration, and set `NOTION_TOKEN` in `.env`. Then initialize and
+validate all four databases:
+
+```bash
+./.venv/bin/python -m src.notion.setup_workspace \
+  --parent-page-id "<notion-parent-page-url-or-id>"
+./.venv/bin/python -m src.notion.check_workspace
+```
+
+The setup command creates Podcast Library, Expression Database, Weekly
+Reflection, and Vocabulary Database, then writes their IDs to `.env`.
 
 FFmpeg is supplied by the project dependency set when no system installation
 is present.
 
 ### Step 3: Provide Podcast Input
 
-Give Codex a podcast URL, podcast RSS feed, local audio file, or a Notion
+Give Codex an Apple Podcasts episode URL, podcast RSS feed, local audio file, or a Notion
 highlight source.
 
 ### Step 4: Run the Analysis Workflow
@@ -140,14 +177,14 @@ the final page to Notion.
 
 | Command | Purpose | Required Input | Generated Artifacts | Expected Output | Next Action |
 |---|---|---|---|---|---|
-| `python3 src/main.py "<source>"` | Extract audio, transcribe, and create a Codex analysis request | Podcast URL, podcast RSS feed, or local audio path | `data/transcripts/<file>.json`, `data/analysis_requests/<file>.json` | A Codex analysis request file path | Codex generates analysis JSON |
-| `python3 src/main.py "<source>" --analysis-json data/analysis/<file>.json` | Publish a complete Podcast Library page | Source plus Codex-generated analysis JSON | Podcast page in Notion | Created Notion Podcast Library page | Move to vocabulary or weekly workflows if needed |
-| `python3 src/main.py --weekly-reflection` | Run the Weekly Reflection pipeline | Weekly learning context from the current period | `output/weekly_learning_context.json`, `output/reflection_context.json`, `output/weekly_review.json`, `output/pipeline_run.json` | Weekly Reflection page, or dry-run output if configured | Review result in Notion or rerun with dry-run |
-| `python3 src/main.py --weekly-reflection --dry-run` | Run the Weekly Reflection pipeline without Notion publish | Weekly learning context | `output/reflection_context.json`, `output/weekly_review.json`, `output/pipeline_run.json` | Validation and quality output only | Inspect artifacts, then publish if ready |
-| `python3 src/main.py --weekly-review` | Build a Weekly Review request from Notion learning data | Current Notion learning data | `data/weekly_review_requests/<week>.json` | Weekly Review request file path | Codex generates Weekly Review JSON |
-| `python3 src/main.py --publish-highlight-vocab PAGE_ID` | Publish exact user-selected pink-highlight vocabulary from a Notion page | Notion page ID | Vocabulary preview / publish artifacts | Updated Vocabulary Database entries | Verify vocabulary entries in Notion |
-| `python3 src/main.py --sync-vocab-comments` | Legacy compatibility: sync comment-triggered vocabulary captures | Podcast Library pages with historical comment triggers | Sync state + vocabulary records | Vocabulary sync summary | Prefer the pink-highlight workflow for v1 use |
-| `python3 -m pytest` | Run the full test suite | None | Test reports | Pass/fail summary | Fix issues before publishing |
+| `./.venv/bin/python src/main.py "<source>"` | Extract audio, transcribe, and create a Codex analysis request | Apple Podcasts episode URL, podcast RSS feed, or local audio path | `data/transcripts/<file>.json`, `data/analysis_requests/<file>.json` | A Codex analysis request file path | Codex generates analysis JSON |
+| `./.venv/bin/python src/main.py "<source>" --analysis-json data/analysis/<file>.json` | Publish a complete Podcast Library page | Source plus Codex-generated analysis JSON | Podcast page in Notion | Created Notion Podcast Library page | Move to vocabulary or weekly workflows if needed |
+| `./.venv/bin/python src/main.py --weekly-reflection` | Run the Weekly Reflection pipeline | Weekly learning context from the current period | `output/weekly_learning_context.json`, `output/reflection_context.json`, `output/weekly_review.json`, `output/pipeline_run.json` | Weekly Reflection page, or dry-run output if configured | Review result in Notion or rerun with dry-run |
+| `./.venv/bin/python src/main.py --weekly-reflection --dry-run` | Run the Weekly Reflection pipeline without Notion publish | Weekly learning context | `output/reflection_context.json`, `output/weekly_review.json`, `output/pipeline_run.json` | Validation and quality output only | Inspect artifacts, then publish if ready |
+| `./.venv/bin/python src/main.py --weekly-review` | Build a Weekly Review request from Notion learning data | Current Notion learning data | `data/weekly_review_requests/<week>.json` | Weekly Review request file path | Codex generates Weekly Review JSON |
+| `./.venv/bin/python src/main.py --publish-highlight-vocab PAGE_ID` | Publish exact user-selected pink-highlight vocabulary from a Notion page | Notion page ID | Vocabulary preview / publish artifacts | Updated Vocabulary Database entries | Verify vocabulary entries in Notion |
+| `./.venv/bin/python src/main.py --sync-vocab-comments` | Legacy compatibility: sync comment-triggered vocabulary captures | Podcast Library pages with historical comment triggers | Sync state + vocabulary records | Vocabulary sync summary | Prefer the pink-highlight workflow for v1 use |
+| `./.venv/bin/python -m pytest` | Run the full test suite | None | Test reports | Pass/fail summary | Fix issues before publishing |
 
 ## 6. Workflow Contracts
 
@@ -169,7 +206,7 @@ Notion publish
 
 #### Inputs
 
-- podcast URL
+- Apple Podcasts episode URL
 - podcast RSS feed
 - local audio file
 - transcript JSON if available
