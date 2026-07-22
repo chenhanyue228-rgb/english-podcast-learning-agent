@@ -2,7 +2,7 @@
 
 ## System Overview
 
-English Podcast Learning Agent is a Codex Skill plus a small Python backend.
+English Audio Learning Agent is a Codex Skill plus a small Python backend.
 
 Python is responsible for deterministic work:
 
@@ -28,7 +28,7 @@ JSON request file that Codex reads and turns into validated analysis JSON.
 
 ```text
 User Input
-(YouTube / Apple Podcasts / RSS / Direct Audio / Local Audio)
+(Apple Podcasts / RSS / Local Audio)
 ↓
 Source Router
 ↓
@@ -59,11 +59,16 @@ Expressions.
 
 ## Supported Inputs
 
-- YouTube URL
 - Apple Podcasts episode URL
 - Podcast RSS URL
-- Direct audio URL
 - Local audio file
+
+## Out of Scope for v1
+
+YouTube is intentionally excluded from the supported product. The v1 runtime
+focuses on stable audio sources without platform login, anti-bot, or video
+downloader dependencies. Existing YouTube extraction modules are experimental
+and retained only for possible future evaluation.
 
 Generic podcast platform page support is intentionally outside the current MVP.
 For now, "Podcast Page URL" means Apple Podcasts episode URL.

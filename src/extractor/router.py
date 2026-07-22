@@ -16,7 +16,7 @@ from src.config.media import is_supported_audio_extension
 
 
 class SourceType(str, Enum):
-    """Supported source types accepted by the source pipeline."""
+    """Recognized source types; YouTube is experimental and outside v1."""
 
     YOUTUBE = "youtube"
     APPLE_PODCAST = "apple_podcast"
@@ -119,9 +119,9 @@ def detect_source(source: str) -> SourceDetection:
             source_type = SourceType.PODCAST_RSS
         else:
             raise SourceRouterError(
-                "Unsupported URL type. The source pipeline supports YouTube URLs, "
-                "Apple Podcasts page URLs, Podcast RSS URLs, direct audio URLs, "
-                "and local audio files. Generic podcast platform pages are not "
+                "Unsupported URL type. The v1 source pipeline supports Apple "
+                "Podcasts page URLs and Podcast RSS URLs; local audio files are "
+                "accepted as paths. Generic podcast platform pages are not "
                 "supported yet."
             )
 

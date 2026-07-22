@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "required": [
+    "weekly_theme",
+    "mindset_shifts",
+    "cross_content_patterns",
+    "professional_actions"
+  ],
+  "properties": {
+    "weekly_theme": {
+      "type": "object",
+      "required": ["category", "theme"],
+      "properties": {
+        "category": { "type": "string" },
+        "theme": { "type": "string" }
+      }
+    },
+    "mindset_shifts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["before", "after", "evidence", "confidence"],
+        "properties": {
+          "before": { "type": "string" },
+          "after": { "type": "string" },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["source", "supporting_concept"],
+              "properties": {
+                "source": { "type": "string" },
+                "supporting_concept": { "type": "string" }
+              }
+            }
+          },
+          "confidence": { "type": "number" }
+        }
+      }
+    },
+    "cross_content_patterns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "professional_actions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

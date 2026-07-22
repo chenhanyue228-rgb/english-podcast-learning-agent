@@ -12,6 +12,7 @@ from src.notion.uploader import (
     podcast_page_children,
     podcast_page_properties,
     transcript_to_text,
+    create_notion_client,
 )
 
 
@@ -27,6 +28,25 @@ class FakePages:
 class FakeNotion:
     def __init__(self):
         self.pages = FakePages()
+
+
+def test_create_notion_client_uses_explicit_timeout(monkeypatch) -> None:
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr("src.notion.uploader.Client", FakeClient)
+
+    create_notion_client("secret")
+
+    assert captured["auth"] == "secret"
+    timeout = captured["client"].timeout
+    assert timeout.connect == 10.0
+    assert timeout.read == 30.0
+    assert timeout.write == 30.0
+    assert timeout.pool == 10.0
 
 
 def test_load_notion_upload_config_prefers_podcast_database_id() -> None:

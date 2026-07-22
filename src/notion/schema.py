@@ -11,6 +11,7 @@ from __future__ import annotations
 PODCAST_LIBRARY = "Podcast Library"
 EXPRESSION_DATABASE = "Expression Database"
 WEEKLY_REVIEW = "Weekly Review"
+VOCABULARY_DATABASE = "Vocabulary Database"
 
 SOURCE_TYPES = ["YouTube", "Podcast", "Local Audio"]
 EXPRESSION_CATEGORIES = [
@@ -20,8 +21,9 @@ EXPRESSION_CATEGORIES = [
     "Collocation",
     "Sentence Pattern",
 ]
-REVIEW_STATUSES = ["New", "Learning", "Mastered"]
+REVIEW_STATUSES = ["New", "Reviewing", "Mastered"]
 COMMONNESS_LEVELS = ["High", "Medium", "Low"]
+VOCABULARY_CATEGORIES = ["Word", "Phrase", "Term"]
 
 CATEGORY_COLORS = {
     "Native Expression": "Green",
@@ -60,9 +62,19 @@ REQUIRED_DATABASE_PROPERTIES: dict[str, dict[str, str]] = {
         "Week": "title",
         "Date": "date",
         "Podcasts": "relation",
-        "Expression Count": "number",
-        "Vocabulary Count": "number",
-        "AI Summary": "rich_text",
+    },
+    VOCABULARY_DATABASE: {
+        "Name": "title",
+        "Original Context": "rich_text",
+        "Meaning": "rich_text",
+        "Professional Category": "select",
+        "Source": "relation",
+        "Source Page ID": "rich_text",
+        "First Seen": "date",
+        "Review Status": "select",
+        "Last Review": "date",
+        "Usage Example": "rich_text",
+        "Personal Note": "rich_text",
     },
 }
 

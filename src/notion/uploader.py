@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Mapping, Optional, Tuple, Union
 
+import httpx
 from notion_client import APIResponseError, Client
 
 from src.notion.config import load_dotenv
@@ -26,6 +27,7 @@ NOTION_TOKEN_ENV = "NOTION_TOKEN"
 PODCAST_DATABASE_ID_ENV = "PODCAST_DATABASE_ID"
 LEGACY_PODCAST_DATABASE_ID_ENV = "NOTION_PODCAST_LIBRARY_DATABASE_ID"
 MAX_RICH_TEXT_LENGTH = 1900
+NOTION_TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
 
 
 class NotionUploadError(RuntimeError):
@@ -83,7 +85,10 @@ def load_notion_upload_config(env: Optional[Mapping[str, str]] = None) -> Tuple[
 def create_notion_client(token: Optional[str] = None) -> Client:
     """Create the official Notion API SDK client."""
     notion_token = token or load_notion_upload_config()[0]
-    return Client(auth=notion_token)
+    return Client(
+        auth=notion_token,
+        client=httpx.Client(timeout=NOTION_TIMEOUT),
+    )
 
 
 def title_property(text: str) -> dict[str, Any]:

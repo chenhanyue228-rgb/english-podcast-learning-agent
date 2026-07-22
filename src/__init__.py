@@ -1,1 +1,1 @@
-"""English Podcast Learning Agent package."""
+"""English Audio Learning Agent package."""

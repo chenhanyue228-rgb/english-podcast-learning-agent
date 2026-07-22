@@ -62,7 +62,11 @@ class FakeBlocks:
 
 
 class FakeDataSources:
-    def __init__(self, properties: dict[str, object] = None):
+    def __init__(
+        self,
+        properties: dict[str, object] = None,
+        query_results: list[dict[str, object]] = None,
+    ):
         self.properties = properties or {
             "Expression": {"type": "title"},
             "Category": {"type": "select"},
@@ -72,6 +76,8 @@ class FakeDataSources:
         }
         self.retrieve_calls = []
         self.update_calls = []
+        self.query_calls = []
+        self.query_results = query_results or []
 
     def retrieve(self, **kwargs):
         self.retrieve_calls.append(kwargs)
@@ -82,12 +88,23 @@ class FakeDataSources:
         self.properties.update({"Commonness": {"type": "select"}})
         return {"id": kwargs.get("data_source_id")}
 
+    def query(self, **kwargs):
+        self.query_calls.append(kwargs)
+        return {"results": self.query_results}
+
 
 class FakeNotion:
-    def __init__(self, properties: dict[str, object] = None):
+    def __init__(
+        self,
+        properties: dict[str, object] = None,
+        query_results: list[dict[str, object]] = None,
+    ):
         self.pages = FakePages()
         self.blocks = FakeBlocks()
-        self.data_sources = FakeDataSources(properties=properties)
+        self.data_sources = FakeDataSources(
+            properties=properties,
+            query_results=query_results,
+        )
 
 
 class ErrorWithoutMessage:
@@ -394,6 +411,43 @@ def test_publish_complete_learning_materials_creates_podcast_then_expressions() 
     assert expression_create["parent"] == {"data_source_id": "expression_db"}
     assert expression_create["properties"]["Source Podcast"] == {
         "relation": [{"id": "podcast_page"}]
+    }
+
+
+def test_publish_complete_learning_materials_updates_exact_repeat_without_duplicates() -> None:
+    notion = FakeNotion(
+        query_results=[
+            {
+                "id": "existing_podcast_page",
+                "url": "https://notion.so/existing_podcast_page",
+            }
+        ]
+    )
+
+    result = publish_complete_learning_materials(
+        CompletePodcastLearningPayload(
+            title="Original Title",
+            source_url="https://podcasts.apple.com/podcast/id123?i=456",
+            source_type="Podcast",
+            transcript="Companies need to take ownership.",
+            analysis=analysis_result(),
+        ),
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+
+    assert result.podcast_page_id == "existing_podcast_page"
+    assert result.podcast_page_url == "https://notion.so/existing_podcast_page"
+    assert result.expression_page_ids == []
+    assert notion.pages.create_calls == []
+    assert notion.blocks.children.append_calls == []
+    assert notion.pages.update_calls[0]["page_id"] == "existing_podcast_page"
+    query_call = notion.data_sources.query_calls[0]
+    assert query_call["data_source_id"] == "podcast_db"
+    assert query_call["filter"] == {
+        "property": "URL",
+        "url": {"equals": "https://podcasts.apple.com/podcast/id123?i=456"},
     }
 
 

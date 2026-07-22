@@ -1,4 +1,4 @@
-"""Validate the Notion workspace schema for English Podcast Learning Agent.
+"""Validate the Notion workspace schema for English Audio Learning Agent.
 
 Usage:
     python -m src.notion.check_workspace
@@ -95,6 +95,7 @@ def validate_workspace() -> list[DatabaseValidationResult]:
         "Podcast Library": config.podcast_database_id,
         "Expression Database": config.expression_database_id,
         "Weekly Review": config.weekly_database_id,
+        "Vocabulary Database": config.vocabulary_database_id,
     }
 
     results: list[DatabaseValidationResult] = []

@@ -4,8 +4,8 @@ This checklist verifies the Phase 2 MVP source extraction path manually.
 
 Scope:
 
-- YouTube URL to local audio file
 - Apple Podcasts URL to local audio file
+- Podcast RSS feed to local audio file
 - Local mp3 validation
 
 Out of scope:
@@ -24,8 +24,7 @@ Install dependencies:
 python3 scripts/bootstrap_environment.py
 ```
 
-For YouTube and non-mp3 audio conversion, `ffmpeg` must be installed and
-available on `PATH`.
+For non-mp3 audio conversion, the project dependency set provides FFmpeg.
 
 Create the output directory if needed:
 
@@ -33,50 +32,7 @@ Create the output directory if needed:
 mkdir -p data/audio
 ```
 
-## Test 1: YouTube URL
-
-Input:
-
-```text
-https://www.youtube.com/watch?v=cWZI2RyI9wM
-```
-
-Command:
-
-```bash
-python3 - <<'PY'
-from src.extractor.pipeline import extract_audio_from_source
-
-audio_path = extract_audio_from_source(
-    "https://www.youtube.com/watch?v=cWZI2RyI9wM",
-    output_dir="data/audio",
-)
-print(audio_path)
-PY
-```
-
-Expected:
-
-```text
-YouTube URL
-↓
-local audio file
-```
-
-Pass criteria:
-
-- Command exits with code `0`.
-- Printed path exists.
-- Printed path ends with `.mp3`.
-- File size is greater than `0`.
-
-Manual check:
-
-```bash
-ls -lh data/audio
-```
-
-## Test 2: Apple Podcasts URL
+## Test 1: Apple Podcasts URL
 
 Input:
 
@@ -124,7 +80,7 @@ Notes:
   back to the first audio enclosure. This should be reviewed before treating
   the result as a correct episode match.
 
-## Test 3: Local mp3
+## Test 2: Local mp3
 
 Input:
 
@@ -169,11 +125,6 @@ Record manual smoke test results here:
 Date:
 Tester:
 
-YouTube URL:
-- Pass/Fail:
-- Output path:
-- Notes:
-
 Apple Podcasts URL:
 - Pass/Fail:
 - Output path:
@@ -184,3 +135,8 @@ Local mp3:
 - Output path:
 - Notes:
 ```
+
+## Out of Scope for v1
+
+YouTube is intentionally excluded from this smoke test and the supported v1
+product. Existing downloader code is experimental future work.

@@ -2,7 +2,7 @@
 
 Project:
 
-English Podcast Learning Agent
+English Audio Learning Agent
 
 
 Version:
@@ -28,8 +28,8 @@ Primary:
 English learners who consume:
 
 - Podcasts
-- Youtube interviews
-- Business content
+- Business audio content
+- Local English audio
 
 
 ---
@@ -77,14 +77,21 @@ Learning document
 
 Input:
 
-- Youtube URL
 - Podcast URL
+- Podcast RSS Feed
 - Audio file
 
 
 Output:
 
 Audio file
+
+
+## Out of Scope for v1
+
+YouTube support is intentionally excluded. The product focuses on stable audio
+sources and avoids platform authentication, anti-bot behavior, and downloader
+maintenance.
 
 
 ---

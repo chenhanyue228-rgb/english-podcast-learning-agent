@@ -1,4 +1,4 @@
-"""Initialize the Notion workspace databases for English Podcast Learning Agent.
+"""Initialize the Notion workspace databases for English Audio Learning Agent.
 
 Usage:
     python -m src.notion.setup_workspace --parent-page-id <notion_page_id_or_url>
@@ -32,6 +32,7 @@ from src.notion.schema import (
     EXPRESSION_CATEGORIES,
     REVIEW_STATUSES,
     SOURCE_TYPES,
+    VOCABULARY_CATEGORIES,
 )
 
 
@@ -181,23 +182,44 @@ def create_base_databases(notion: Client, parent_page_id: str) -> dict[str, str]
         properties={
             "Week": title_property(),
             "Date": {"date": {}},
-            "Expression Count": {"number": {"format": "number"}},
-            "Vocabulary Count": {"number": {"format": "number"}},
-            "AI Summary": rich_text_property(),
+        },
+    )
+
+    vocabulary_database_id = create_database(
+        notion=notion,
+        parent_page_id=parent_page_id,
+        name="Vocabulary Database",
+        properties={
+            "Name": title_property(),
+            "Original Context": rich_text_property(),
+            "Meaning": rich_text_property(),
+            "Professional Category": select_property(VOCABULARY_CATEGORIES),
+            "Source": relation_property(podcast_library_id),
+            "Source Page ID": rich_text_property(),
+            "First Seen": {"date": {}},
+            "Review Status": select_property(REVIEW_STATUSES),
+            "Last Review": {"date": {}},
+            "Usage Example": rich_text_property(),
+            "Personal Note": rich_text_property(),
         },
     )
 
     return {
         "NOTION_PODCAST_LIBRARY_DATABASE_ID": podcast_library_id,
         "NOTION_EXPRESSION_DATABASE_ID": expression_database_id,
-        "NOTION_WEEKLY_REVIEW_DATABASE_ID": weekly_review_id,
+        "NOTION_WEEKLY_REFLECTION_DATABASE_ID": weekly_review_id,
+        "NOTION_VOCABULARY_DATABASE_ID": vocabulary_database_id,
     }
 
 
 def wire_database_relations(notion: Client, database_ids: dict[str, str]) -> None:
     podcast_library_id = database_ids["NOTION_PODCAST_LIBRARY_DATABASE_ID"]
     expression_database_id = database_ids["NOTION_EXPRESSION_DATABASE_ID"]
-    weekly_review_id = database_ids["NOTION_WEEKLY_REVIEW_DATABASE_ID"]
+    weekly_review_id = database_ids.get(
+        "NOTION_WEEKLY_REFLECTION_DATABASE_ID",
+        database_ids.get("NOTION_WEEKLY_REVIEW_DATABASE_ID", ""),
+    )
+    vocabulary_database_id = database_ids["NOTION_VOCABULARY_DATABASE_ID"]
 
     update_database_properties(
         notion=notion,
@@ -213,6 +235,13 @@ def wire_database_relations(notion: Client, database_ids: dict[str, str]) -> Non
         properties={
             "Podcasts": relation_property(podcast_library_id),
         },
+    )
+
+    update_database_properties(
+        notion=notion,
+        database_id=vocabulary_database_id,
+        database_name="Vocabulary Database",
+        properties={"Source": relation_property(podcast_library_id)},
     )
 
 
@@ -251,7 +280,7 @@ def setup_workspace(parent_page_id: str, notion: Optional[Client] = None) -> dic
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Create the Notion databases required by English Podcast Learning Agent."
+        description="Create the Notion databases required by English Audio Learning Agent."
     )
     parser.add_argument(
         "--parent-page-id",

@@ -335,6 +335,85 @@ def create_complete_podcast_learning_page(
     return page_id, response.get("url")
 
 
+def find_existing_complete_podcast_page(
+    notion: Client,
+    podcast_database_id: str,
+    payload: CompletePodcastLearningPayload,
+) -> Optional[dict[str, Any]]:
+    """Find the Podcast Library page representing the same source identity."""
+    if payload.source_url:
+        query_filter: dict[str, Any] = {
+            "property": "URL",
+            "url": {"equals": payload.source_url},
+        }
+    else:
+        title = payload.analysis.podcast_metadata.title or payload.title
+        query_filter = {
+            "and": [
+                {"property": "Title", "title": {"equals": title}},
+                {
+                    "property": "Source Type",
+                    "select": {"equals": payload.source_type},
+                },
+            ]
+        }
+
+    try:
+        if hasattr(notion, "data_sources") and hasattr(notion.data_sources, "query"):
+            response = notion.data_sources.query(
+                data_source_id=podcast_database_id,
+                filter=query_filter,
+                page_size=1,
+            )
+        elif hasattr(notion, "databases") and hasattr(notion.databases, "query"):
+            response = notion.databases.query(
+                database_id=podcast_database_id,
+                filter=query_filter,
+                page_size=1,
+            )
+        else:
+            logger.warning(
+                "Notion client does not expose a data source query API; "
+                "Podcast idempotency check skipped."
+            )
+            return None
+    except APIResponseError as exc:
+        raise LearningPublisherError(
+            f"Notion API failed to check existing podcast page: {api_error_message(exc)}"
+        ) from exc
+    except Exception as exc:
+        raise LearningPublisherError(
+            f"Failed to check existing podcast page: {exc}"
+        ) from exc
+
+    results = response.get("results", [])
+    if not isinstance(results, list) or not results:
+        return None
+    first = results[0]
+    return first if isinstance(first, dict) else None
+
+
+def update_complete_podcast_page_properties(
+    notion: Client,
+    page_id: str,
+    payload: CompletePodcastLearningPayload,
+) -> None:
+    """Refresh properties for an exact repeat without duplicating page content."""
+    try:
+        notion.pages.update(
+            page_id=page_id,
+            properties=complete_podcast_page_properties(payload),
+        )
+    except APIResponseError as exc:
+        raise LearningPublisherError(
+            f"Notion API failed to update existing podcast page: {api_error_message(exc)}"
+        ) from exc
+    except Exception as exc:
+        raise LearningPublisherError(
+            f"Failed to update existing podcast page: {exc}"
+        ) from exc
+
+
 def publish_complete_learning_materials(
     payload: CompletePodcastLearningPayload,
     notion: Optional[Client] = None,
@@ -347,6 +426,32 @@ def publish_complete_learning_materials(
         notion = notion or create_notion_client(config.token)
         podcast_database_id = podcast_database_id or config.podcast_database_id
         expression_database_id = expression_database_id or config.expression_database_id
+
+    existing_page = find_existing_complete_podcast_page(
+        notion=notion,
+        podcast_database_id=podcast_database_id,
+        payload=payload,
+    )
+    if existing_page:
+        podcast_page_id = str(existing_page.get("id", "")).strip()
+        if not podcast_page_id:
+            raise LearningPublisherError(
+                "Notion existing Podcast Library result did not include a page ID."
+            )
+        podcast_page_url = existing_page.get("url")
+        update_complete_podcast_page_properties(
+            notion=notion,
+            page_id=podcast_page_id,
+            payload=payload,
+        )
+        logger.info("Updated existing Podcast Library page: %s", podcast_page_id)
+        return LearningPublishResult(
+            podcast_page_id=podcast_page_id,
+            expression_page_ids=[],
+            podcast_page_url=(
+                str(podcast_page_url) if podcast_page_url is not None else None
+            ),
+        )
 
     podcast_page_id, podcast_page_url = create_complete_podcast_learning_page(
         notion=notion,

@@ -1,6 +1,6 @@
 # Notion Onboarding
 
-This document defines how new users connect English Podcast Learning Agent to
+This document defines how new users connect English Audio Learning Agent to
 Notion after installing the skill.
 
 ## Goal

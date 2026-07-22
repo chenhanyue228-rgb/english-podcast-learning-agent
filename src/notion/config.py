@@ -18,7 +18,9 @@ NOTION_TOKEN_ENV = "NOTION_TOKEN"
 NOTION_PARENT_PAGE_ID_ENV = "NOTION_PARENT_PAGE_ID"
 PODCAST_DATABASE_ID_ENV = "NOTION_PODCAST_LIBRARY_DATABASE_ID"
 EXPRESSION_DATABASE_ID_ENV = "NOTION_EXPRESSION_DATABASE_ID"
-WEEKLY_DATABASE_ID_ENV = "NOTION_WEEKLY_REVIEW_DATABASE_ID"
+WEEKLY_DATABASE_ID_ENV = "NOTION_WEEKLY_REFLECTION_DATABASE_ID"
+LEGACY_WEEKLY_DATABASE_ID_ENV = "NOTION_WEEKLY_REVIEW_DATABASE_ID"
+VOCABULARY_DATABASE_ID_ENV = "NOTION_VOCABULARY_DATABASE_ID"
 
 
 class NotionConfigError(RuntimeError):
@@ -31,6 +33,7 @@ class NotionDatabaseMapping(TypedDict):
     podcast_database_id: str
     expression_database_id: str
     weekly_database_id: str
+    vocabulary_database_id: str
 
 
 @dataclass(frozen=True)
@@ -41,6 +44,7 @@ class NotionConfig:
     podcast_database_id: str
     expression_database_id: str
     weekly_database_id: str
+    vocabulary_database_id: str
 
     @property
     def database_mapping(self) -> NotionDatabaseMapping:
@@ -49,6 +53,7 @@ class NotionConfig:
             "podcast_database_id": self.podcast_database_id,
             "expression_database_id": self.expression_database_id,
             "weekly_database_id": self.weekly_database_id,
+            "vocabulary_database_id": self.vocabulary_database_id,
         }
 
 
@@ -95,7 +100,8 @@ def load_notion_config(
     - NOTION_TOKEN
     - NOTION_PODCAST_LIBRARY_DATABASE_ID
     - NOTION_EXPRESSION_DATABASE_ID
-    - NOTION_WEEKLY_REVIEW_DATABASE_ID
+    - NOTION_WEEKLY_REFLECTION_DATABASE_ID
+    - NOTION_VOCABULARY_DATABASE_ID
     """
     if env is None:
         load_dotenv(dotenv_path)
@@ -117,9 +123,18 @@ def load_notion_config(
             EXPRESSION_DATABASE_ID_ENV,
             "Run python -m src.notion.setup_workspace to create the workspace.",
         ),
-        weekly_database_id=require_env(
+        weekly_database_id=(
+            env.get(WEEKLY_DATABASE_ID_ENV, "").strip()
+            or env.get(LEGACY_WEEKLY_DATABASE_ID_ENV, "").strip()
+            or require_env(
+                env,
+                WEEKLY_DATABASE_ID_ENV,
+                "Run python -m src.notion.setup_workspace to create the workspace.",
+            )
+        ),
+        vocabulary_database_id=require_env(
             env,
-            WEEKLY_DATABASE_ID_ENV,
+            VOCABULARY_DATABASE_ID_ENV,
             "Run python -m src.notion.setup_workspace to create the workspace.",
         ),
     )

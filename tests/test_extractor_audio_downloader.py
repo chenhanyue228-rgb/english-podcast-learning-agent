@@ -6,8 +6,11 @@ from src.extractor import audio_downloader
 
 
 class FakeYoutubeDL:
+    last_options = None
+
     def __init__(self, options):
         self.options = options
+        type(self).last_options = options
 
     def __enter__(self):
         return self
@@ -91,8 +94,14 @@ def test_download_youtube_audio_uses_yt_dlp(monkeypatch, tmp_path: Path) -> None
         "yt_dlp",
         type("Module", (), {"YoutubeDL": FakeYoutubeDL}),
     )
+    monkeypatch.setattr(
+        audio_downloader,
+        "_resolve_ffmpeg_executable",
+        lambda: "/runtime/ffmpeg",
+    )
 
     assert audio_downloader.download_youtube_audio("https://youtu.be/abc", tmp_path) == expected_mp3
+    assert FakeYoutubeDL.last_options["ffmpeg_location"] == "/runtime/ffmpeg"
 
 
 def test_download_youtube_audio_requires_mp3_output(monkeypatch, tmp_path: Path) -> None:
@@ -101,9 +110,92 @@ def test_download_youtube_audio_requires_mp3_output(monkeypatch, tmp_path: Path)
         "yt_dlp",
         type("Module", (), {"YoutubeDL": FakeYoutubeDL}),
     )
+    monkeypatch.setattr(
+        audio_downloader,
+        "_resolve_ffmpeg_executable",
+        lambda: "/runtime/ffmpeg",
+    )
 
     with pytest.raises(audio_downloader.AudioDownloadError, match="not created"):
         audio_downloader.download_youtube_audio("https://youtu.be/abc", tmp_path)
+
+
+def test_download_youtube_audio_uses_explicit_cookie_file(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    expected_mp3 = tmp_path / "Example-abc.mp3"
+    expected_mp3.write_bytes(b"audio")
+    cookie_file = tmp_path / "youtube.cookies.txt"
+    cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    monkeypatch.setenv(audio_downloader.YOUTUBE_COOKIE_FILE_ENV, str(cookie_file))
+    monkeypatch.setattr(
+        audio_downloader,
+        "_resolve_ffmpeg_executable",
+        lambda: "/runtime/ffmpeg",
+    )
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "yt_dlp",
+        type("Module", (), {"YoutubeDL": FakeYoutubeDL}),
+    )
+
+    result = audio_downloader.download_youtube_audio("https://youtu.be/abc", tmp_path)
+
+    assert result == expected_mp3.resolve()
+    assert FakeYoutubeDL.last_options["cookiefile"] == str(cookie_file.resolve())
+
+
+def test_download_youtube_audio_rejects_missing_cookie_file(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv(
+        audio_downloader.YOUTUBE_COOKIE_FILE_ENV,
+        str(tmp_path / "missing.cookies.txt"),
+    )
+    monkeypatch.setattr(
+        audio_downloader,
+        "_resolve_ffmpeg_executable",
+        lambda: "/runtime/ffmpeg",
+    )
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "yt_dlp",
+        type("Module", (), {"YoutubeDL": FakeYoutubeDL}),
+    )
+
+    with pytest.raises(audio_downloader.AudioDownloadError, match="does not point"):
+        audio_downloader.download_youtube_audio("https://youtu.be/abc", tmp_path)
+
+
+def test_youtube_bot_check_has_safe_remediation() -> None:
+    error = audio_downloader._classify_youtube_download_error(
+        RuntimeError("Sign in to confirm you're not a bot")
+    )
+
+    assert "anti-bot" in error
+    assert audio_downloader.YOUTUBE_COOKIE_FILE_ENV in error
+    assert "never commit" in error
+
+
+def test_resolve_ffmpeg_prefers_system_binary(monkeypatch) -> None:
+    monkeypatch.setattr(audio_downloader.shutil, "which", lambda name: "/usr/bin/ffmpeg")
+
+    assert audio_downloader._resolve_ffmpeg_executable() == "/usr/bin/ffmpeg"
+
+
+def test_resolve_ffmpeg_uses_project_bundle(monkeypatch, tmp_path: Path) -> None:
+    bundled = tmp_path / "ffmpeg"
+    bundled.write_bytes(b"binary")
+    monkeypatch.setattr(audio_downloader.shutil, "which", lambda name: None)
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "imageio_ffmpeg",
+        type("Module", (), {"get_ffmpeg_exe": staticmethod(lambda: str(bundled))}),
+    )
+
+    assert audio_downloader._resolve_ffmpeg_executable() == str(bundled)
 
 
 def test_download_remote_audio_keeps_mp3(monkeypatch, tmp_path: Path) -> None:
