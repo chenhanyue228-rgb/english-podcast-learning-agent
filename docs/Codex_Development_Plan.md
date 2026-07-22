@@ -50,8 +50,8 @@ src/extractor
 Tasks:
 
 
-- Youtube extractor
-- Podcast extractor
+- Podcast URL and RSS extractor
+- Local audio loader
 
 
 Estimated:
@@ -174,3 +174,10 @@ Total:
 60-90 hours
 
 4-6 weeks
+
+---
+
+# Out of Scope for v1
+
+YouTube extraction is intentionally excluded. Any existing implementation is
+experimental future work and is not part of the supported product.

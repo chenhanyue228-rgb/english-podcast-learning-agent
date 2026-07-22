@@ -2,7 +2,7 @@
 
 ## Project
 
-English Podcast Learning Agent
+English Audio Learning Agent
 
 Version:
 v1.0

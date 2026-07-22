@@ -1,6 +1,6 @@
 # Notion Data Model
 
-This document is the source of truth for how English Podcast Learning Agent
+This document is the source of truth for how English Audio Learning Agent
 stores learning material in Notion.
 
 ## Design Principles
