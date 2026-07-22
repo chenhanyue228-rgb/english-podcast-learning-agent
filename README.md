@@ -71,18 +71,17 @@ If you only want dependencies:
 
 ### 2. Install the Codex Skill
 
-Codex discovers user-installed Skills under `~/.codex/skills/`. From the
-repository root, expose this repository's Skill with a symbolic link:
+In Codex, use the supported Skill installer with this exact request:
 
-```bash
-mkdir -p "$HOME/.codex/skills"
-ln -s "$(pwd)/skill" "$HOME/.codex/skills/english-audio-learning-agent"
+```text
+Use $skill-installer to install english-audio-learning-agent from https://github.com/chenhanyue228-rgb/english-podcast-learning-agent/tree/main/skill
 ```
 
-If that destination already exists, inspect it before replacing it. Fully quit
-and reopen Codex after creating the link so the Skill list is reloaded.
+The installer copies the repository's `skill/` directory into the Codex user
+Skill directory. The Skill becomes available on the next Codex turn. If it is
+not discovered, fully quit and reopen Codex, then start a new task.
 
-Open this repository in a new Codex task and verify discovery with:
+Verify discovery with:
 
 ```text
 Use $english-audio-learning-agent to list supported inputs
@@ -90,6 +89,19 @@ Use $english-audio-learning-agent to list supported inputs
 
 Codex should list Apple Podcasts episode URLs, podcast RSS feeds, and local
 audio files.
+
+#### Developer-only local fallback
+
+Repository contributors who need local edits to appear immediately may expose
+the working tree with a symbolic link:
+
+```bash
+mkdir -p "$HOME/.codex/skills"
+ln -s "$(pwd)/skill" "$HOME/.codex/skills/english-audio-learning-agent"
+```
+
+This symlink is not the primary end-user installation path. Inspect an existing
+destination before replacing it.
 
 ### 3. Configure Notion
 
@@ -117,7 +129,7 @@ The command creates and connects four databases:
 
 - Podcast Library
 - Expression Database
-- Weekly Reflection
+- Weekly Review (stores the Weekly Reflection learning note)
 - Vocabulary Database
 
 It writes the parent page ID and all four database IDs into `.env`. Validate
@@ -141,8 +153,8 @@ For a podcast or audio source:
 
 This creates the intermediate transcript and analysis-request artifacts.
 
-Then Codex generates the AI JSON artifact, and Python publishes the final
-Notion page:
+Then use `$english-audio-learning-agent` to generate the AI JSON artifact.
+Python validates it and publishes the final Notion page:
 
 ```bash
 ./.venv/bin/python src/main.py "<source>" \

@@ -178,7 +178,7 @@ def create_base_databases(notion: Client, parent_page_id: str) -> dict[str, str]
     weekly_review_id = create_database(
         notion=notion,
         parent_page_id=parent_page_id,
-        name="Weekly Reflection",
+        name="Weekly Review",
         properties={
             "Week": title_property(),
             "Date": {"date": {}},
@@ -231,7 +231,7 @@ def wire_database_relations(notion: Client, database_ids: dict[str, str]) -> Non
     update_database_properties(
         notion=notion,
         database_id=weekly_review_id,
-        database_name="Weekly Reflection",
+        database_name="Weekly Review",
         properties={
             "Podcasts": relation_property(podcast_library_id),
         },
@@ -314,7 +314,8 @@ def print_onboarding() -> None:
                 "7. Run: ./.venv/bin/python -m src.notion.setup_workspace --parent-page-id <page_url_or_id>",
                 "8. Run: ./.venv/bin/python -m src.notion.check_workspace",
                 "",
-                "The setup creates Podcast Library, Expression Database, Weekly Reflection, and Vocabulary Database.",
+                "The setup creates Podcast Library, Expression Database, Weekly Review, and Vocabulary Database.",
+                "Weekly Review stores the Weekly Reflection learning note.",
             ]
         )
     )

@@ -111,15 +111,15 @@ Codex should be used for reasoning and content generation.
 
 ### Step 1: Install the Skill
 
-From the repository root, expose `skill/` in Codex's user Skill directory:
+In Codex, use the supported Skill installer:
 
-```bash
-mkdir -p "$HOME/.codex/skills"
-ln -s "$(pwd)/skill" "$HOME/.codex/skills/english-audio-learning-agent"
+```text
+Use $skill-installer to install english-audio-learning-agent from https://github.com/chenhanyue228-rgb/english-podcast-learning-agent/tree/main/skill
 ```
 
-If the destination already exists, inspect it before replacing it. Fully quit
-and reopen Codex, start a new task in this repository, and verify discovery:
+The Skill becomes available on the next Codex turn. If Codex does not discover
+it, fully quit and reopen Codex, then start a new task in this repository.
+Verify discovery with:
 
 ```text
 Use $english-audio-learning-agent to list supported inputs
@@ -127,6 +127,11 @@ Use $english-audio-learning-agent to list supported inputs
 
 The expected inputs are Apple Podcasts episode URLs, podcast RSS feeds, and
 local audio files.
+
+Developer-only fallback: repository contributors may link `skill/` to
+`$HOME/.codex/skills/english-audio-learning-agent` when they need working-tree
+edits to appear immediately. This is not the primary end-user installation
+path, and an existing destination must be inspected before replacement.
 
 ### Step 2: Configure the Environment
 
@@ -148,8 +153,9 @@ validate all four databases:
 ./.venv/bin/python -m src.notion.check_workspace
 ```
 
-The setup command creates Podcast Library, Expression Database, Weekly
-Reflection, and Vocabulary Database, then writes their IDs to `.env`.
+The setup command creates Podcast Library, Expression Database, Weekly Review,
+and Vocabulary Database, then writes their IDs to `.env`. Weekly Review stores
+the Weekly Reflection learning note.
 
 FFmpeg is supplied by the project dependency set when no system installation
 is present.

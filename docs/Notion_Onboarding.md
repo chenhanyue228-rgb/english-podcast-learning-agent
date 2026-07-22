@@ -46,7 +46,7 @@ Flow:
 7. The setup script normalizes the parent page URL or ID and creates:
    - `Podcast Library`
    - `Expression Database`
-   - `Weekly Reflection`
+   - `Weekly Review` (stores the Weekly Reflection learning note)
    - `Vocabulary Database`
 8. The setup script connects the required relations and writes the parent page
    ID plus all four database IDs back to `.env`.

@@ -53,7 +53,7 @@ def test_create_base_databases_uses_four_product_database_names(monkeypatch) -> 
     assert created_names == [
         "Podcast Library",
         "Expression Database",
-        "Weekly Reflection",
+        "Weekly Review",
         "Vocabulary Database",
     ]
     assert set(database_ids) == {
@@ -64,12 +64,18 @@ def test_create_base_databases_uses_four_product_database_names(monkeypatch) -> 
     }
 
 
-def test_print_onboarding_describes_single_four_database_flow(capsys) -> None:
+def test_print_onboarding_describes_single_four_database_flow(
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setenv("NOTION_TOKEN", "top-secret-token")
     setup_workspace.print_onboarding()
 
     output = capsys.readouterr().out
     assert "Notion onboarding modes" not in output
     assert "Podcast Library" in output
     assert "Expression Database" in output
-    assert "Weekly Reflection" in output
+    assert "Weekly Review" in output
+    assert "Weekly Reflection learning note" in output
     assert "Vocabulary Database" in output
+    assert "top-secret-token" not in output

@@ -965,12 +965,16 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if result:
         if result.kind == "analysis_request":
-            print(f"Codex AI Analysis Request: {result.value}")
+            print("Codex AI Analysis Request:")
+            print(result.value)
             if result.expected_output_path and result.rerun_command:
-                print(f"Expected Analysis Output: {result.expected_output_path}")
-                print("Next step:")
-                print("Use Codex to read the request and generate:")
+                print()
+                print("Use $english-audio-learning-agent to read:")
+                print(result.value)
+                print()
+                print("Generate schema-conformant JSON at:")
                 print(result.expected_output_path)
+                print()
                 print("Then run:")
                 print(result.rerun_command)
         elif result.kind == "weekly_review_request":

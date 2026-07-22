@@ -1192,9 +1192,11 @@ def test_main_prints_complete_analysis_artifact_handoff(monkeypatch, capsys) -> 
 
     output = capsys.readouterr().out
     assert exit_code == 0
-    assert "Codex AI Analysis Request: /project/data/analysis_requests/example.json" in output
-    assert "Expected Analysis Output: /project/data/analysis/example.json" in output
-    assert "Use Codex to read the request and generate:" in output
+    assert "Codex AI Analysis Request:\n/project/data/analysis_requests/example.json" in output
+    assert "Use $english-audio-learning-agent to read:" in output
+    assert "Use Codex" not in output
+    assert "Generate schema-conformant JSON at:" in output
+    assert "/project/data/analysis/example.json" in output
     assert "Then run:" in output
     assert "--transcript-json transcript.json --analysis-json analysis.json" in output
 
