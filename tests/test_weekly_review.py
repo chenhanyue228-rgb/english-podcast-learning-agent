@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+import logging
+
 from src.workflow.weekly_review_pipeline import (
+    _extract_multi_select_property,
+    _extract_rich_text_property,
+    _extract_select_property,
+    _extract_title_property,
     fetch_weekly_learning_data,
     run_weekly_review_workflow,
 )
@@ -36,6 +42,23 @@ class FakeDataSources:
         return FakeQueryResult(self.expression_results)
 
 
+class FakeDatabases:
+    def __init__(self, podcast_results=None, expression_results=None, weekly_results=None):
+        self.podcast_results = podcast_results or []
+        self.expression_results = expression_results or []
+        self.weekly_results = weekly_results or []
+        self.query_calls = []
+
+    def query(self, **kwargs):
+        self.query_calls.append(kwargs)
+        database_id = kwargs.get("database_id")
+        if database_id == "podcast_db":
+            return FakeQueryResult(self.podcast_results)
+        if database_id == "weekly_db":
+            return FakeQueryResult(self.weekly_results)
+        return FakeQueryResult(self.expression_results)
+
+
 class FakePages:
     def __init__(self):
         self.create_calls = []
@@ -58,6 +81,7 @@ class FakeBlocks:
 class FakeNotion:
     def __init__(self, podcast_results=None, expression_results=None, weekly_results=None):
         self.data_sources = FakeDataSources(podcast_results, expression_results, weekly_results)
+        self.databases = FakeDatabases(podcast_results, expression_results, weekly_results)
         self.pages = FakePages()
         self.blocks = FakeBlocks()
 
@@ -102,6 +126,46 @@ def test_empty_week_fetches_no_data(tmp_path: Path) -> None:
     assert data.expressions == []
 
 
+def test_extractors_return_empty_string_for_null_notion_fields(caplog) -> None:
+    page = {
+        "id": "page_1",
+        "properties": {
+            "Title": {"title": None},
+            "Topic": {"select": None},
+            "Difficulty": {"multi_select": None},
+            "Short Summary": {"rich_text": None},
+        },
+    }
+
+    caplog.set_level(logging.DEBUG)
+
+    assert _extract_title_property(page) == ""
+    assert _extract_select_property(page, "Topic") == ""
+    assert _extract_multi_select_property(page, "Difficulty") == ""
+    assert _extract_rich_text_property(page, "Short Summary") == ""
+
+    debug_lines = "\n".join(record.message for record in caplog.records)
+    assert "page_id=page_1" in debug_lines
+    assert "property_name=Title" in debug_lines
+    assert "property_name=Topic" in debug_lines
+    assert "property_name=Difficulty" in debug_lines
+    assert "property_name=Short Summary" in debug_lines
+
+
+def test_extractors_return_empty_string_when_property_missing(caplog) -> None:
+    page = {"id": "page_2", "properties": {}}
+
+    caplog.set_level(logging.DEBUG)
+
+    assert _extract_title_property(page) == ""
+    assert _extract_select_property(page, "Topic") == ""
+    assert _extract_multi_select_property(page, "Tags") == ""
+    assert _extract_rich_text_property(page, "Short Summary") == ""
+
+    debug_lines = "\n".join(record.message for record in caplog.records)
+    assert "page_id=page_2" in debug_lines
+
+
 def test_weekly_review_workflow_collects_podcasts_and_expressions(tmp_path: Path) -> None:
     notion = FakeNotion(
         podcast_results=[podcast_page("podcast_1", "Episode 1")],
@@ -110,7 +174,7 @@ def test_weekly_review_workflow_collects_podcasts_and_expressions(tmp_path: Path
     )
     analysis_path = tmp_path / "weekly_review.json"
     analysis_path.write_text(
-        '{"week":"2026-W29","date":"2026-07-17","statistics":{"podcast_count":1,"expression_count":1,"category_distribution":{"Business Phrase":1}},"summary":{"english":"Summary","chinese":"总结"},"key_learning_points":["Point"],"recommended_review":[{"expression":"take ownership","reason":"Useful"}]}',
+        '{"week":"2026-W29","executive_summary":{"overview":"Summary","takeaway":"总结","highlights":["Topic"]},"knowledge_insights":[{"what_happened":"Something happened","why_it_matters":"It matters","my_interpretation":"Interpretation","application":"Apply it"}],"expression_upgrade":[{"expression":"take ownership","meaning":"Accept responsibility","context":"Useful","example":"We need to take ownership."}],"vocabulary_memory":[],"career_reflection":{"questions":["What changed?"],"possible_applications":["Use it at work."]},"next_learning_direction":["Plan"]}',
         encoding="utf-8",
     )
 
@@ -125,8 +189,10 @@ def test_weekly_review_workflow_collects_podcasts_and_expressions(tmp_path: Path
 
     assert result.publish_result.page_id == "weekly_page"
     assert notion.pages.create_calls
-    assert notion.pages.create_calls[0]["properties"]["Expression Count"] == {"number": 1}
-    assert notion.pages.create_calls[0]["properties"]["Podcasts"] == {"relation": [{"id": "podcast_1"}]}
+    assert notion.pages.create_calls[0]["properties"]["Week"]["title"][0]["text"]["content"] == "2026-W29"
+    assert notion.pages.create_calls[0]["properties"]["Status"] == {"select": {"name": "Draft"}}
+    assert notion.data_sources.query_calls[0]["data_source_id"] == "podcast_db"
+    assert notion.data_sources.query_calls[1]["data_source_id"] == "expression_db"
 
 
 def test_multiple_podcasts_keep_all_relations(tmp_path: Path) -> None:
@@ -143,7 +209,7 @@ def test_multiple_podcasts_keep_all_relations(tmp_path: Path) -> None:
     )
     analysis_path = tmp_path / "weekly_review.json"
     analysis_path.write_text(
-        '{"week":"2026-W29","date":"2026-07-17","statistics":{"podcast_count":2,"expression_count":2,"category_distribution":{"Business Phrase":2}},"summary":{"english":"Summary","chinese":"总结"},"key_learning_points":["Point"],"recommended_review":[{"expression":"take ownership","reason":"Useful"}]}',
+        '{"week":"2026-W29","executive_summary":{"overview":"Summary","takeaway":"总结","highlights":["Topic"]},"knowledge_insights":[{"what_happened":"Something happened","why_it_matters":"It matters","my_interpretation":"Interpretation","application":"Apply it"}],"expression_upgrade":[{"expression":"take ownership","meaning":"Accept responsibility","context":"Useful","example":"We need to take ownership."}],"vocabulary_memory":[],"career_reflection":{"questions":["What changed?"],"possible_applications":["Use it at work."]},"next_learning_direction":["Plan"]}',
         encoding="utf-8",
     )
 
@@ -157,6 +223,30 @@ def test_multiple_podcasts_keep_all_relations(tmp_path: Path) -> None:
     )
 
     assert result.publish_result.page_id == "weekly_page"
-    assert notion.pages.create_calls[0]["properties"]["Podcasts"] == {
-        "relation": [{"id": "podcast_1"}, {"id": "podcast_2"}]
-    }
+    assert notion.pages.create_calls[0]["properties"]["Week"]["title"][0]["text"]["content"] == "2026-W29"
+    assert notion.data_sources.query_calls[0]["data_source_id"] == "podcast_db"
+
+
+def test_weekly_review_workflow_preserves_vocabulary_memory(tmp_path: Path) -> None:
+    notion = FakeNotion(
+        podcast_results=[podcast_page("podcast_1", "Episode 1")],
+        expression_results=[expression_page("expr_1", "take ownership", "podcast_1")],
+        weekly_results=[],
+    )
+    analysis_path = tmp_path / "weekly_review.json"
+    analysis_path.write_text(
+        '{"week":"2026-W29","executive_summary":{"overview":"Summary","takeaway":"总结","highlights":["Topic"]},"knowledge_insights":[{"what_happened":"Something happened","why_it_matters":"It matters","my_interpretation":"Interpretation","application":"Apply it"}],"expression_upgrade":[{"expression":"take ownership","meaning":"Accept responsibility","context":"Useful","example":"We need to take ownership."}],"vocabulary_memory":[{"word":"leverage","context":"Companies can leverage AI.","meaning":"Use resources effectively","professional_category":"Word","my_usage":"We can leverage AI tools to save time.","review_status":"New"}],"career_reflection":{"questions":["What changed?"],"possible_applications":["Use it at work."]},"next_learning_direction":["Plan"]}',
+        encoding="utf-8",
+    )
+
+    result = run_weekly_review_workflow(
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+        weekly_database_id="weekly_db",
+        data_dir=tmp_path,
+        generated_analysis_path=analysis_path,
+    )
+
+    assert result.publish_result.page_id == "weekly_page"
+    assert notion.pages.create_calls[0]["properties"]["Week"]["title"][0]["text"]["content"] == "2026-W29"
