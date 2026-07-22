@@ -7,7 +7,7 @@ Phase 4 — Product Validation
 ## Stable Baseline
 
 - Release: v1.1.0
-- Main commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
+- v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
 - Tests: 345 passed
 - Architecture: Stable
 

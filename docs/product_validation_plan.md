@@ -8,7 +8,7 @@ new user without project-author assistance.
 ## 2. Stable Baseline
 
 - Release: v1.1.0
-- Main commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
+- v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
 - Architecture: stable Codex Artifact Runtime
 - Verification: 345 passing tests and CLI smoke check
 - Supported inputs: Podcast episode URL, Podcast RSS feed, local audio file
