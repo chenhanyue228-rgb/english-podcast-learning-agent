@@ -396,12 +396,15 @@ def parse_args() -> argparse.Namespace:
         description="Process podcast learning data and publish it to Notion."
     )
     parser.add_argument("--title", required=True, help="Podcast title.")
-    parser.add_argument("--source-url", help="Original podcast, YouTube, or audio URL.")
+    parser.add_argument("--source-url", help="Original podcast or audio source URL.")
     parser.add_argument(
         "--source-type",
         required=True,
         choices=["YouTube", "Podcast", "Local Audio"],
-        help="Source type stored in Notion.",
+        help=(
+            "Source type stored in Notion. YouTube is retained only for legacy "
+            "compatibility and is outside v1."
+        ),
     )
     parser.add_argument("--topic", help="Podcast topic.")
     parser.add_argument("--difficulty", help="Learning difficulty.")

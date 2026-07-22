@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -21,6 +22,7 @@ DOWNLOAD_CHUNK_SIZE_BYTES = 8192
 DOWNLOAD_TIMEOUT_SECONDS = 60
 DOWNLOAD_MAX_RETRIES = 3
 DOWNLOAD_PROGRESS_INTERVAL_BYTES = 5 * 1024 * 1024
+YOUTUBE_COOKIE_FILE_ENV = "YOUTUBE_COOKIE_FILE"
 
 
 class AudioDownloadError(RuntimeError):
@@ -129,8 +131,93 @@ def _download_remote_audio_once(
         _stream_response_to_file(response, destination)
 
 
+def _resolve_ffmpeg_executable() -> str:
+    """Return a usable system or project-bundled ffmpeg executable."""
+    system_ffmpeg = shutil.which("ffmpeg")
+    if system_ffmpeg:
+        return system_ffmpeg
+
+    try:
+        import imageio_ffmpeg
+
+        bundled_ffmpeg = Path(imageio_ffmpeg.get_ffmpeg_exe())
+    except (ImportError, RuntimeError, OSError) as exc:
+        raise AudioDownloadError(
+            "YouTube conversion failed: ffmpeg is unavailable. Install ffmpeg or "
+            "install project dependencies with pip install -r requirements.txt."
+        ) from exc
+
+    if not bundled_ffmpeg.is_file():
+        raise AudioDownloadError(
+            "YouTube conversion failed: the bundled ffmpeg executable was not found. "
+            "Reinstall project dependencies with pip install -r requirements.txt."
+        )
+    return str(bundled_ffmpeg)
+
+
+def _resolve_youtube_cookie_file() -> Optional[Path]:
+    """Validate an explicitly supplied cookie file without reading its contents."""
+    configured_path = os.getenv(YOUTUBE_COOKIE_FILE_ENV, "")
+    if not configured_path:
+        return None
+
+    cookie_file = Path(configured_path).expanduser()
+    if not cookie_file.is_file():
+        raise AudioDownloadError(
+            f"YouTube cookie configuration failed: {YOUTUBE_COOKIE_FILE_ENV} does not "
+            "point to an existing file. Provide a user-exported Netscape cookie file "
+            "or unset the variable."
+        )
+    return cookie_file.resolve()
+
+
+def _classify_youtube_download_error(exc: Exception) -> str:
+    """Return a safe, actionable error for common yt-dlp failures."""
+    message = str(exc)
+    lowered = message.lower()
+
+    if (
+        "sign in to confirm" in lowered
+        or "not a bot" in lowered
+        or "login required" in lowered
+    ):
+        return (
+            "YouTube authentication is required by the platform's anti-bot checks. "
+            "Retrying without a changed network may not help. Optionally set "
+            f"{YOUTUBE_COOKIE_FILE_ENV} to a user-exported Netscape cookie file; "
+            "never commit or share that file."
+        )
+    if "unsupported url" in lowered:
+        return "The supplied URL is not supported by the YouTube downloader."
+    if any(
+        token in lowered
+        for token in (
+            "requested format is not available",
+            "no video formats found",
+            "no formats found",
+            "does not have any formats",
+        )
+    ):
+        return "YouTube did not expose a downloadable audio stream for this video."
+    if any(
+        token in lowered
+        for token in (
+            "unable to download",
+            "connection",
+            "network",
+            "timed out",
+            "temporary failure",
+            "name or service not known",
+        )
+    ):
+        return "YouTube download failed because of a network error; retry is reasonable."
+    if "ffmpeg" in lowered or "postprocess" in lowered:
+        return "YouTube audio conversion failed in ffmpeg. Verify the ffmpeg runtime."
+    return f"YouTube audio download failed: {message}"
+
+
 def download_youtube_audio(url: str, output_dir: Union[Path, str]) -> Path:
-    """Download YouTube audio with yt-dlp and convert it to mp3."""
+    """Experimental, non-v1 YouTube download and mp3 conversion path."""
     try:
         from yt_dlp import YoutubeDL
     except ModuleNotFoundError as exc:
@@ -141,11 +228,17 @@ def download_youtube_audio(url: str, output_dir: Union[Path, str]) -> Path:
     audio_dir = Path(output_dir)
     audio_dir.mkdir(parents=True, exist_ok=True)
     output_template = str(audio_dir / "%(title).200B-%(id)s.%(ext)s")
+    ffmpeg_path = _resolve_ffmpeg_executable()
+    cookie_file = _resolve_youtube_cookie_file()
 
     options = {
         "format": "bestaudio/best",
         "outtmpl": output_template,
         "noplaylist": True,
+        "ffmpeg_location": ffmpeg_path,
+        "retries": DOWNLOAD_MAX_RETRIES,
+        "fragment_retries": DOWNLOAD_MAX_RETRIES,
+        "socket_timeout": DOWNLOAD_TIMEOUT_SECONDS,
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -156,6 +249,12 @@ def download_youtube_audio(url: str, output_dir: Union[Path, str]) -> Path:
         "quiet": True,
         "no_warnings": True,
     }
+    if cookie_file:
+        options["cookiefile"] = str(cookie_file)
+        LOGGER.warning(
+            "Using an explicit user-supplied YouTube cookie file. Keep it private "
+            "and outside version control."
+        )
 
     LOGGER.info("Downloading YouTube audio")
     try:
@@ -163,7 +262,7 @@ def download_youtube_audio(url: str, output_dir: Union[Path, str]) -> Path:
             info = ydl.extract_info(url, download=True)
             prepared_path = Path(ydl.prepare_filename(info))
     except Exception as exc:
-        raise AudioDownloadError(f"Failed to download YouTube audio: {exc}") from exc
+        raise AudioDownloadError(_classify_youtube_download_error(exc)) from exc
 
     return validate_audio_file(prepared_path.with_suffix(".mp3"))
 
@@ -244,11 +343,7 @@ def convert_to_mp3(input_path: Path) -> Path:
     if not input_path.exists() or input_path.stat().st_size <= 0:
         raise AudioDownloadError(f"Cannot convert missing or empty file: {input_path}")
 
-    ffmpeg_path = shutil.which("ffmpeg")
-    if not ffmpeg_path:
-        raise AudioDownloadError(
-            "ffmpeg is required for mp3 conversion. Install ffmpeg and try again."
-        )
+    ffmpeg_path = _resolve_ffmpeg_executable()
 
     output_path = input_path.with_suffix(".mp3")
     command = [

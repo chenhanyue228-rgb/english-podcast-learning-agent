@@ -1,4 +1,4 @@
-"""Application settings for English Podcast Learning Agent.
+"""Application settings for English Audio Learning Agent.
 
 The settings layer stays intentionally small. It centralizes environment
 loading for extraction, transcription, generated artifacts, and Notion access.

@@ -1,0 +1,59 @@
+{
+  "type": "object",
+  "required": [
+    "period",
+    "core_idea",
+    "mindset_shift",
+    "ideas_worth_compounding",
+    "expressions_worth_reusing",
+    "language_thinking_connection",
+    "next_week_application",
+    "sources"
+  ],
+  "properties": {
+    "period": {
+      "type": "object",
+      "required": ["start_date", "end_date", "generated_at", "source"]
+    },
+    "core_idea": {
+      "type": "object",
+      "required": ["idea", "why_it_matters", "refined_understanding"]
+    },
+    "mindset_shift": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "object", "required": ["before", "now"]}
+      ]
+    },
+    "ideas_worth_compounding": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["idea", "why_it_matters", "application", "source_reference"]
+      }
+    },
+    "expressions_worth_reusing": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["expression", "contextual_meaning", "reusable_example", "communication_function"]
+      }
+    },
+    "language_thinking_connection": {"type": "string"},
+    "next_week_application": {
+      "type": "object",
+      "required": ["scenario", "behavior", "phrase_to_use", "completion_condition"]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page_id", "title", "url"]
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-"""Create sample Notion learning data for English Podcast Learning Agent.
+"""Create sample Notion learning data for English Audio Learning Agent.
 
 Usage:
     python -m src.notion.create_example_data

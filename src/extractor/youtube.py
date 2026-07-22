@@ -1,4 +1,4 @@
-"""YouTube audio extraction using yt-dlp."""
+"""Experimental YouTube extraction retained outside the supported v1 product."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ class YouTubeExtractionError(RuntimeError):
 
 
 def extract_youtube_audio(source_url: str, output_dir: Union[Path, str]) -> Path:
-    """Download YouTube audio only and convert it to mp3."""
+    """Experimentally download YouTube audio and convert it to mp3."""
     try:
         from yt_dlp import YoutubeDL
     except ModuleNotFoundError as exc:

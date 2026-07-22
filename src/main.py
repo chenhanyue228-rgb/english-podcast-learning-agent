@@ -39,6 +39,14 @@ from src.analyzer.weekly_review_analyzer import (
     save_weekly_review_request,
     validate_weekly_review_output,
 )
+from src.agents.weekly_review_agent import (
+    WeeklyReviewAgentError,
+    run_weekly_review_agent,
+)
+from src.agent.vocabulary_sync_agent import (
+    VocabularySyncAgentError,
+    sync_vocabulary_from_highlight_changes,
+)
 from src.extractor.pipeline import SourceExtractionError, extract_audio_from_source
 from src.extractor.podcast_resolver import PodcastResolverError, resolve_podcast_title
 from src.extractor.router import SourceRouterError, SourceType, detect_source
@@ -47,10 +55,21 @@ from src.notion.learning_publisher import (
     LearningPublisherError,
     publish_complete_learning_materials,
 )
+from src.workflow.highlight_vocabulary_publish_pipeline import (
+    HighlightVocabularyPublishResult,
+    publish_highlight_vocabulary,
+)
 from src.notion.weekly_review_publisher import (
     WeeklyReviewPublishPayload,
     WeeklyReviewPublisherError,
     publish_weekly_review,
+)
+from src.notion.comment_vocab_sync import (
+    CommentVocabSyncError,
+    debug_comment_sync,
+    debug_comment_sources,
+    debug_page_comments,
+    sync_vocab_comments,
 )
 from src.notion.config import load_notion_config
 from src.notion.uploader import (
@@ -64,6 +83,10 @@ from src.transcriber.whisper import save_transcript_json
 from src.workflow.weekly_review_pipeline import (
     WeeklyReviewPipelineError,
     fetch_weekly_learning_data,
+)
+from src.workflow.weekly_reflection_pipeline import (
+    WeeklyReflectionPipelineError,
+    run_weekly_reflection_pipeline,
 )
 
 
@@ -90,8 +113,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "source",
         nargs="?",
         help=(
-            "YouTube URL, Apple Podcasts page URL, Podcast RSS URL, direct "
-            "audio URL, or local audio file."
+            "Apple Podcasts page URL, Podcast RSS URL, or local audio file."
         ),
     )
     parser.add_argument(
@@ -101,7 +123,10 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--source-type",
         choices=["YouTube", "Podcast", "Local Audio"],
-        help="Optional Notion Source Type. Defaults based on detected source.",
+        help=(
+            "Optional Notion Source Type. YouTube remains a legacy experimental "
+            "value and is not supported in v1."
+        ),
     )
     parser.add_argument(
         "--model-size",
@@ -133,8 +158,24 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--weekly-review",
-        action="store_true",
-        help="Generate or publish the current week's Weekly Review workflow.",
+        nargs="?",
+        const="",
+        default=None,
+        help=(
+            "Generate the current week's Weekly Review request when used "
+            "without a path, or publish the provided analysis JSON when a "
+            "path is supplied."
+        ),
+    )
+    parser.add_argument(
+        "--weekly-reflection",
+        nargs="?",
+        const="",
+        default=None,
+        help=(
+            "Run the full Weekly Reflection pipeline. When used without a path, "
+            "it loads output/weekly_learning_context.json."
+        ),
     )
     parser.add_argument(
         "--weekly-review-json",
@@ -142,6 +183,64 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help=(
             "Path to Codex-generated Weekly Review JSON. When provided with "
             "--weekly-review, publishes the weekly review to Notion."
+        ),
+    )
+    parser.add_argument(
+        "--sync-vocab-comments",
+        action="store_true",
+        help=(
+            "Scan Podcast Library comments for ?vocab triggers and sync "
+            "manual vocabulary captures into the Vocabulary Database."
+        ),
+    )
+    parser.add_argument(
+        "--run-vocabulary-agent",
+        action="store_true",
+        help=(
+            "Scan changed Podcast Library pages for new pink highlights and "
+            "sync them into the Vocabulary Database."
+        ),
+    )
+    parser.add_argument(
+        "--publish-highlight-vocab",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="PAGE_ID",
+        help=(
+            "Publish approved pink-highlight vocabulary from a Notion page "
+            "into the Vocabulary Database."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview vocabulary publishing without calling Notion.",
+    )
+    parser.add_argument(
+        "--debug-comments",
+        action="store_true",
+        help="Print raw Podcast Library comments without filtering.",
+    )
+    parser.add_argument(
+        "--debug-page-comments",
+        action="store_true",
+        help="Print page_id comment payloads fetched via Notion comments?page_id=...",
+    )
+    parser.add_argument(
+        "--debug-comment-sources",
+        action="store_true",
+        help=(
+            "Print summaries of fetched Podcast Library comments, including "
+            "comment text, discussion info, and source structure."
+        ),
+    )
+    parser.add_argument(
+        "--publish-weekly-review",
+        type=Path,
+        help=(
+            "Path to Codex-generated Weekly Review JSON. Publishes the weekly "
+            "review to Notion."
         ),
     )
     parser.add_argument(
@@ -253,21 +352,232 @@ def load_transcript_json(path: Path) -> dict:
     return payload
 
 
+def load_json_object(path: Path, label: str) -> dict:
+    """Load a JSON object from disk for publish-only commands."""
+    if not path.exists():
+        raise MainPipelineError(f"{label} does not exist: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise MainPipelineError(f"{label} is invalid: {exc.msg}") from exc
+    if not isinstance(payload, dict):
+        raise MainPipelineError(f"{label} must be a JSON object.")
+    return payload
+
+
+def sync_vocab_comments_from_cli(dry_run: bool = False) -> MainPipelineResult:
+    settings = load_settings()
+    configure_logging(settings.log_level)
+    try:
+        result = sync_vocab_comments(dry_run=dry_run)
+    except Exception as exc:
+        raise MainPipelineError(str(exc)) from exc
+
+    if dry_run:
+        print("Vocabulary comment sync dry run")
+        print()
+        print("Scanned pages:")
+        print(result.scanned_pages)
+        print()
+        print("Matched comments:")
+        print(result.matched_comments)
+        print()
+        print("Create:")
+        print(result.created)
+        print()
+        print("Update:")
+        print(result.updated)
+        print()
+        print("Preview:")
+        for preview in result.previews or []:
+            print(json.dumps(preview, ensure_ascii=False, indent=2))
+        return MainPipelineResult(
+            kind="vocab_comment_sync_dry_run",
+            value=str(result.scanned_pages),
+        )
+
+    LOGGER.info(
+        "Vocabulary comments synced: created=%s updated=%s skipped=%s",
+        result.created,
+        result.updated,
+        result.skipped,
+    )
+    return MainPipelineResult(
+        kind="vocab_comment_sync",
+        value=f"created={result.created}, updated={result.updated}, skipped={result.skipped}",
+    )
+
+
+def publish_highlight_vocab_from_cli(page_id: str) -> MainPipelineResult:
+    settings = load_settings()
+    configure_logging(settings.log_level)
+    if not page_id.strip():
+        raise MainPipelineError("--publish-highlight-vocab requires a page_id.")
+
+    try:
+        result: HighlightVocabularyPublishResult = publish_highlight_vocabulary(page_id.strip())
+    except Exception as exc:
+        raise MainPipelineError(str(exc)) from exc
+
+    LOGGER.info(
+        "Highlight vocabulary published: created=%s updated=%s skipped=%s",
+        result.created,
+        result.updated,
+        result.skipped,
+    )
+    return MainPipelineResult(
+        kind="highlight_vocab_page",
+        value=f"created={result.created}, updated={result.updated}, skipped={result.skipped}",
+    )
+
+
+def debug_comments_from_cli() -> MainPipelineResult:
+    settings = load_settings()
+    configure_logging(settings.log_level)
+    try:
+        result = debug_comment_sync()
+    except Exception as exc:
+        raise MainPipelineError(str(exc)) from exc
+    return MainPipelineResult(kind="debug_comments", value=str(result))
+
+
+def debug_page_comments_from_cli() -> MainPipelineResult:
+    settings = load_settings()
+    configure_logging(settings.log_level)
+    try:
+        result = debug_page_comments()
+    except Exception as exc:
+        raise MainPipelineError(str(exc)) from exc
+    return MainPipelineResult(kind="debug_page_comments", value=str(result))
+
+
+def debug_comment_sources_from_cli() -> MainPipelineResult:
+    settings = load_settings()
+    configure_logging(settings.log_level)
+    try:
+        result = debug_comment_sources()
+    except Exception as exc:
+        raise MainPipelineError(str(exc)) from exc
+    return MainPipelineResult(kind="debug_comment_sources", value=str(result))
+
+
+def run_vocabulary_agent_from_cli() -> MainPipelineResult:
+    settings = load_settings()
+    configure_logging(settings.log_level)
+    try:
+        result = sync_vocabulary_from_highlight_changes()
+    except Exception as exc:
+        raise MainPipelineError(str(exc)) from exc
+
+    LOGGER.info(
+        "Vocabulary sync agent finished: pages=%s new_highlights=%s created=%s updated=%s skipped=%s",
+        result.scanned_pages,
+        result.new_highlights,
+        result.created,
+        result.updated,
+        result.skipped,
+    )
+    return MainPipelineResult(
+        kind="vocabulary_sync_agent",
+        value=(
+            f"pages={result.scanned_pages}, new_highlights={result.new_highlights}, "
+            f"created={result.created}, updated={result.updated}, skipped={result.skipped}"
+        ),
+    )
+
+
+def publish_vocab_from_file(path: Path, dry_run: bool = False) -> MainPipelineResult:
+    settings = load_settings()
+    configure_logging(settings.log_level)
+    try:
+        expressions = load_analysis_expressions(path)
+        if not expressions:
+            raise MainPipelineError("Analysis JSON does not contain any expressions.")
+
+        if dry_run:
+            plan = build_vocabulary_publish_plan(expressions)
+            _print_vocabulary_dry_run(plan)
+            return MainPipelineResult(kind="vocabulary_dry_run", value=str(path))
+
+        config = load_notion_config()
+        notion = create_notion_client(config.token)
+
+        created = 0
+        updated = 0
+        for expression in expressions:
+            word = str(expression.get("expression", "")).strip()
+            if not word:
+                continue
+            result = upsert_vocabulary_page(
+                expression_to_vocabulary_payload(expression),
+                notion=notion,
+                vocabulary_database_id=config.vocabulary_database_id,
+            )
+            if result.action == "updated":
+                updated += 1
+            else:
+                created += 1
+    except Exception as exc:
+        raise MainPipelineError(str(exc)) from exc
+
+    LOGGER.info("Vocabulary pages published: created=%s updated=%s", created, updated)
+    return MainPipelineResult(
+        kind="vocabulary_page",
+        value=f"created={created}, updated={updated}",
+    )
+
+
+def publish_weekly_review_from_file(path: Path) -> MainPipelineResult:
+    settings = load_settings()
+    configure_logging(settings.log_level)
+    try:
+        config = load_notion_config()
+        notion = create_notion_client(config.token)
+        weekly_review_json = validate_weekly_review_output(
+            load_json_object(path, "Weekly Review JSON")
+        )
+        result = publish_weekly_review(
+            WeeklyReviewPublishPayload(
+                week=str(weekly_review_json.get("week", "")),
+                executive_summary=weekly_review_json.get("executive_summary", {}),
+                knowledge_insights=weekly_review_json.get("knowledge_insights", []),
+                expression_upgrade=weekly_review_json.get("expression_upgrade", []),
+                vocabulary_memory=weekly_review_json.get("vocabulary_memory", []),
+                career_reflection=weekly_review_json.get("career_reflection", {}),
+                next_learning_direction=weekly_review_json.get("next_learning_direction", []),
+            ),
+            notion=notion,
+            weekly_database_id=config.weekly_database_id,
+            vocabulary_database_id=config.vocabulary_database_id,
+        )
+    except Exception as exc:
+        raise MainPipelineError(str(exc)) from exc
+
+    LOGGER.info("Weekly review page created: %s", result.page_id)
+    return MainPipelineResult(kind="weekly_review_page", value=result.page_url or result.page_id)
+
+
 def publish_from_existing_transcript(
     args: argparse.Namespace,
     title: str,
     source_type: str,
 ) -> MainPipelineResult:
-    """Create a complete Notion page without rerunning audio extraction/Whisper."""
-    if not args.analysis_json:
-        raise MainPipelineError("--transcript-json requires --analysis-json.")
-
+    """Prepare analysis or publish without rerunning audio extraction/Whisper."""
     transcript_payload = load_transcript_json(args.transcript_json)
     transcript_text = transcript_to_text(transcript_payload)
     analyzer = LearningAnalyzer()
     analyzer.prepare_analysis_request(
         TranscriptAnalysisInput(title=title, transcript=transcript_text)
     )
+    if not args.analysis_json:
+        request_path = save_analysis_request_json(
+            analyzer=analyzer,
+            title=title,
+            transcript_text=transcript_text,
+            output_path=analysis_request_output_path(title, load_settings().data_dir),
+        )
+        return MainPipelineResult(kind="analysis_request", value=str(request_path))
+
     analysis = analyzer.validate_generated_analysis(
         read_generated_analysis_file(args.analysis_json)
     )
@@ -320,15 +630,33 @@ def run_weekly_review_pipeline(args: argparse.Namespace) -> MainPipelineResult:
     weekly_review_json = validate_weekly_review_output(
         read_generated_analysis_file(args.weekly_review_json)
     )
+    executive_summary = weekly_review_json.get("executive_summary", {})
+    if not isinstance(executive_summary, dict):
+        executive_summary = {}
+    knowledge_insights = weekly_review_json.get("knowledge_insights", [])
+    if not isinstance(knowledge_insights, list):
+        knowledge_insights = []
+    expression_upgrade = weekly_review_json.get("expression_upgrade", [])
+    if not isinstance(expression_upgrade, list):
+        expression_upgrade = []
+    vocabulary_memory = weekly_review_json.get("vocabulary_memory", [])
+    if not isinstance(vocabulary_memory, list):
+        vocabulary_memory = []
+    career_reflection = weekly_review_json.get("career_reflection", {})
+    if not isinstance(career_reflection, dict):
+        career_reflection = {}
+    next_learning_direction = weekly_review_json.get("next_learning_direction", [])
+    if not isinstance(next_learning_direction, list):
+        next_learning_direction = []
     publish_result = publish_weekly_review(
         WeeklyReviewPublishPayload(
             week=str(weekly_review_json.get("week", weekly_data.week)),
-            date=str(weekly_review_json.get("date", weekly_data.date)),
-            statistics=weekly_review_json.get("statistics", {}),
-            summary=weekly_review_json.get("summary", {}),
-            key_learning_points=list(weekly_review_json.get("key_learning_points", [])),
-            recommended_review=list(weekly_review_json.get("recommended_review", [])),
-            podcast_page_ids=[podcast.page_id for podcast in weekly_data.podcasts if podcast.page_id],
+            executive_summary=executive_summary,
+            knowledge_insights=knowledge_insights,
+            expression_upgrade=expression_upgrade,
+            vocabulary_memory=vocabulary_memory,
+            career_reflection=career_reflection,
+            next_learning_direction=next_learning_direction,
         ),
         notion=notion,
         weekly_database_id=config.weekly_database_id,
@@ -337,6 +665,76 @@ def run_weekly_review_pipeline(args: argparse.Namespace) -> MainPipelineResult:
         kind="weekly_review_page",
         value=publish_result.page_url or publish_result.page_id,
     )
+
+
+def _weekly_reflection_learning_context_path_from_args(args: argparse.Namespace) -> Path:
+    weekly_reflection_arg = getattr(args, "weekly_reflection", None)
+    if isinstance(weekly_reflection_arg, str) and weekly_reflection_arg:
+        return Path(weekly_reflection_arg)
+    return Path("output/weekly_learning_context.json")
+
+
+def run_weekly_reflection_pipeline_from_cli(args: argparse.Namespace) -> MainPipelineResult:
+    settings = load_settings()
+    configure_logging(settings.log_level)
+
+    weekly_learning_context_path = _weekly_reflection_learning_context_path_from_args(args)
+    try:
+        result = run_weekly_reflection_pipeline(
+            weekly_learning_context_path=weekly_learning_context_path,
+            dry_run=args.dry_run,
+        )
+    except Exception as exc:
+        raise MainPipelineError(str(exc)) from exc
+
+    print("================================")
+    print("Weekly Reflection Pipeline")
+    print("================================")
+    print()
+    print("Extraction:")
+    print("SUCCESS")
+    print()
+    print("Reflection Analysis:")
+    print("SUCCESS")
+    print()
+    print("ReflectionContext:")
+    print("saved")
+    print()
+    print("Path:")
+    print(str(result.reflection_context_path))
+    print()
+    print("Weekly Review:")
+    print("SUCCESS")
+    print()
+    print("Quality Gate:")
+    print("PASSED")
+    print(f"Score: {int(result.quality_report.get('score', 0))}/100")
+    print()
+    is_dry_run = bool(getattr(result, "dry_run", args.dry_run))
+    publish_result = getattr(result, "publish_result", None)
+
+    if is_dry_run or publish_result is None:
+        print("Notion skipped (dry run)")
+    else:
+        print("Notion:")
+        print("Page created")
+        print()
+        print("URL:")
+        print(publish_result.page_url or publish_result.page_id)
+
+    return MainPipelineResult(
+        kind="weekly_reflection_dry_run" if is_dry_run or publish_result is None else "weekly_reflection_page",
+        value="dry-run" if is_dry_run or publish_result is None else (publish_result.page_url or publish_result.page_id),
+    )
+
+
+def _weekly_review_analysis_path_from_args(args: argparse.Namespace) -> Optional[Path]:
+    weekly_review_arg = getattr(args, "weekly_review", None)
+    if isinstance(weekly_review_arg, str) and weekly_review_arg:
+        return Path(weekly_review_arg)
+    if args.weekly_review_json:
+        return args.weekly_review_json
+    return None
 
 
 def run_pipeline(args: argparse.Namespace) -> Optional[MainPipelineResult]:
@@ -348,7 +746,37 @@ def run_pipeline(args: argparse.Namespace) -> Optional[MainPipelineResult]:
         print_config()
         return None
 
-    if args.weekly_review:
+    if args.publish_highlight_vocab is not None:
+        return publish_highlight_vocab_from_cli(args.publish_highlight_vocab)
+
+    if args.run_vocabulary_agent:
+        return run_vocabulary_agent_from_cli()
+
+    if args.sync_vocab_comments:
+        return sync_vocab_comments_from_cli(dry_run=args.dry_run)
+
+    if args.debug_comments:
+        return debug_comments_from_cli()
+
+    if args.debug_page_comments:
+        return debug_page_comments_from_cli()
+
+    if args.debug_comment_sources:
+        return debug_comment_sources_from_cli()
+
+    if args.publish_weekly_review:
+        return publish_weekly_review_from_file(args.publish_weekly_review)
+
+    if args.weekly_reflection is not None:
+        return run_weekly_reflection_pipeline_from_cli(args)
+
+    weekly_review_analysis_path = _weekly_review_analysis_path_from_args(args)
+    if args.weekly_review is not None or weekly_review_analysis_path is not None:
+        if weekly_review_analysis_path is not None:
+            return run_weekly_review_agent(
+                weekly_review_analysis_path,
+                dry_run=args.dry_run,
+            )
         return run_weekly_review_pipeline(args)
 
     if not args.source:
@@ -432,6 +860,10 @@ def run_pipeline(args: argparse.Namespace) -> Optional[MainPipelineResult]:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv and argv[0] == "weekly-reflection":
+        argv = ["--weekly-reflection", *argv[1:]]
     args = parse_args(argv)
 
     try:
@@ -439,7 +871,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     except (
         MainPipelineError,
         WeeklyReviewAnalyzerError,
+        WeeklyReviewAgentError,
         WeeklyReviewPipelineError,
+        WeeklyReflectionPipelineError,
         SourceRouterError,
         SourceExtractionError,
         AudioValidationError,
@@ -450,6 +884,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         AnalysisValidationError,
         LearningPublisherError,
         WeeklyReviewPublisherError,
+        VocabularySyncAgentError,
+        CommentVocabSyncError,
     ) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
@@ -461,6 +897,24 @@ def main(argv: Optional[list[str]] = None) -> int:
             print(f"Weekly Review Request: {result.value}")
         elif result.kind == "weekly_review_page":
             print(f"Created Weekly Review Page: {result.value}")
+        elif result.kind == "weekly_review_dry_run":
+            print(f"Weekly Review Dry Run: {result.value}")
+        elif result.kind == "weekly_reflection_page":
+            print(f"Created Weekly Reflection Page: {result.value}")
+        elif result.kind == "weekly_reflection_dry_run":
+            print(f"Weekly Reflection Dry Run: {result.value}")
+        elif result.kind == "vocab_comment_sync":
+            print(f"Synced Vocabulary Comments: {result.value}")
+        elif result.kind == "debug_comments":
+            print(f"Debug Comments: {result.value}")
+        elif result.kind == "debug_page_comments":
+            print(f"Debug Page Comments: {result.value}")
+        elif result.kind == "debug_comment_sources":
+            print(f"Debug Comment Sources: {result.value}")
+        elif result.kind == "vocabulary_sync_agent":
+            print(f"Vocabulary Sync Agent: {result.value}")
+        elif result.kind == "highlight_vocab_page":
+            print(f"Published Highlight Vocabulary: {result.value}")
         else:
             print(f"Created Notion Podcast Page: {result.value}")
     return 0
