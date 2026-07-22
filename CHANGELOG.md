@@ -3,7 +3,25 @@
 All notable product and architecture changes are recorded here. Historical
 entries must be appended or clarified, not removed.
 
-## [v1.1] - 2026-07-22
+## Unreleased — Phase 4 Product Validation
+
+- Clean-clone onboarding validation.
+- First-user journey measurement.
+- External-user feedback collection.
+- Evidence-based UX improvement planning.
+
+These activities are planned validation work, not completed product changes.
+
+## [v1.1.0] - 2026-07-22
+
+### Release Finalization
+
+- Release: v1.1.0
+- Release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
+- 345 tests passed with 0 failures and 3 expected deprecation warnings.
+- Clean-worktree verification passed.
+- CLI help smoke check passed.
+- Annotated tag `v1.1.0` was created and pushed.
 
 ### Added
 
@@ -43,8 +61,9 @@ entries must be appended or clarified, not removed.
 - Notion page creation and repeat-run PATCH behavior.
 - Pure Codex default runtime without an `OPENAI_API_KEY` requirement.
 - Full regression suite after runtime and documentation alignment.
-- Release-baseline regression result: 344 passed with 3 expected deprecation
-  warnings from explicitly selected OpenAI compatibility providers.
+- Pre-finalization release-baseline regression result: 344 passed with 3
+  expected deprecation warnings from explicitly selected OpenAI compatibility
+  providers. Final release validation passed 345 tests as recorded above.
 
 ## Earlier v1 Milestones
 
