@@ -31,11 +31,9 @@ if [[ ! -x "$VENV_PYTHON" ]]; then
     fail_and_wait "无法创建项目内运行环境。"
 fi
 
-if ! "$VENV_PYTHON" -c "import notion_client" >/dev/null 2>&1; then
-  print "正在安装项目依赖..."
-  "$VENV_PYTHON" "$PROJECT_DIR/scripts/bootstrap_environment.py" --skip-tests ||
-    fail_and_wait "项目依赖安装失败。请检查网络连接。"
-fi
+print "正在检查并准备完整项目依赖..."
+"$VENV_PYTHON" "$PROJECT_DIR/scripts/bootstrap_environment.py" --skip-tests ||
+  fail_and_wait "项目依赖安装失败。请检查网络连接。"
 
 "$VENV_PYTHON" "$PROJECT_DIR/scripts/first_time_setup.py"
 SETUP_STATUS=$?

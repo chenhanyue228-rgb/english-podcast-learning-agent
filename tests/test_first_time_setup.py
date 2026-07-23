@@ -18,6 +18,28 @@ DATABASE_IDS = {
     "NOTION_WEEKLY_REFLECTION_DATABASE_ID": "weekly-id",
     "NOTION_VOCABULARY_DATABASE_ID": "vocabulary-id",
 }
+DATABASE_ORDER = tuple(DATABASE_IDS)
+
+
+def create_missing_database_ids(
+    _notion,
+    _parent,
+    *,
+    existing_ids=None,
+    on_database_created=None,
+):
+    database_ids = {
+        key: value
+        for key, value in (existing_ids or {}).items()
+        if value
+    }
+    for env_key, database_id in DATABASE_IDS.items():
+        if env_key in database_ids:
+            continue
+        database_ids[env_key] = database_id
+        if on_database_created is not None:
+            on_database_created(env_key, database_id)
+    return database_ids
 
 
 def make_project_root(tmp_path: Path, *, include_example: bool = True) -> Path:
@@ -228,7 +250,11 @@ def test_full_parent_page_url_is_normalized_and_saved(
     monkeypatch.setattr(
         first_time_setup,
         "create_base_databases",
-        lambda _notion, parent: DATABASE_IDS
+        lambda _notion, parent, **kwargs: create_missing_database_ids(
+            _notion,
+            parent,
+            **kwargs,
+        )
         if parent == "01234567-89ab-cdef-0123-456789abcdef"
         else pytest.fail("unexpected parent id"),
     )
@@ -252,7 +278,7 @@ def test_full_parent_page_url_is_normalized_and_saved(
     )
 
 
-def test_complete_database_configuration_only_validates(
+def test_complete_database_configuration_rewires_and_validates(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -261,20 +287,37 @@ def test_complete_database_configuration_only_validates(
         "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items()) + "\n",
         encoding="utf-8",
     )
+    calls: list[str] = []
     monkeypatch.setattr(
         first_time_setup,
         "create_base_databases",
-        lambda *_args: pytest.fail("must not create databases"),
+        create_missing_database_ids,
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: calls.append("wire"),
     )
 
     result = first_time_setup.run_first_time_setup(
         project_root=root,
         token=FAKE_TOKEN,
         parent_page=PARENT_URL,
+        notion=object(),
         validator=valid_results,
+        database_access_validator=lambda _notion, ids: calls.append(
+            f"access:{len(ids)}"
+        ),
     )
 
     assert result.created_databases is False
+    assert calls == ["access:4", "wire"]
+    assert (
+        first_time_setup.read_env_values(root / ".env")[
+            first_time_setup.SETUP_STATE_ENV
+        ]
+        == first_time_setup.SETUP_STATE_COMPLETE
+    )
 
 
 def test_empty_database_configuration_creates_databases(
@@ -286,7 +329,8 @@ def test_empty_database_configuration_creates_databases(
     monkeypatch.setattr(
         first_time_setup,
         "create_base_databases",
-        lambda _notion, _parent: calls.append("create") or DATABASE_IDS,
+        lambda _notion, _parent, **kwargs: calls.append("create")
+        or create_missing_database_ids(_notion, _parent, **kwargs),
     )
     monkeypatch.setattr(
         first_time_setup,
@@ -341,7 +385,7 @@ def test_tests_never_require_real_notion(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         first_time_setup,
         "create_base_databases",
-        lambda _notion, _parent: DATABASE_IDS,
+        create_missing_database_ids,
     )
     monkeypatch.setattr(
         first_time_setup,
@@ -358,6 +402,247 @@ def test_tests_never_require_real_notion(monkeypatch, tmp_path: Path) -> None:
     )
 
     assert result.database_ids == DATABASE_IDS
+
+
+@pytest.mark.parametrize("completed_count", [1, 2, 3])
+def test_interrupted_creation_resumes_only_missing_databases(
+    monkeypatch,
+    tmp_path: Path,
+    completed_count: int,
+) -> None:
+    root = make_project_root(tmp_path)
+    first_run_calls: list[str] = []
+
+    def interrupted_creator(
+        _notion,
+        _parent,
+        *,
+        existing_ids=None,
+        on_database_created=None,
+    ):
+        database_ids = {
+            key: value
+            for key, value in (existing_ids or {}).items()
+            if value
+        }
+        for index, (env_key, database_id) in enumerate(DATABASE_IDS.items()):
+            if env_key in database_ids:
+                continue
+            if index == completed_count:
+                raise RuntimeError("simulated creation failure")
+            first_run_calls.append(env_key)
+            database_ids[env_key] = database_id
+            on_database_created(env_key, database_id)
+        return database_ids
+
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        interrupted_creator,
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: None,
+    )
+
+    with pytest.raises(first_time_setup.FirstTimeSetupError, match="创建未完成"):
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=PARENT_URL,
+            notion=object(),
+            validator=valid_results,
+            database_access_validator=lambda _notion, _ids: None,
+        )
+
+    saved_after_failure = first_time_setup.read_env_values(root / ".env")
+    assert first_run_calls == list(DATABASE_ORDER[:completed_count])
+    for env_key in DATABASE_ORDER[:completed_count]:
+        assert saved_after_failure[env_key] == DATABASE_IDS[env_key]
+    assert (
+        saved_after_failure[first_time_setup.SETUP_STATE_ENV]
+        == first_time_setup.SETUP_STATE_IN_PROGRESS
+    )
+
+    resumed_calls: list[str] = []
+
+    def resumed_creator(_notion, _parent, **kwargs):
+        existing_ids = kwargs.get("existing_ids", {})
+        resumed_calls.extend(
+            env_key for env_key in DATABASE_ORDER if not existing_ids.get(env_key)
+        )
+        return create_missing_database_ids(_notion, _parent, **kwargs)
+
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        resumed_creator,
+    )
+    result = first_time_setup.run_first_time_setup(
+        project_root=root,
+        token=FAKE_TOKEN,
+        parent_page=PARENT_URL,
+        notion=object(),
+        validator=valid_results,
+        database_access_validator=lambda _notion, _ids: None,
+    )
+
+    assert resumed_calls == list(DATABASE_ORDER[completed_count:])
+    assert result.database_ids == DATABASE_IDS
+    assert (
+        first_time_setup.read_env_values(root / ".env")[
+            first_time_setup.SETUP_STATE_ENV
+        ]
+        == first_time_setup.SETUP_STATE_COMPLETE
+    )
+
+
+def test_relation_failure_is_retried_without_database_recreation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    create_calls: list[str] = []
+    relation_calls: list[str] = []
+
+    def creator(_notion, _parent, **kwargs):
+        existing_ids = kwargs.get("existing_ids", {})
+        create_calls.extend(
+            env_key for env_key in DATABASE_ORDER if not existing_ids.get(env_key)
+        )
+        return create_missing_database_ids(_notion, _parent, **kwargs)
+
+    def fail_first_relation(_notion, _ids):
+        relation_calls.append("wire")
+        if len(relation_calls) == 1:
+            raise RuntimeError("simulated relation failure")
+
+    monkeypatch.setattr(first_time_setup, "create_base_databases", creator)
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        fail_first_relation,
+    )
+
+    with pytest.raises(first_time_setup.FirstTimeSetupError, match="关系配置失败"):
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=PARENT_URL,
+            notion=object(),
+            validator=valid_results,
+            database_access_validator=lambda _notion, _ids: None,
+        )
+
+    assert create_calls == list(DATABASE_ORDER)
+    assert (
+        first_time_setup.read_env_values(root / ".env")[
+            first_time_setup.SETUP_STATE_ENV
+        ]
+        == first_time_setup.SETUP_STATE_IN_PROGRESS
+    )
+
+    create_calls.clear()
+    first_time_setup.run_first_time_setup(
+        project_root=root,
+        token=FAKE_TOKEN,
+        parent_page=PARENT_URL,
+        notion=object(),
+        validator=valid_results,
+        database_access_validator=lambda _notion, _ids: None,
+    )
+
+    assert create_calls == []
+    assert relation_calls == ["wire", "wire"]
+
+
+def test_validation_failure_retries_relations_and_keeps_progress(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    relation_calls: list[str] = []
+    invalid_results = [
+        SimpleNamespace(name="Podcast Library", is_valid=False),
+    ]
+
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        create_missing_database_ids,
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: relation_calls.append("wire"),
+    )
+
+    with pytest.raises(first_time_setup.FirstTimeSetupError, match="验证未通过"):
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=PARENT_URL,
+            notion=object(),
+            validator=lambda: invalid_results,
+            database_access_validator=lambda _notion, _ids: None,
+        )
+
+    assert (
+        first_time_setup.read_env_values(root / ".env")[
+            first_time_setup.SETUP_STATE_ENV
+        ]
+        == first_time_setup.SETUP_STATE_IN_PROGRESS
+    )
+
+    first_time_setup.run_first_time_setup(
+        project_root=root,
+        token=FAKE_TOKEN,
+        parent_page=PARENT_URL,
+        notion=object(),
+        validator=valid_results,
+        database_access_validator=lambda _notion, _ids: None,
+    )
+
+    assert relation_calls == ["wire", "wire"]
+
+
+def test_inaccessible_existing_database_stops_without_overwrite(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    env_path = root / ".env"
+    original = (
+        f"{first_time_setup.SETUP_STATE_ENV}="
+        f"{first_time_setup.SETUP_STATE_IN_PROGRESS}\n"
+        "NOTION_PODCAST_LIBRARY_DATABASE_ID=podcast-id\n"
+    )
+    env_path.write_text(original, encoding="utf-8")
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        lambda *_args, **_kwargs: pytest.fail("must not create databases"),
+    )
+
+    with pytest.raises(first_time_setup.FirstTimeSetupError, match="无法访问"):
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=PARENT_URL,
+            notion=object(),
+            validator=valid_results,
+            database_access_validator=lambda _notion, _ids: (_ for _ in ()).throw(
+                RuntimeError("not found")
+            ),
+        )
+
+    saved = first_time_setup.read_env_values(env_path)
+    assert saved["NOTION_PODCAST_LIBRARY_DATABASE_ID"] == "podcast-id"
+    assert (
+        saved[first_time_setup.SETUP_STATE_ENV]
+        == first_time_setup.SETUP_STATE_IN_PROGRESS
+    )
 
 
 def test_success_report_is_chinese() -> None:
@@ -429,6 +714,9 @@ def test_start_command_uses_its_own_directory_and_project_venv() -> None:
     assert 'dirname -- "$0"' in content
     assert 'cd "$PROJECT_DIR"' in content
     assert '$PROJECT_DIR/.venv/bin/python' in content
+    assert "scripts/bootstrap_environment.py" in content
+    assert "--skip-tests" in content
+    assert "import notion_client" not in content
     assert "scripts/first_time_setup.py" in content
     assert "sudo" not in content
     assert "NOTION_TOKEN=" not in content

@@ -26,6 +26,13 @@ entries must be appended or clarified, not removed.
 
 ### Phase 4.1C Owner Acceptance
 
+- Made first-time Notion database creation resumable with per-database
+  progress persistence and safe retry.
+- Added existing-database access checks and mandatory relation rewiring before
+  setup completion.
+- Made the macOS setup entry verify the complete project dependency set.
+- Clarified that the Codex Notion plugin is optional and is not a second
+  authentication, setup, or write path.
 - Added a complete Chinese user guide for installation, Notion authorization,
   first-time setup, daily use, and recovery.
 - Made the current conversation the primary continuation after installation.
@@ -41,6 +48,8 @@ entries must be appended or clarified, not removed.
   duplicate protection.
 - Added the post-setup prompt for the user's first podcast.
 - Added first-time setup and Skill onboarding contract regression tests.
+- Verified the resumable setup closure with 401 passing tests and 3 expected
+  compatibility-provider deprecation warnings.
 - Prepared Owner Acceptance with status `READY_FOR_ONBOARDING_PR`.
 - External-user testing has not started; external-user session count remains 0.
 

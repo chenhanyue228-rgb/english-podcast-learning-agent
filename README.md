@@ -102,6 +102,17 @@ https://github.com/chenhanyue228-rgb/english-podcast-learning-agent
 用户需要亲自完成的只有 Notion 账户授权、在本地安全界面输入访问密钥和父
 页面完整链接，以及选择学习内容。访问密钥不得发送到 Codex 对话。
 
+### Notion 连接边界
+
+使用英语音频学习助手不需要安装 Codex 的 Notion 插件。数据库创建、验证和
+学习内容写入，由本地 Python 程序通过用户自己的 Notion 内部连接完成。
+Notion 插件只是可选的搜索、读取和辅助查看工具。
+
+- 插件授权不会传递给本地 Python。
+- 插件不能代替 `NOTION_TOKEN` 或 `setup_workspace` 第一次设置流程。
+- 正式写入只有“Codex artifact → 本地 Python → Notion”一条路径。
+- 不要让插件和本地设置分别创建数据库，以免出现两套工作区。
+
 安全设置会自动创建或验证：
 
 - Podcast Library（播客资料库）

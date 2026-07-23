@@ -56,6 +56,17 @@ DATABASE_ENV_KEYS = (
     VOCABULARY_DATABASE_ID_ENV,
 )
 
+SETUP_STATE_ENV = "EPLA_NOTION_SETUP_STATE"
+SETUP_STATE_IN_PROGRESS = "in_progress"
+SETUP_STATE_COMPLETE = "complete"
+
+DATABASE_ENV_NAMES = {
+    PODCAST_DATABASE_ID_ENV: "Podcast Library",
+    EXPRESSION_DATABASE_ID_ENV: "Expression Database",
+    WEEKLY_DATABASE_ID_ENV: "Weekly Review",
+    VOCABULARY_DATABASE_ID_ENV: "Vocabulary Database",
+}
+
 DATABASE_NAMES_ZH = {
     "Podcast Library": "播客资料库",
     "Expression Database": "表达资料库",
@@ -236,6 +247,18 @@ def _default_validator() -> Sequence[Any]:
     return validate_workspace()
 
 
+def _default_database_access_validator(
+    notion: Any,
+    database_ids: Mapping[str, str],
+) -> None:
+    """Confirm configured database IDs are accessible before reusing them."""
+    from src.notion.check_workspace import fetch_database
+
+    for env_key, database_id in database_ids.items():
+        if database_id:
+            fetch_database(notion, database_id, DATABASE_ENV_NAMES[env_key])
+
+
 def _ensure_validation_passed(results: Sequence[Any]) -> None:
     invalid_names = [
         DATABASE_NAMES_ZH.get(getattr(result, "name", ""), getattr(result, "name", ""))
@@ -254,6 +277,9 @@ def run_first_time_setup(
     parent_page: str,
     notion: Optional[Any] = None,
     validator: Callable[[], Sequence[Any]] = _default_validator,
+    database_access_validator: Callable[
+        [Any, Mapping[str, str]], None
+    ] = _default_database_access_validator,
 ) -> FirstTimeSetupResult:
     """安全保存配置，按状态创建或验证四个 Notion 数据库。"""
     project_root = project_root.resolve()
@@ -270,8 +296,9 @@ def run_first_time_setup(
     existing_values = read_env_values(env_path)
     database_ids = configured_database_ids(existing_values)
     state = database_configuration_state(database_ids)
+    setup_state = existing_values.get(SETUP_STATE_ENV, "").strip()
 
-    if state == "partial":
+    if state == "partial" and setup_state != SETUP_STATE_IN_PROGRESS:
         raise FirstTimeSetupError(
             "检测到部分数据库编号。为避免重复创建，首次设置已停止；"
             "请让 Codex 检查现有 Notion 配置。"
@@ -280,27 +307,61 @@ def run_first_time_setup(
     base_updates = {
         NOTION_TOKEN_ENV: safe_token,
         NOTION_PARENT_PAGE_ID_ENV: normalized_parent_id,
+        SETUP_STATE_ENV: SETUP_STATE_IN_PROGRESS,
     }
-    if state == "complete":
+    if database_ids[WEEKLY_DATABASE_ID_ENV]:
         base_updates[WEEKLY_DATABASE_ID_ENV] = database_ids[WEEKLY_DATABASE_ID_ENV]
 
     secure_update_env(env_path, example_path, base_updates)
-    created_databases = state == "empty"
+    notion_client = notion or create_notion_client(safe_token)
 
-    if created_databases:
-        notion_client = notion or create_notion_client(safe_token)
-        try:
-            database_ids = create_base_databases(
-                notion_client,
-                normalized_parent_id,
-            )
-            # 先持久化完整编号。后续关系或验证失败时，重复运行不会重复建库。
-            secure_update_env(env_path, example_path, database_ids)
-            wire_database_relations(notion_client, database_ids)
-        except Exception as exc:
+    try:
+        database_access_validator(notion_client, database_ids)
+    except Exception as exc:
+        raise FirstTimeSetupError(
+            "已有 Notion 数据库无法访问。为避免覆盖或重复创建，首次设置已停止；"
+            "请检查数据库编号、页面共享权限和网络后重试。"
+        ) from exc
+
+    created_keys: list[str] = []
+
+    def persist_database_id(env_key: str, database_id: str) -> None:
+        existing_id = database_ids.get(env_key, "")
+        if existing_id and existing_id != database_id:
             raise FirstTimeSetupError(
-                "Notion 数据库创建或关系配置失败。请检查页面权限和网络后重试。"
-            ) from exc
+                f"{DATABASE_ENV_NAMES[env_key]} 已存在不同数据库编号，已安全停止。"
+            )
+        database_ids[env_key] = database_id
+        created_keys.append(env_key)
+        secure_update_env(
+            env_path,
+            example_path,
+            {
+                env_key: database_id,
+                SETUP_STATE_ENV: SETUP_STATE_IN_PROGRESS,
+            },
+        )
+
+    try:
+        database_ids = create_base_databases(
+            notion_client,
+            normalized_parent_id,
+            existing_ids=database_ids,
+            on_database_created=persist_database_id,
+        )
+    except Exception as exc:
+        raise FirstTimeSetupError(
+            "Notion 数据库创建未完成。已保存成功进度；"
+            "请检查页面权限和网络后重新运行，系统只会继续创建缺失数据库。"
+        ) from exc
+
+    try:
+        wire_database_relations(notion_client, database_ids)
+    except Exception as exc:
+        raise FirstTimeSetupError(
+            "Notion 数据库关系配置失败。数据库编号已保存；"
+            "请检查权限和网络后重新运行，系统会重试关系配置而不会重复建库。"
+        ) from exc
 
     runtime_values = {
         NOTION_TOKEN_ENV: safe_token,
@@ -316,9 +377,14 @@ def run_first_time_setup(
             ) from exc
 
     _ensure_validation_passed(validation_results)
+    secure_update_env(
+        env_path,
+        example_path,
+        {SETUP_STATE_ENV: SETUP_STATE_COMPLETE},
+    )
     return FirstTimeSetupResult(
         database_ids=dict(database_ids),
-        created_databases=created_databases,
+        created_databases=bool(created_keys),
         validation_results=validation_results,
     )
 

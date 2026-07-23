@@ -16,7 +16,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Mapping, Optional
 
 from notion_client import APIResponseError, Client
 
@@ -143,12 +143,48 @@ def update_database_properties(
         ) from exc
 
 
-def create_base_databases(notion: Client, parent_page_id: str) -> dict[str, str]:
-    podcast_library_id = create_database(
-        notion=notion,
-        parent_page_id=parent_page_id,
-        name="Podcast Library",
-        properties={
+def create_base_databases(
+    notion: Client,
+    parent_page_id: str,
+    existing_ids: Optional[Mapping[str, str]] = None,
+    on_database_created: Optional[Callable[[str, str], None]] = None,
+) -> dict[str, str]:
+    """Create only missing databases and optionally report each successful ID.
+
+    Existing callers may omit both optional arguments and retain the original
+    all-four creation behavior. The callback lets first-time setup persist
+    progress immediately after each successful Notion API response.
+    """
+    database_ids = {
+        key: value
+        for key, value in (existing_ids or {}).items()
+        if value
+    }
+
+    def get_or_create(
+        env_key: str,
+        name: str,
+        properties: dict[str, Any],
+    ) -> str:
+        existing_id = database_ids.get(env_key, "")
+        if existing_id:
+            return existing_id
+
+        database_id = create_database(
+            notion=notion,
+            parent_page_id=parent_page_id,
+            name=name,
+            properties=properties,
+        )
+        database_ids[env_key] = database_id
+        if on_database_created is not None:
+            on_database_created(env_key, database_id)
+        return database_id
+
+    podcast_library_id = get_or_create(
+        "NOTION_PODCAST_LIBRARY_DATABASE_ID",
+        "Podcast Library",
+        {
             "Title": title_property(),
             "URL": {"url": {}},
             "Source Type": select_property(SOURCE_TYPES),
@@ -159,11 +195,10 @@ def create_base_databases(notion: Client, parent_page_id: str) -> dict[str, str]
         },
     )
 
-    expression_database_id = create_database(
-        notion=notion,
-        parent_page_id=parent_page_id,
-        name="Expression Database",
-        properties={
+    get_or_create(
+        "NOTION_EXPRESSION_DATABASE_ID",
+        "Expression Database",
+        {
             "Expression": title_property(),
             "Category": select_property(
                 [
@@ -175,21 +210,19 @@ def create_base_databases(notion: Client, parent_page_id: str) -> dict[str, str]
         },
     )
 
-    weekly_review_id = create_database(
-        notion=notion,
-        parent_page_id=parent_page_id,
-        name="Weekly Review",
-        properties={
+    get_or_create(
+        "NOTION_WEEKLY_REFLECTION_DATABASE_ID",
+        "Weekly Review",
+        {
             "Week": title_property(),
             "Date": {"date": {}},
         },
     )
 
-    vocabulary_database_id = create_database(
-        notion=notion,
-        parent_page_id=parent_page_id,
-        name="Vocabulary Database",
-        properties={
+    get_or_create(
+        "NOTION_VOCABULARY_DATABASE_ID",
+        "Vocabulary Database",
+        {
             "Name": title_property(),
             "Original Context": rich_text_property(),
             "Meaning": rich_text_property(),
@@ -204,12 +237,7 @@ def create_base_databases(notion: Client, parent_page_id: str) -> dict[str, str]
         },
     )
 
-    return {
-        "NOTION_PODCAST_LIBRARY_DATABASE_ID": podcast_library_id,
-        "NOTION_EXPRESSION_DATABASE_ID": expression_database_id,
-        "NOTION_WEEKLY_REFLECTION_DATABASE_ID": weekly_review_id,
-        "NOTION_VOCABULARY_DATABASE_ID": vocabulary_database_id,
-    }
+    return database_ids
 
 
 def wire_database_relations(notion: Client, database_ids: dict[str, str]) -> None:

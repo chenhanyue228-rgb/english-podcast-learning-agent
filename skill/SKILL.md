@@ -147,6 +147,16 @@ The suggested destination is `~/EnglishAudioLearningAgent`.
 
 ### First-Time Setup Responsibilities
 
+The Codex Notion plugin is not required. Database creation, validation, and
+learning-content writes use local Python with the user's own Notion internal
+integration. The plugin is optional for search, read, and assisted viewing
+only:
+
+- plugin authorization is not passed to local Python
+- it does not replace `NOTION_TOKEN` or the `setup_workspace` first-time setup
+- it must not introduce a second production write path
+- never let the plugin and local setup create separate database sets
+
 For the setup trigger, Codex must:
 
 1. Locate or safely acquire the complete project.

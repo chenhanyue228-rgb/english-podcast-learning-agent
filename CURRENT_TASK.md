@@ -48,7 +48,8 @@ Codex-operated podcast-to-Notion flow
 7. Automatically create or validate all four Notion databases.
 8. Let Codex actively prompt for the first podcast after setup.
 9. Lock the onboarding contract with regression tests.
-10. Prepare the branch for onboarding review without starting Owner Acceptance.
+10. Make interrupted database creation safely resumable.
+11. Prepare the branch for onboarding review without starting Owner Acceptance.
 
 ## Out of Scope
 
@@ -71,6 +72,9 @@ Codex-operated podcast-to-Notion flow
 - The token and complete parent-page URL are entered in a local safe interface.
 - Codex prepares the runtime and starts the setup flow.
 - Codex and Python create and validate the four databases.
+- Interrupted setup resumes from saved database IDs without creating duplicates.
+- Existing database IDs are checked before reuse.
+- Relations and schema validation pass before setup is marked complete.
 - Codex actively prompts for a podcast after setup.
 - Codex operates the podcast-to-Notion workflow.
 - No unresolved P0 or P1 onboarding blocker remains in the implementation.
@@ -84,7 +88,9 @@ Owner Acceptance and external-user validation have not started.
 - PR #4 is merged.
 - The Phase 4.1C documentation branch exists.
 - The user interaction contract is being completed.
-- The safe first-time setup tool is being added.
+- The safe first-time setup tool and its interruption recovery are implemented.
+- Safe per-database setup recovery and dependency verification are implemented.
+- The Notion plugin is documented as optional and outside the production write path.
 - Owner Acceptance has not started.
 - External-user sessions: 0.
 
