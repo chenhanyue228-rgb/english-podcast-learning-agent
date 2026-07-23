@@ -118,7 +118,16 @@ def test_first_publish_snapshot_comparison_passes() -> None:
         result.report.initial_pr_9_head
         == "7a0d240cfb3c8ccf935ebc96bf7b671994e332ef"
     )
-    assert result.report.final_pr_9_integration_verified is False
+    assert (
+        result.report.reviewed_pr_9_head
+        == "3a667afbe9c07b406ef21f9b1afb5e068fd541f3"
+    )
+    assert (
+        result.report.integrated_main_head
+        == "a93c92ebc29ebbf1392f4e8089c99ac3326d9f78"
+    )
+    assert result.report.pr_9_status == "MERGED"
+    assert result.report.final_pr_9_integration_verified is True
     assert result.evidence.podcast_added_on_first_publish == 1
     assert result.evidence.expressions_added_on_first_publish == 2
     assert len(workspace.target_podcast_pages()) == 1
@@ -306,6 +315,9 @@ def test_all_public_reports_are_redacted() -> None:
         status=workspace.config.token,
         depends_on_pr_9=True,
         initial_pr_9_head=workspace.config.expression_data_source_id,
+        reviewed_pr_9_head=workspace.config.vocabulary_data_source_id,
+        integrated_main_head=workspace.config.weekly_data_source_id,
+        pr_9_status=workspace.config.token,
         final_pr_9_integration_verified=False,
         pre_publish_snapshot="https://notion.so/private-page",
         first_publish_verification="passed",
@@ -329,7 +341,18 @@ def test_all_public_reports_are_redacted() -> None:
         '"7a0d240cfb3c8ccf935ebc96bf7b671994e332ef"'
         in rendered
     )
-    assert '"final_pr_9_integration_verified": false' in rendered
+    assert (
+        '"reviewed_pr_9_head": '
+        '"3a667afbe9c07b406ef21f9b1afb5e068fd541f3"'
+        in rendered
+    )
+    assert (
+        '"integrated_main_head": '
+        '"a93c92ebc29ebbf1392f4e8089c99ac3326d9f78"'
+        in rendered
+    )
+    assert '"pr_9_status": "MERGED"' in rendered
+    assert '"final_pr_9_integration_verified": true' in rendered
 
 
 def test_temporary_snapshots_are_deleted_in_finally(tmp_path) -> None:

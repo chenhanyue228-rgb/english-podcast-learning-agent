@@ -43,6 +43,9 @@ SETUP_STATE_ENV = "EPLA_NOTION_SETUP_STATE"
 SETUP_STATE_COMPLETE = "complete"
 DEPENDS_ON_PR_9 = True
 INITIAL_PR_9_HEAD = "7a0d240cfb3c8ccf935ebc96bf7b671994e332ef"
+REVIEWED_PR_9_HEAD = "3a667afbe9c07b406ef21f9b1afb5e068fd541f3"
+INTEGRATED_MAIN_HEAD = "a93c92ebc29ebbf1392f4e8089c99ac3326d9f78"
+PR_9_STATUS = "MERGED"
 
 
 class AcceptanceConfigurationError(RuntimeError):
@@ -990,6 +993,9 @@ class AcceptanceReport:
     status: str
     depends_on_pr_9: bool
     initial_pr_9_head: str
+    reviewed_pr_9_head: str
+    integrated_main_head: str
+    pr_9_status: str
     final_pr_9_integration_verified: bool
     pre_publish_snapshot: str
     first_publish_verification: str
@@ -1015,6 +1021,21 @@ class AcceptanceReport:
             "initial_pr_9_head": (
                 self.initial_pr_9_head
                 if self.initial_pr_9_head == INITIAL_PR_9_HEAD
+                else "[REDACTED]"
+            ),
+            "reviewed_pr_9_head": (
+                self.reviewed_pr_9_head
+                if self.reviewed_pr_9_head == REVIEWED_PR_9_HEAD
+                else "[REDACTED]"
+            ),
+            "integrated_main_head": (
+                self.integrated_main_head
+                if self.integrated_main_head == INTEGRATED_MAIN_HEAD
+                else "[REDACTED]"
+            ),
+            "pr_9_status": (
+                self.pr_9_status
+                if self.pr_9_status == PR_9_STATUS
                 else "[REDACTED]"
             ),
             "final_pr_9_integration_verified": bool(
@@ -1132,7 +1153,10 @@ class OwnerAcceptanceRunner:
             status="passed",
             depends_on_pr_9=DEPENDS_ON_PR_9,
             initial_pr_9_head=INITIAL_PR_9_HEAD,
-            final_pr_9_integration_verified=False,
+            reviewed_pr_9_head=REVIEWED_PR_9_HEAD,
+            integrated_main_head=INTEGRATED_MAIN_HEAD,
+            pr_9_status=PR_9_STATUS,
+            final_pr_9_integration_verified=True,
             pre_publish_snapshot="passed",
             first_publish_verification="passed",
             second_publish_verification="passed",
@@ -1270,7 +1294,10 @@ def render_failure_report(code: str) -> str:
             "status": "failed",
             "depends_on_pr_9": DEPENDS_ON_PR_9,
             "initial_pr_9_head": INITIAL_PR_9_HEAD,
-            "final_pr_9_integration_verified": False,
+            "reviewed_pr_9_head": REVIEWED_PR_9_HEAD,
+            "integrated_main_head": INTEGRATED_MAIN_HEAD,
+            "pr_9_status": PR_9_STATUS,
+            "final_pr_9_integration_verified": True,
             "failure": safe_code,
             "secrets_redacted": True,
         },
