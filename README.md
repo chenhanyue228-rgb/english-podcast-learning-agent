@@ -31,14 +31,15 @@ Current state:
 - the pipeline and Notion publishing are stable
 - direct OpenAI providers are deprecated compatibility paths only
 - `OPENAI_API_KEY` is not required for the production Skill workflow
-- the pre-PR #7 production baseline is merged through PR #6 and passes 407
-  tests with 3 expected compatibility warnings
-- PR #7 remediation implementation has been reviewed with result
-  `READY_TO_MERGE`
-- candidate verification is 453 passed with 3 expected warnings
-- the existing four Data Source IDs must be reused during real recovery
-- Owner Acceptance remains blocked until the existing four Data Sources pass
-  real field and Relation recovery
+- production `main` includes PR #7 and passes 453 tests with 3 expected
+  compatibility warnings
+- real Notion in-place recovery passed with the existing four Data Sources
+- new databases created: 0
+- required fields and three single-property relations passed validation
+- unknown fields and existing records were preserved
+- setup state is `complete`
+- Owner Acceptance remains blocked pending evidence review and the remaining
+  podcast-to-Notion journey
 - external-user sessions remain 0
 
 For the production runtime contract, read:

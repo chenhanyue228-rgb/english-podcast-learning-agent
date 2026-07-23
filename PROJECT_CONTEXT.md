@@ -24,9 +24,8 @@ The system helps users build long-term personal English learning memory.
 **Status:** `OWNER_ACCEPTANCE_BLOCKED`
 
 The current stable release remains **v1.1.0**, built from release commit
-`80cbab01ea266e487a0359ddbec562959070d8a0`. The pre-PR #7 production
-baseline includes PR #6 through merge commit
-`87b96d9f68ad65d3356943b1f8196eeea8f9f3ee`.
+`80cbab01ea266e487a0359ddbec562959070d8a0`. Production `main` includes PR #7
+through merge commit `68cf0db509600862c002c66659478522ff290e35`.
 
 Release status:
 
@@ -36,31 +35,34 @@ Release status:
 - PR #4 merged the Phase 4.1B onboarding fixes into `main`
 - PR #5 merged the guided first-time-use flow into `main`
 - PR #6 merged the one-action/one-confirmation Notion guidance into `main`
-- the pre-PR #7 production baseline passes 407 tests with 3 expected
+- PR #7 merged the Notion API and setup remediation into `main`
+- production verification: 453 tests passed with 3 expected
   compatibility-provider deprecation warnings
-- PR #7 remediation implementation reviewed on
-  `fix/phase-4.1c-notion-api-and-setup-ux`
-- candidate verification: 453 tests passed with 3 expected
-  compatibility-provider deprecation warnings
-- review result: `READY_TO_MERGE`
-- the existing four Data Source IDs must be reused
-- real Owner Acceptance remains pending
+- real Notion in-place recovery: PASS
+- the existing four Data Source IDs were reused
+- new databases created: 0
+- required fields and three single-property relations: PASS
+- unknown fields and existing records preserved: PASS
+- setup state: `complete`
+- real Owner Acceptance remains pending evidence review and the remaining
+  podcast-to-Notion journey
 - external-user sessions: 0
 - Owner Acceptance started
 - Skill installation passed
 - continuing in the installation conversation passed without a restart
 - the one-action/one-confirmation conversation mechanism passed
-- Owner Acceptance is blocked by current Notion data source schema
-  compatibility and local secure-input feedback issues
+- Owner Acceptance is blocked pending evidence review before the remaining
+  end-to-end journey
 
 Phase 4.1C is running in the owner's real Codex environment. The first
 acceptance attempt confirmed Skill installation, immediate continuation in the
 same conversation, and the reply-gated guidance mechanism. Real setup then
 revealed that the current Notion UI uses “连接” in the developer dashboard and
 “集成” on a normal page, while the local setup used an obsolete database
-creation payload. Four database containers were created but their data source
-fields and relations were incomplete. Their saved identifiers must be reused;
-they must not be deleted or recreated. External-user testing has not started.
+creation payload. Four database containers were created in the first attempt.
+The protected in-place recovery reused them, completed their fields and
+one-way relations, and preserved existing records and unknown fields. They
+must not be deleted or recreated. External-user testing has not started.
 
 The formal user flow continues in the current conversation after installation.
 A new conversation is not mandatory, and restarting Codex is only the second

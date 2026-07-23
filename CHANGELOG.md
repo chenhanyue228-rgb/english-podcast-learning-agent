@@ -98,15 +98,21 @@ entries must be appended or clarified, not removed.
   create, update, or delete page records.
 - Removed Data Source IDs and other configuration values from developer CLI
   output and API failure summaries.
-- Reviewed the PR #7 remediation implementation with result
-  `READY_TO_MERGE`.
-- Candidate verification completed with 453 passing tests and 3 expected
+- Merged PR #7 with Create a merge commit
+  (`68cf0db509600862c002c66659478522ff290e35`).
+- Production verification completed with 453 passing tests and 3 expected
   compatibility-provider deprecation warnings.
-- Kept Owner Acceptance blocked and external-user sessions at 0 pending real
-  recovery with the existing four Data Source IDs.
+- Completed protected real Notion in-place recovery with the existing four
+  Data Source IDs.
+- Created no new databases and preserved the parent page, existing records,
+  unknown fields, and all four Data Source identities.
+- Verified all required fields and three single-property relations.
+- Advanced the setup state from `in_progress` to `complete`.
+- Kept Owner Acceptance blocked and external-user sessions at 0 pending
+  evidence review and the remaining podcast-to-Notion journey.
 
-Owner Acceptance remains pending until this remediation is available from the
-latest `main` and the existing four Data Sources pass real recovery.
+Owner Acceptance remains pending until the recovery evidence is reviewed and
+the remaining podcast-to-Notion journey is completed.
 
 ## [v1.1.0] - 2026-07-22
 
