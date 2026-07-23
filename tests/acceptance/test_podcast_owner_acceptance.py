@@ -30,6 +30,7 @@ from src.notion.learning_publisher import (
     LearningPublisherError,
     publish_complete_learning_materials,
 )
+from src.notion import learning_publisher, target_binding
 from src.notion.target_binding import validate_notion_target_binding
 
 from tests.acceptance.fakes import (
@@ -155,6 +156,29 @@ def test_first_publish_snapshot_comparison_passes() -> None:
         "pages.delete",
         "blocks.delete",
     }.intersection(workspace.api_calls[:first_snapshot_query])
+
+
+def test_owner_acceptance_allows_verified_target_page_reads(
+    monkeypatch,
+) -> None:
+    workspace = FakeNotion()
+    monkeypatch.setattr(
+        learning_publisher,
+        "ensure_notion_target_binding_for_write",
+        target_binding.ensure_notion_target_binding_for_write,
+    )
+    monkeypatch.setattr(
+        learning_publisher,
+        "ensure_notion_page_belongs_to_role",
+        target_binding.ensure_notion_page_belongs_to_role,
+    )
+
+    result = OwnerAcceptanceRunner(workspace, workspace.config).run(
+        complete_payload()
+    )
+
+    assert result.report.status == "passed"
+    assert workspace.api_calls.count("pages.retrieve") >= 2
 
 
 def test_second_publish_adds_nothing() -> None:

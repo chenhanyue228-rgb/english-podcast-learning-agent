@@ -49,6 +49,7 @@ from src.notion.target_binding import (
     TARGET_DATABASE_AMBIGUOUS,
     TARGET_DATABASE_MISSING,
     TARGET_DATABASE_ROLE_MISMATCH,
+    TARGET_PAGE_OUTSIDE_GROUP,
     TARGET_PARENT_MISMATCH,
     TARGET_PARENT_NOT_CONFIGURED,
     TARGET_RELATION_MODE_INVALID,
@@ -396,9 +397,12 @@ class AcceptancePolicy:
         if data_source_id not in self.allowed_data_source_ids:
             raise GuardViolation("unexpected_data_source_read_blocked")
 
-    def validate_parent_page_read(self, page_id: str) -> None:
-        if page_id != self.config.target_parent_page_id:
-            raise GuardViolation("unexpected_parent_page_read_blocked")
+    def validate_page_read(self, page_id: str) -> None:
+        if (
+            page_id != self.config.target_parent_page_id
+            and page_id not in self.allowed_update_page_ids
+        ):
+            raise GuardViolation("unexpected_page_read_blocked")
 
     def validate_page_create(self, kwargs: Mapping[str, Any]) -> str:
         parent = kwargs.get("parent")
@@ -499,7 +503,7 @@ class _GuardedPages:
         return response
 
     def retrieve(self, **kwargs: Any) -> Any:
-        self._policy.validate_parent_page_read(
+        self._policy.validate_page_read(
             str(kwargs.get("page_id", "")).strip()
         )
         return self._raw.retrieve(**kwargs)
@@ -1363,7 +1367,7 @@ _PUBLIC_FAILURE_CODES = frozenset(
         "unexpected_page_create_blocked",
         "unexpected_page_update_blocked",
         "unexpected_page_update_shape_blocked",
-        "unexpected_parent_page_read_blocked",
+        "unexpected_page_read_blocked",
         "unexpected_podcast_create_blocked",
         "unexpected_podcast_created",
         "unrelated_record_changed",
@@ -1384,6 +1388,7 @@ _PUBLIC_FAILURE_CODES = frozenset(
         TARGET_DATABASE_MISSING,
         TARGET_DATABASE_AMBIGUOUS,
         TARGET_DATABASE_ROLE_MISMATCH,
+        TARGET_PAGE_OUTSIDE_GROUP,
         TARGET_RELATION_OUTSIDE_GROUP,
         TARGET_RELATION_MODE_INVALID,
         TARGET_BINDING_RETRIEVE_FAILED,

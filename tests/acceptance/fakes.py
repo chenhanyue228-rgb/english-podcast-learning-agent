@@ -73,6 +73,10 @@ class FakePage:
     def to_api(self) -> dict[str, Any]:
         return {
             "id": self.page_id,
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": self.data_source_id,
+            },
             "properties": deepcopy(self.properties),
             "archived": self.archived,
             "in_trash": self.in_trash,

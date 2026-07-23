@@ -28,10 +28,12 @@ TARGET_DATABASE_AMBIGUOUS = "target_database_ambiguous"
 TARGET_DATABASE_ROLE_MISMATCH = "target_database_role_mismatch"
 TARGET_RELATION_OUTSIDE_GROUP = "target_relation_outside_group"
 TARGET_RELATION_MODE_INVALID = "target_relation_mode_invalid"
+TARGET_PAGE_OUTSIDE_GROUP = "target_page_outside_group"
 TARGET_BINDING_RETRIEVE_FAILED = "target_binding_retrieve_failed"
 TARGET_BINDING_VALIDATION_FAILED = "target_binding_validation_failed"
 
 _CACHE_ATTRIBUTE = "_epla_target_binding_proof"
+_PAGE_CACHE_ATTRIBUTE = "_epla_target_page_role_proofs"
 
 
 class NotionTargetBindingError(RuntimeError):
@@ -312,3 +314,50 @@ def ensure_notion_target_binding_for_write(
                 raise NotionTargetBindingError(TARGET_DATABASE_ROLE_MISMATCH)
 
     return validate_notion_target_binding(notion, config)
+
+
+def ensure_notion_page_belongs_to_role(
+    notion: Any,
+    page_id: str,
+    expected_role: str,
+    *,
+    config: Optional[NotionConfig] = None,
+) -> NotionTargetBindingResult:
+    """Prove a caller-supplied page belongs to the configured role."""
+    normalized_page_id = normalize_notion_id(page_id)
+    if not normalized_page_id:
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
+
+    result = ensure_notion_target_binding_for_write(notion, config=config)
+    proof = getattr(notion, _CACHE_ATTRIBUTE, None)
+    if not isinstance(proof, _NotionTargetBindingProof):
+        raise NotionTargetBindingError(TARGET_BINDING_VALIDATION_FAILED)
+    expected_data_source_id = proof.role_mapping().get(expected_role)
+    if not expected_data_source_id:
+        raise NotionTargetBindingError(TARGET_DATABASE_ROLE_MISMATCH)
+
+    cache = getattr(notion, _PAGE_CACHE_ATTRIBUTE, None)
+    if not isinstance(cache, set):
+        cache = set()
+        setattr(notion, _PAGE_CACHE_ATTRIBUTE, cache)
+    cache_key = (normalized_page_id, expected_role)
+    if cache_key in cache:
+        return result
+
+    try:
+        page = notion.pages.retrieve(page_id=page_id)
+    except Exception:
+        raise NotionTargetBindingError(TARGET_BINDING_RETRIEVE_FAILED) from None
+    if not isinstance(page, Mapping):
+        raise NotionTargetBindingError(TARGET_BINDING_RETRIEVE_FAILED)
+    parent = page.get("parent")
+    if not isinstance(parent, Mapping):
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
+    if parent.get("type") != "data_source_id":
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
+    actual_data_source_id = normalize_notion_id(parent.get("data_source_id"))
+    if actual_data_source_id != expected_data_source_id:
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
+
+    cache.add(cache_key)
+    return result

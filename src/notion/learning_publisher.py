@@ -18,7 +18,10 @@ from src.notion.schema import (
     PODCAST_LIBRARY,
     category_color,
 )
-from src.notion.target_binding import ensure_notion_target_binding_for_write
+from src.notion.target_binding import (
+    ensure_notion_page_belongs_to_role,
+    ensure_notion_target_binding_for_write,
+)
 from src.notion.uploader import create_notion_client
 
 logger = logging.getLogger(__name__)
@@ -333,7 +336,11 @@ def update_podcast_learning_page(
     if not transcript.strip():
         raise LearningPublisherError("Transcript text is required.")
 
-    ensure_notion_target_binding_for_write(notion)
+    ensure_notion_page_belongs_to_role(
+        notion,
+        podcast_page_id,
+        PODCAST_LIBRARY,
+    )
     learning_items = analysis.all_learning_items()
     try:
         notion.pages.update(
@@ -365,6 +372,11 @@ def create_expression_page(
     ensure_notion_target_binding_for_write(
         notion,
         configured_role_ids={EXPRESSION_DATABASE: expression_database_id},
+    )
+    ensure_notion_page_belongs_to_role(
+        notion,
+        podcast_page_id,
+        PODCAST_LIBRARY,
     )
     try:
         response = notion.pages.create(
@@ -506,7 +518,11 @@ def update_complete_podcast_page_properties(
     payload: CompletePodcastLearningPayload,
 ) -> None:
     """Refresh properties for an exact repeat without duplicating page content."""
-    ensure_notion_target_binding_for_write(notion)
+    ensure_notion_page_belongs_to_role(
+        notion,
+        page_id,
+        PODCAST_LIBRARY,
+    )
     try:
         notion.pages.update(
             page_id=page_id,
@@ -747,6 +763,11 @@ def publish_learning_materials(
             PODCAST_LIBRARY: podcast_database_id,
             EXPRESSION_DATABASE: expression_database_id,
         },
+    )
+    ensure_notion_page_belongs_to_role(
+        notion,
+        payload.podcast_page_id,
+        PODCAST_LIBRARY,
     )
     ensure_expression_database_schema(
         notion,

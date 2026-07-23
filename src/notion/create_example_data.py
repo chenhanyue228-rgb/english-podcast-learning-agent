@@ -18,7 +18,10 @@ from typing import Any, TYPE_CHECKING
 from src.notion.config import NotionConfigError, load_notion_config
 from src.notion.renderers import expression_body_blocks, podcast_body_blocks
 from src.notion.schema import EXPRESSION_DATABASE, PODCAST_LIBRARY
-from src.notion.target_binding import ensure_notion_target_binding_for_write
+from src.notion.target_binding import (
+    ensure_notion_page_belongs_to_role,
+    ensure_notion_target_binding_for_write,
+)
 
 if TYPE_CHECKING:
     from notion_client import Client
@@ -141,6 +144,11 @@ def create_expression_page(
     ensure_notion_target_binding_for_write(
         notion,
         configured_role_ids={EXPRESSION_DATABASE: expression_database_id},
+    )
+    ensure_notion_page_belongs_to_role(
+        notion,
+        podcast_page_id,
+        PODCAST_LIBRARY,
     )
     try:
         response = notion.pages.create(

@@ -30,7 +30,10 @@ from src.notion.renderers import (
     podcast_body_blocks,
 )
 from src.notion.schema import EXPRESSION_DATABASE, PODCAST_LIBRARY
-from src.notion.target_binding import ensure_notion_target_binding_for_write
+from src.notion.target_binding import (
+    ensure_notion_page_belongs_to_role,
+    ensure_notion_target_binding_for_write,
+)
 
 if TYPE_CHECKING:
     from notion_client import Client
@@ -313,6 +316,11 @@ class NotionPodcastPublisher:
                 EXPRESSION_DATABASE: self.expression_db_id,
             },
         )
+        ensure_notion_page_belongs_to_role(
+            self.notion,
+            podcast_page_id,
+            PODCAST_LIBRARY,
+        )
         page_ids: list[str] = []
         for expression in expressions:
             response = self.notion.pages.create(
@@ -349,6 +357,11 @@ class NotionPodcastPublisher:
                 PODCAST_LIBRARY: self.podcast_db_id,
                 EXPRESSION_DATABASE: self.expression_db_id,
             },
+        )
+        ensure_notion_page_belongs_to_role(
+            self.notion,
+            podcast_page_id,
+            PODCAST_LIBRARY,
         )
         self.notion.blocks.children.append(
             block_id=podcast_page_id,

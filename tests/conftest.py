@@ -43,3 +43,9 @@ def isolate_publisher_payload_tests(monkeypatch: pytest.MonkeyPatch) -> None:
             "ensure_notion_target_binding_for_write",
             verified,
         )
+        if hasattr(module, "ensure_notion_page_belongs_to_role"):
+            monkeypatch.setattr(
+                module,
+                "ensure_notion_page_belongs_to_role",
+                verified,
+            )
