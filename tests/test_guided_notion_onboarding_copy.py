@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -142,3 +143,11 @@ def test_guides_do_not_use_failed_owner_acceptance_instruction() -> None:
     failed_copy = "Notion 授权已经完成"
     assert failed_copy not in USER_GUIDE
     assert failed_copy not in NOTION_GUIDE
+
+
+def test_user_guide_second_level_section_numbers_are_continuous() -> None:
+    section_numbers = [
+        int(number)
+        for number in re.findall(r"^## (\d+)\.", USER_GUIDE, flags=re.MULTILINE)
+    ]
+    assert section_numbers == list(range(1, len(section_numbers) + 1))
