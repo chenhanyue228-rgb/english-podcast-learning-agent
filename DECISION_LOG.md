@@ -188,3 +188,77 @@ compatibility, and idempotent publishing behavior without a schema migration.
 - `NOTION_WEEKLY_REFLECTION_DATABASE_ID` remains the canonical environment
   variable.
 - `NOTION_WEEKLY_REVIEW_DATABASE_ID` remains a legacy compatibility alias.
+
+## DEC-008: Continue First-Time Setup in the Installation Conversation
+
+- Date: 2026-07-23
+- Status: 项目所有者验收阶段采用
+
+### Decision
+
+After installation, the installing Codex asks in the current conversation
+whether the user wants to continue first-time setup. A new conversation is
+only the first Skill-refresh fallback. Restarting Codex is the second fallback.
+
+### Reason
+
+Installation and setup should feel like one product journey. Requiring a new
+conversation adds an unnecessary handoff and makes the user remember a command.
+
+## DEC-009: Normal Users Do Not Locate the Project Directory
+
+- Date: 2026-07-23
+- Status: 项目所有者验收阶段采用
+
+### Decision
+
+Codex locates or safely acquires the complete project and operates the local
+runtime. Normal users are not responsible for the project path, `cd`, `.venv`,
+or primary terminal commands.
+
+### Reason
+
+These are execution details owned by Codex and Python, not learning tasks owned
+by the user.
+
+## DEC-010: Use One Safe First-Time Setup Entry
+
+- Date: 2026-07-23
+- Status: 采用
+
+### Decision
+
+Use one Codex-launched local setup flow for the Notion token and complete
+parent-page URL. The token must not be accepted through chat, command
+arguments, or plaintext shell commands.
+
+### Reason
+
+A single hidden-input path reduces configuration errors and keeps the secret
+out of conversation history, process arguments, and logs.
+
+## DEC-011: Short Instructions Trigger Complete User Flows
+
+- Date: 2026-07-23
+- Status: 项目所有者验收阶段采用
+
+### Decision
+
+First-time setup may be triggered with:
+
+```text
+请使用英语音频学习助手，带我完成第一次设置。
+```
+
+Podcast processing may be triggered with:
+
+```text
+请使用英语音频学习助手处理这个播客。
+```
+
+The detailed background sequence belongs to the Skill contract and is not
+copied by the user.
+
+### Reason
+
+Users should express intent while Codex handles orchestration details.

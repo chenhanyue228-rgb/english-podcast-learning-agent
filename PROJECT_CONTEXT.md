@@ -19,9 +19,9 @@ The system helps users build long-term personal English learning memory.
 
 **Phase 4 — Product Validation**
 
-**Execution stage:** Phase 4.1C — Owner Acceptance
+**Execution stage:** Phase 4.1C — Owner Acceptance Preparation
 
-**Status:** `READY_FOR_OWNER_ACCEPTANCE`
+**Status:** `READY_FOR_ONBOARDING_PR`
 
 The current stable release remains **v1.1.0**, built from release commit
 `80cbab01ea266e487a0359ddbec562959070d8a0`. The current production `main`
@@ -36,10 +36,22 @@ Release status:
 - PR #4 merged the Phase 4.1B onboarding fixes into `main`
 - 351 tests pass with 3 expected compatibility-provider deprecation warnings
 - external-user sessions: 0
-- Owner Acceptance is the current priority
+- the guided first-time-use flow is being prepared for Owner Acceptance
 
-Phase 4.1C validates the merged onboarding contract in the owner's real Codex
-and Notion environment. External-user testing has not started.
+Phase 4.1C prepares the guided onboarding flow before it is merged and tested
+in the owner's real Codex and Notion environment. Owner Acceptance has not
+started. External-user testing has not started.
+
+The formal user flow continues in the current conversation after installation.
+A new conversation is not mandatory, and restarting Codex is only the second
+Skill-refresh fallback. The user does not need to memorize commands, locate the
+project directory, type `cd`, create `.venv`, or run the primary workflow.
+
+Codex locates or safely acquires the complete project, prepares the local
+runtime, starts the safe first-time setup tool, and advances the workflow. The
+user remains responsible for non-delegable account authorization, hidden token
+entry, the parent-page URL, learning-content selection, and required
+permissions.
 
 ## Runtime Model
 
@@ -140,7 +152,8 @@ Weekly Reflection is a compounding learning note rather than a recap.
 
 - The Codex Skills UI installation path is defined but has not completed Owner
   Acceptance.
-- The four-database Notion setup has not completed Owner Acceptance.
+- The new safe first-time setup tool must be reviewed and merged before Owner
+  Acceptance begins.
 - The merged artifact handoff has not yet been exercised in the owner's full
   learning journey.
 - External-user session count remains 0.
@@ -156,10 +169,10 @@ full regression suite, and completed the reviewed v1.1.0 release.
 
 ## Immediate Milestone
 
-Complete Phase 4.1C Owner Acceptance: install the Skill through the Codex
-Skills UI, verify discovery, initialize and validate the four-database Notion
-workspace, then complete one supported audio-to-Notion learning flow. Record
-the result without claiming external-user validation.
+Review and merge the guided first-time-use flow. Then begin Phase 4.1C Owner
+Acceptance from the latest `main`: install the Skill, continue in the current
+conversation, complete safe Notion setup, and run one supported
+audio-to-Notion learning flow. External-user sessions remain 0.
 
 Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md` and
 `skill/SKILL.md` before changing runtime behavior.

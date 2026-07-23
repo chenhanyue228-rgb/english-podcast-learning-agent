@@ -15,37 +15,40 @@ Phase 4 — Product Validation
 
 ## Current Sprint
 
-Phase 4.1C — Owner Acceptance
+Phase 4.1C — Owner Acceptance Preparation
 
-Status: `READY_FOR_OWNER_ACCEPTANCE`
+Status: `READY_FOR_ONBOARDING_PR`
 
 External-user sessions: 0
 
 ## Goal
 
-Verify the merged onboarding flow in the owner's real Codex and Notion
-environment:
+Complete and verify a first-time setup flow in which a normal user does not
+need to locate the project directory, type `cd`, or run primary commands
+manually.
 
 ```text
-Codex Skills UI installation
+Installation handoff in the current conversation
 ↓
-Skill discovery
+Guided Notion authorization
 ↓
-Four-database Notion setup
+Safe local setup
 ↓
-Complete learning flow
+Codex-operated podcast-to-Notion flow
 ```
 
 ## Current Tasks
 
-1. Install the Skill through the Codex Skills UI.
-2. Restart Codex or open a new task.
-3. Verify `$english-audio-learning-agent` discovery.
-4. Create a disposable Notion parent page and share it with the integration.
-5. Run `python -m src.notion.setup_workspace --parent-page-id "<id>"`.
-6. Run `python -m src.notion.check_workspace`.
-7. Complete one full supported audio-to-artifact-to-Notion learning flow.
-8. Record results, failures, timing, and evidence.
+1. Keep the current conversation as the primary post-install continuation.
+2. Make a new conversation and restart fallback-only actions.
+3. Add the Chinese user guide and complete path comparison.
+4. Add secure local token and parent-page URL input.
+5. Add the macOS one-click setup entry.
+6. Let Codex locate the project and prepare the runtime.
+7. Automatically create or validate all four Notion databases.
+8. Let Codex actively prompt for the first podcast after setup.
+9. Lock the onboarding contract with regression tests.
+10. Prepare the branch for onboarding review without starting Owner Acceptance.
 
 ## Out of Scope
 
@@ -61,15 +64,29 @@ Complete learning flow
 
 ## Completion Criteria
 
-- The Skill is installed through the documented Codex Skills UI path.
-- `$english-audio-learning-agent` is discovered after restart or a new task.
-- All four Notion databases are created and pass `check_workspace`.
-- One complete supported learning flow publishes successfully to Notion.
+- The current conversation can continue directly after installation.
+- A new conversation is not mandatory.
+- The user does not need to memorize an instruction.
+- The user does not locate the project directory or type `cd`.
+- The token and complete parent-page URL are entered in a local safe interface.
+- Codex prepares the runtime and starts the setup flow.
+- Codex and Python create and validate the four databases.
+- Codex actively prompts for a podcast after setup.
+- Codex operates the podcast-to-Notion workflow.
+- No unresolved P0 or P1 onboarding blocker remains in the implementation.
 - No real credentials are committed.
-- Owner Acceptance results are recorded.
 - No external-user readiness claim is made.
 
-External-user validation remains a later activity and has not started.
+Owner Acceptance and external-user validation have not started.
+
+## Current State
+
+- PR #4 is merged.
+- The Phase 4.1C documentation branch exists.
+- The user interaction contract is being completed.
+- The safe first-time setup tool is being added.
+- Owner Acceptance has not started.
+- External-user sessions: 0.
 
 ## Completed Phase 4.1 Milestones
 

@@ -1,7 +1,7 @@
 # Codex Skill Contract
 
 This document defines the runtime contract between Codex and the local Python
-project for the AI English Learning Knowledge Agent.
+project for English Audio Learning Agent.
 
 It is a behavioral contract, not an implementation plan.
 
@@ -20,14 +20,35 @@ The contract below defines:
 
 ## 2. Architecture Rules
 
+### User Responsibilities
+
+The user is responsible only for actions that cannot be delegated:
+
+- authorizing the Notion account and workspace
+- creating the Notion internal connection and parent page
+- adding the internal connection to the parent page
+- entering the Notion token in the local hidden-input interface
+- providing the complete parent-page URL
+- selecting the learning source or highlighted vocabulary
+- approving necessary local execution and network access
+
+The user must not send the Notion token to Codex chat.
+
 ### Codex Responsibilities
 
 Codex is responsible for:
 
+- installation handoff
+- user guidance
+- locating or safely acquiring the complete project
+- preparing and operating the local runtime
 - reasoning
 - language understanding
 - content generation
 - synthesizing learning signals into structured JSON
+- advancing each workflow stage
+- recovering from failures
+- reporting final results
 
 Codex must not be treated as a database writer or a deterministic parser.
 
@@ -44,6 +65,43 @@ Python is responsible for:
 
 Python must not be responsible for external LLM reasoning in the production
 Skill path.
+
+### Notion Responsibilities
+
+Notion stores the four long-term learning databases and the final validated
+knowledge assets. The production write path is the local Python Notion API
+integration, not a separate Notion connector workflow.
+
+### Local Execution Rule
+
+Local execution is required because audio processing, transcription,
+validation, configuration persistence, and Notion synchronization are
+deterministic Python responsibilities.
+
+Manual terminal operation by the user is not required. Codex should run the
+local commands, prepare `.venv`, and launch the safe first-time setup tool.
+Terminal instructions are a final recovery path only.
+
+### First-Time Setup Contract
+
+Installation uses the repository URL once. After installation, Codex continues
+in the current conversation and asks whether the user wants to proceed. A new
+conversation is the first Skill-refresh fallback; restarting Codex is the
+second fallback.
+
+For first-time setup, Codex:
+
+1. verifies the complete project or safely acquires it
+2. prepares the project-local runtime
+3. guides the user through Notion authorization
+4. launches `scripts/first_time_setup.py` or `start_setup.command`
+5. keeps the access token out of chat and command arguments
+6. lets Python create or validate all four databases
+7. reports the result and actively asks for the first podcast
+
+The user enters only the hidden token and complete parent-page URL in the local
+interface. The user does not locate the project directory, type `cd`, edit
+`.env`, extract a page ID, or run the primary workflow commands.
 
 ## 3. Stage Contracts
 

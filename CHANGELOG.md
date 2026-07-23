@@ -26,11 +26,26 @@ entries must be appended or clarified, not removed.
 
 ### Phase 4.1C Owner Acceptance
 
-- Entered Owner Acceptance with status `READY_FOR_OWNER_ACCEPTANCE`.
+- Added a complete Chinese user guide for installation, Notion authorization,
+  first-time setup, daily use, and recovery.
+- Made the current conversation the primary continuation after installation.
+- Limited new-conversation and restart guidance to Skill-refresh fallbacks.
+- Added the full user-path and runtime-path comparison table.
+- Added automatic project location and safe acquisition rules for Codex.
+- Added one macOS first-time setup entry.
+- Added hidden Notion token input and complete parent-page URL support.
+- Removed the normal-user requirement to locate a project directory, type
+  `cd`, edit `.env`, create `.venv`, run primary commands, or extract a page
+  ID manually.
+- Added automatic four-database creation/validation and partial-configuration
+  duplicate protection.
+- Added the post-setup prompt for the user's first podcast.
+- Added first-time setup and Skill onboarding contract regression tests.
+- Prepared Owner Acceptance with status `READY_FOR_ONBOARDING_PR`.
 - External-user testing has not started; external-user session count remains 0.
 
-Owner Acceptance remains pending and must not be treated as external-user
-validation.
+Owner Acceptance begins only after this onboarding update is reviewed, merged,
+and installed from the latest `main`.
 
 ## [v1.1.0] - 2026-07-22
 

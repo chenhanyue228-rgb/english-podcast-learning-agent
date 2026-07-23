@@ -48,144 +48,80 @@ The Skill helps a user:
 4. generate weekly reflection artifacts
 5. publish the final knowledge assets into Notion
 
-## Installation
+## 中文用户入口
 
-### 1. Create the Python environment
+普通用户请先阅读：
 
-From the repository root, create the project virtual environment and install
-dependencies:
+- [英语音频学习助手用户指南](docs/USER_GUIDE_ZH.md)
+- [Notion 首次设置](docs/Notion_Onboarding.md)
 
-```bash
-python3 -m venv .venv
-./.venv/bin/python scripts/bootstrap_environment.py
-```
+## 安装与第一次设置
 
-Project dependencies include a local FFmpeg runtime through `imageio-ffmpeg`,
-so Homebrew is optional for supported audio conversion.
-
-If you only want dependencies:
-
-```bash
-./.venv/bin/python scripts/bootstrap_environment.py --skip-tests
-```
-
-### 2. Install the Codex Skill
-
-#### Primary (User Path)
-
-Use the Codex Skills UI:
-
-1. Open the **Skills** panel in Codex.
-2. Click **Create**.
-3. Choose **Upload from your computer** and select this repository's `skill/`
-   directory.
-4. Save the Skill.
-5. Open a new Codex task. If the Skill is not discovered, fully quit and
-   restart Codex before trying again.
-
-Verify discovery with:
+第一次安装时，把下面这段话发送给 Codex：
 
 ```text
-Use $english-audio-learning-agent to list supported inputs
+请从下面的项目安装英语音频学习助手：
+
+https://github.com/chenhanyue228-rgb/english-podcast-learning-agent
+
+安装成功后，请直接在当前对话中带我继续第一次设置。
 ```
 
-Codex should list Apple Podcasts episode URLs, podcast RSS feeds, and local
-audio files.
+仓库地址只用于第一次安装。安装完成后，Codex 应在当前对话中直接询问：
 
-#### Advanced / Developer Setup
+```text
+英语音频学习助手已经安装完成。
 
-Repository contributors who need local edits to appear immediately may expose
-the working tree with a symbolic link:
+现在可以在当前对话中继续第一次设置。
 
-```bash
-mkdir -p "$HOME/.codex/skills"
-ln -s "$(pwd)/skill" "$HOME/.codex/skills/english-audio-learning-agent"
+是否现在继续？
 ```
 
-This Developer-only symlink is not the default onboarding path and does not
-replace the Skills UI flow. Inspect an existing destination before replacing
-it.
+用户回复“继续”即可。当前对话优先继续，不强制新建对话，也不要求用户记住
+操作指令。
 
-### 3. Configure Notion
+如果当前对话尚未刷新新安装的技能，新建对话作为第一次备用；如果新对话仍
+未识别，重启 Codex 作为第二次备用。
 
-Copy environment variables:
+备用指令：
 
-```bash
-cp .env.example .env
+```text
+请使用英语音频学习助手，带我完成第一次设置。
 ```
 
-Create a Notion internal integration and copy its token. Then create a parent
-page, share that page with the integration, and set the token in `.env`:
+只安装 `skill/` 文件夹不能代替完整本地运行环境。Codex 会自动获取或定位
+完整项目，准备项目内 `.venv`，并启动本地安全设置工具。普通用户：
 
-```bash
-NOTION_TOKEN=
+- 不需要寻找项目目录
+- 不需要输入 `cd`
+- 不需要手动创建虚拟环境
+- 不需要手动编辑 `.env`
+- 不需要手动运行数据库初始化或验证命令
+- 不需要手动提取 Notion 页面编号
+
+用户需要亲自完成的只有 Notion 账户授权、在本地安全界面输入访问密钥和父
+页面完整链接，以及选择学习内容。访问密钥不得发送到 Codex 对话。
+
+安全设置会自动创建或验证：
+
+- Podcast Library（播客资料库）
+- Expression Database（表达资料库）
+- Weekly Review（每周复盘资料库，存放 Weekly Reflection 每周复盘内容）
+- Vocabulary Database（词汇资料库）
+
+## 日常使用
+
+设置完成后，用户直接发送：
+
+```text
+请使用英语音频学习助手处理这个播客：
+
+<粘贴播客链接>
 ```
 
-Initialize the workspace with the copied parent page URL or ID:
-
-```bash
-./.venv/bin/python -m src.notion.setup_workspace \
-  --parent-page-id "<notion-parent-page-url-or-id>"
-```
-
-The command creates and connects four databases:
-
-- Podcast Library
-- Expression Database
-- Weekly Review (stores the Weekly Reflection learning note)
-- Vocabulary Database
-
-It writes the parent page ID and all four database IDs into `.env`. Validate
-the completed workspace with:
-
-```bash
-./.venv/bin/python -m src.notion.check_workspace
-```
-
-See [docs/Notion_Onboarding.md](docs/Notion_Onboarding.md) for the complete
-Notion setup checklist. `NOTION_WEEKLY_REVIEW_DATABASE_ID` remains accepted
-only as a legacy compatibility alias.
-
-## First Use
-
-For a podcast or audio source:
-
-```bash
-./.venv/bin/python src/main.py "<source>"
-```
-
-This creates the intermediate transcript and analysis-request artifacts.
-
-Then use `$english-audio-learning-agent` to generate the AI JSON artifact.
-Python validates it and publishes the final Notion page:
-
-```bash
-./.venv/bin/python src/main.py "<source>" \
-  --transcript-json data/transcripts/<file>.json \
-  --analysis-json data/analysis/<file>.json
-```
-
-Reusing the transcript JSON avoids running audio extraction and Whisper a
-second time.
-
-For weekly reflection:
-
-```bash
-./.venv/bin/python src/main.py --weekly-reflection
-```
-
-On the first pass Python may report a required Codex artifact. Codex reads the
-generated request, writes the requested JSON output, and reruns the same
-command. Reflection uses:
-
-- `output/reflection_context_request.json` -> `output/reflection_context.json`
-- `output/weekly_review_request.json` -> `output/weekly_review.json`
-
-For a dry run:
-
-```bash
-./.venv/bin/python src/main.py --weekly-reflection --dry-run
-```
+Codex 自动推进音频获取、文字稿生成、分析 artifact 生成、Python 验证和
+Notion 发布，并返回最终页面链接。用户不需要复制后台执行清单或手动运行主要
+流程命令。
 
 ## Supported Workflows
 
@@ -258,7 +194,33 @@ Notion
 - If you are unsure which command to use, start with the Skill manifest:
   [skill/SKILL.md](skill/SKILL.md)
 
-## Core Commands
+## Advanced / Developer and Recovery Commands
+
+The commands below are for repository development or final recovery when Codex
+automation and `start_setup.command` cannot continue. They are not required in
+the normal user journey.
+
+Prepare a local environment:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python scripts/bootstrap_environment.py --skip-tests
+```
+
+Run the safe first-time setup:
+
+```bash
+./.venv/bin/python scripts/first_time_setup.py
+```
+
+Developer-only Skill symlink:
+
+```bash
+mkdir -p "$HOME/.codex/skills"
+ln -s "$(pwd)/skill" "$HOME/.codex/skills/english-audio-learning-agent"
+```
+
+Workflow commands:
 
 - `./.venv/bin/python src/main.py "<source>"`
 - `./.venv/bin/python src/main.py "<source>" --transcript-json data/transcripts/<file>.json --analysis-json data/analysis/<file>.json`
@@ -274,6 +236,8 @@ the production Vocabulary workflow.
 
 ## Documentation
 
+- [Chinese user guide](docs/USER_GUIDE_ZH.md)
+- [Notion onboarding](docs/Notion_Onboarding.md)
 - [Skill manifest](skill/SKILL.md)
 - [Current architecture](docs/current_architecture.md)
 - [Codex Skill contract](docs/codex_skill_contract.md)

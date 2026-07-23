@@ -1,6 +1,6 @@
 ---
 name: english-audio-learning-agent
-description: Analyze Apple Podcasts episodes, podcast RSS feeds, and local English audio; generate learning artifacts with Codex; capture highlighted vocabulary; and publish validated learning notes and weekly reflections to Notion. Use when a user asks to analyze English audio, create learning notes, extract expressions, sync vocabulary, or generate a weekly reflection.
+description: Install and set up English Audio Learning Agent; configure and validate its Notion workspace; analyze Apple Podcasts episodes, podcast RSS feeds, and local English audio; generate learning artifacts; sync highlighted vocabulary; and publish learning notes and weekly reflections.
 ---
 
 # English Audio Learning Agent Skill
@@ -43,11 +43,15 @@ as a supported v1 input.
 
 Use this Skill when the user asks to:
 
+- install the English Audio Learning Agent
+- complete first-time setup
+- configure or validate the Notion workspace
 - "Analyze this podcast"
 - "Create English learning notes"
 - "Extract useful expressions"
 - "Sync vocabulary"
 - "Generate weekly reflection"
+- publish a learning page
 
 Use this Skill when the user provides:
 
@@ -68,7 +72,122 @@ Do not use this Skill when the user asks for:
 If the request is unclear, ask one concise clarifying question before running
 the workflow.
 
-## 3. Runtime Architecture
+## 3. Guided Onboarding Contract
+
+### Installation Request
+
+The supported Chinese installation request is:
+
+```text
+请从下面的项目安装英语音频学习助手：
+
+https://github.com/chenhanyue228-rgb/english-podcast-learning-agent
+
+安装成功后，请直接在当前对话中带我继续第一次设置。
+```
+
+The repository URL is used only during installation. First-time setup and
+daily podcast processing must not require the user to provide it again.
+
+### Installation Handoff
+
+After installation, continue in the current conversation first. Codex must
+display:
+
+```text
+英语音频学习助手已经安装完成。
+
+现在可以在当前对话中继续第一次设置。
+
+是否现在继续？
+```
+
+When the user replies `继续`, begin first-time setup immediately.
+
+Do not require a new conversation. If the current conversation has not
+discovered the newly installed Skill, a new conversation is the first
+fallback. If the new conversation still cannot discover it, restarting Codex
+is the second fallback.
+
+The optional setup trigger is:
+
+```text
+请使用英语音频学习助手，带我完成第一次设置。
+```
+
+The user does not need to memorize this instruction.
+
+### Locate or Acquire the Complete Project
+
+Before first-time setup, Codex must check whether the active workspace contains
+all of:
+
+- `README.md`
+- `skill/`
+- `scripts/`
+- `src/`
+- `requirements.txt`
+- `.env.example`
+
+If present, continue with that project. If absent, Codex should acquire:
+
+```text
+https://github.com/chenhanyue228-rgb/english-podcast-learning-agent
+```
+
+The suggested destination is `~/EnglishAudioLearningAgent`.
+
+- Clone only when the destination does not exist.
+- If it exists, verify it is the correct repository before using it.
+- Never overwrite an unrelated directory or delete user files.
+- Never write a Notion token into the repository or a command.
+- Request user approval for necessary downloads, local execution, or network
+  access.
+- Do not require the user to find the project folder or type `cd`.
+
+### First-Time Setup Responsibilities
+
+For the setup trigger, Codex must:
+
+1. Locate or safely acquire the complete project.
+2. Prepare or reuse the project-local `.venv`.
+3. Direct the user to the official Notion resources:
+   - https://www.notion.so/developers
+   - https://developers.notion.com/guides/get-started/internal-connections
+   - https://www.notion.com/help/create-your-first-page
+   - https://www.notion.com/help/share-your-work
+4. Guide the user to create an internal connection and an empty parent page.
+5. Guide the user to add the connection to the parent page.
+6. Remind the user that the access token must not be sent to the Codex chat.
+7. Automatically launch `scripts/first_time_setup.py` with safe interactive
+   input.
+8. Ask the user to enter only the hidden token and the complete parent-page
+   URL in the local interface.
+9. Never require manual page-ID extraction.
+10. Let Python create or validate all four databases.
+11. Report the four database results.
+
+If safe interactive input is unavailable, try to open `start_setup.command`.
+If that also fails, open the project directory in Finder and ask the user only
+to double-click `start_setup.command`. Terminal instructions are the final
+fallback.
+
+After success, actively prompt the user for an Apple Podcasts episode URL,
+podcast RSS feed, or local audio file.
+
+### Daily Podcast Trigger
+
+```text
+请使用英语音频学习助手处理这个播客：
+
+<播客链接>
+```
+
+Codex must check the input, run the local transcript/request flow, generate the
+analysis artifact, rerun Python validation and publishing, and return the final
+Notion page URL. Do not ask the user to copy the internal command sequence.
+
+## 4. Runtime Architecture
 
 This project is a Codex Skill, not a standalone Python AI application.
 
@@ -107,65 +226,33 @@ The Skill runtime path does not require direct OpenAI API calls.
 Python should be used for orchestration, validation, and publishing.
 Codex should be used for reasoning and content generation.
 
-## 4. User Quick Start
+## 5. User Quick Start
 
 ### Step 1: Install the Skill
 
-Install this Skill via the Codex Skills UI or a supported installer. For the
-primary user path:
-
-1. Open the **Skills** panel.
-2. Click **Create**.
-3. Choose **Upload from your computer** and select the repository's `skill/`
-   directory.
-4. Save the Skill.
-5. Open a new task. If discovery does not refresh, fully quit and restart
-   Codex.
-
-Verify discovery with:
-
-```text
-Use $english-audio-learning-agent to list supported inputs
-```
-
-The expected inputs are Apple Podcasts episode URLs, podcast RSS feeds, and
-local audio files.
+Use the installation request above. After installation, the current
+conversation is the primary continuation path. A new conversation and restart
+are fallbacks only when Skill discovery has not refreshed.
 
 ### Step 2: Configure the Environment
 
-Prepare the local Python environment:
+Codex locates the complete project, prepares the local environment, guides the
+Notion authorization, and starts the safe setup tool. The user enters the
+token and complete parent-page URL only in the local interface.
 
-```bash
-python3 -m venv .venv
-./.venv/bin/python scripts/bootstrap_environment.py
-cp .env.example .env
-```
-
-Create a Notion internal integration, create a parent page, share that page
-with the integration, and set `NOTION_TOKEN` in `.env`. Then initialize and
-validate all four databases:
-
-```bash
-./.venv/bin/python -m src.notion.setup_workspace \
-  --parent-page-id "<notion-parent-page-url-or-id>"
-./.venv/bin/python -m src.notion.check_workspace
-```
-
-The setup command creates Podcast Library, Expression Database, Weekly Review,
-and Vocabulary Database, then writes their IDs to `.env`. Weekly Review stores
-the Weekly Reflection learning note.
-
-FFmpeg is supplied by the project dependency set when no system installation
-is present.
+Python creates or validates Podcast Library, Expression Database, Weekly
+Review, and Vocabulary Database. Weekly Review stores the Weekly Reflection
+learning note.
 
 ### Step 3: Provide Podcast Input
 
-Give Codex an Apple Podcasts episode URL, podcast RSS feed, local audio file, or a Notion
-highlight source.
+Give Codex an Apple Podcasts episode URL, podcast RSS feed, local audio file,
+or a Notion highlight source.
 
 ### Step 4: Run the Analysis Workflow
 
-Run the source pipeline to create the intermediate analysis request artifact.
+Codex runs the source pipeline to create the intermediate analysis request
+artifact.
 
 ### Step 5: Generate Artifacts
 
@@ -174,10 +261,13 @@ appropriate output directory.
 
 ### Step 6: Publish to Notion
 
-Run the publish command so Python validates the generated artifact and writes
-the final page to Notion.
+Codex runs the publish step so Python validates the generated artifact and
+writes the final page to Notion.
 
-## 5. Command Catalog
+## 6. Command Catalog
+
+These commands are an execution contract for Codex and a Developer/recovery
+reference. Normal users are not expected to run them manually.
 
 | Command | Purpose | Required Input | Generated Artifacts | Expected Output | Next Action |
 |---|---|---|---|---|---|
@@ -190,9 +280,9 @@ the final page to Notion.
 | `./.venv/bin/python src/main.py --sync-vocab-comments` | Legacy compatibility: sync comment-triggered vocabulary captures | Podcast Library pages with historical comment triggers | Sync state + vocabulary records | Vocabulary sync summary | Prefer the pink-highlight workflow for v1 use |
 | `./.venv/bin/python -m pytest` | Run the full test suite | None | Test reports | Pass/fail summary | Fix issues before publishing |
 
-## 6. Workflow Contracts
+## 7. Workflow Contracts
 
-### 6.1 Podcast Analysis
+### 7.1 Podcast Analysis
 
 #### Flow
 
@@ -242,7 +332,7 @@ Python:
 - validate generated JSON
 - publish to Notion
 
-### 6.2 Vocabulary Capture
+### 7.2 Vocabulary Capture
 
 #### Flow
 
@@ -291,7 +381,7 @@ Python:
 - validate the vocabulary payload
 - upsert to Notion
 
-### 6.3 Weekly Reflection
+### 7.3 Weekly Reflection
 
 #### Flow
 
@@ -341,7 +431,7 @@ Python:
 - run quality checks
 - publish to Notion
 
-## 7. Artifact Contract
+## 8. Artifact Contract
 
 ### Input Artifacts
 
@@ -382,7 +472,7 @@ Final knowledge outputs:
 - Vocabulary Database page
 - Weekly Reflection page
 
-## 8. Error Handling
+## 9. Error Handling
 
 ### Invalid URL
 
@@ -472,7 +562,7 @@ Recovery:
 
 - update `.env` and rerun the command
 
-## 9. Quality Rules
+## 10. Quality Rules
 
 ### Analysis Quality
 
@@ -495,7 +585,7 @@ Recovery:
 - connect learning to work behavior
 - avoid podcast recaps
 
-## 10. Architecture Freeze Notes
+## 11. Architecture Freeze Notes
 
 ### Frozen
 
@@ -523,7 +613,7 @@ only. The production Skill does not require `OPENAI_API_KEY`.
 - `docs/current_architecture.md`
 - `docs/codex_skill_contract.md`
 
-## 11. Operating Principle
+## 12. Operating Principle
 
 Codex reasons. Python orchestrates and validates. Notion stores the knowledge
 assets.
