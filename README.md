@@ -50,10 +50,14 @@ The Skill helps a user:
 
 ## Installation
 
-Install dependencies:
+### 1. Create the Python environment
+
+From the repository root, create the project virtual environment and install
+dependencies:
 
 ```bash
-python3 scripts/bootstrap_environment.py
+python3 -m venv .venv
+./.venv/bin/python scripts/bootstrap_environment.py
 ```
 
 Project dependencies include a local FFmpeg runtime through `imageio-ffmpeg`,
@@ -62,8 +66,47 @@ so Homebrew is optional for supported audio conversion.
 If you only want dependencies:
 
 ```bash
-python3 scripts/bootstrap_environment.py --skip-tests
+./.venv/bin/python scripts/bootstrap_environment.py --skip-tests
 ```
+
+### 2. Install the Codex Skill
+
+#### Primary (User Path)
+
+Use the Codex Skills UI:
+
+1. Open the **Skills** panel in Codex.
+2. Click **Create**.
+3. Choose **Upload from your computer** and select this repository's `skill/`
+   directory.
+4. Save the Skill.
+5. Open a new Codex task. If the Skill is not discovered, fully quit and
+   restart Codex before trying again.
+
+Verify discovery with:
+
+```text
+Use $english-audio-learning-agent to list supported inputs
+```
+
+Codex should list Apple Podcasts episode URLs, podcast RSS feeds, and local
+audio files.
+
+#### Advanced / Developer Setup
+
+Repository contributors who need local edits to appear immediately may expose
+the working tree with a symbolic link:
+
+```bash
+mkdir -p "$HOME/.codex/skills"
+ln -s "$(pwd)/skill" "$HOME/.codex/skills/english-audio-learning-agent"
+```
+
+This Developer-only symlink is not the default onboarding path and does not
+replace the Skills UI flow. Inspect an existing destination before replacing
+it.
+
+### 3. Configure Notion
 
 Copy environment variables:
 
@@ -71,35 +114,53 @@ Copy environment variables:
 cp .env.example .env
 ```
 
-Fill in the required Notion settings:
+Create a Notion internal integration and copy its token. Then create a parent
+page, share that page with the integration, and set the token in `.env`:
 
 ```bash
 NOTION_TOKEN=
-NOTION_PARENT_PAGE_ID=
-NOTION_PODCAST_LIBRARY_DATABASE_ID=
-NOTION_EXPRESSION_DATABASE_ID=
-NOTION_WEEKLY_REFLECTION_DATABASE_ID=
-NOTION_VOCABULARY_DATABASE_ID=
 ```
 
-`NOTION_WEEKLY_REVIEW_DATABASE_ID` remains accepted only as a legacy
-compatibility alias.
+Initialize the workspace with the copied parent page URL or ID:
+
+```bash
+./.venv/bin/python -m src.notion.setup_workspace \
+  --parent-page-id "<notion-parent-page-url-or-id>"
+```
+
+The command creates and connects four databases:
+
+- Podcast Library
+- Expression Database
+- Weekly Review (stores the Weekly Reflection learning note)
+- Vocabulary Database
+
+It writes the parent page ID and all four database IDs into `.env`. Validate
+the completed workspace with:
+
+```bash
+./.venv/bin/python -m src.notion.check_workspace
+```
+
+See [docs/Notion_Onboarding.md](docs/Notion_Onboarding.md) for the complete
+Notion setup checklist. `NOTION_WEEKLY_REVIEW_DATABASE_ID` remains accepted
+only as a legacy compatibility alias.
 
 ## First Use
 
 For a podcast or audio source:
 
 ```bash
-python3 src/main.py "<source>"
+./.venv/bin/python src/main.py "<source>"
 ```
 
 This creates the intermediate transcript and analysis-request artifacts.
 
-Then Codex generates the AI JSON artifact, and Python publishes the final
-Notion page:
+Then use `$english-audio-learning-agent` to generate the AI JSON artifact.
+Python validates it and publishes the final Notion page:
 
 ```bash
-python3 src/main.py "<source>" \
+./.venv/bin/python src/main.py "<source>" \
   --transcript-json data/transcripts/<file>.json \
   --analysis-json data/analysis/<file>.json
 ```
@@ -110,7 +171,7 @@ second time.
 For weekly reflection:
 
 ```bash
-python3 src/main.py --weekly-reflection
+./.venv/bin/python src/main.py --weekly-reflection
 ```
 
 On the first pass Python may report a required Codex artifact. Codex reads the
@@ -123,14 +184,14 @@ command. Reflection uses:
 For a dry run:
 
 ```bash
-python3 src/main.py --weekly-reflection --dry-run
+./.venv/bin/python src/main.py --weekly-reflection --dry-run
 ```
 
 ## Supported Workflows
 
 Supported v1 inputs are:
 
-- Podcast episode URL
+- Apple Podcasts episode URL
 - Podcast RSS feed
 - Local audio file
 
@@ -199,12 +260,12 @@ Notion
 
 ## Core Commands
 
-- `python3 src/main.py "<source>"`
-- `python3 src/main.py "<source>" --transcript-json data/transcripts/<file>.json --analysis-json data/analysis/<file>.json`
-- `python3 src/main.py --weekly-reflection`
-- `python3 src/main.py --weekly-reflection --dry-run`
-- `python3 src/main.py --publish-highlight-vocab PAGE_ID`
-- `python3 -m pytest`
+- `./.venv/bin/python src/main.py "<source>"`
+- `./.venv/bin/python src/main.py "<source>" --transcript-json data/transcripts/<file>.json --analysis-json data/analysis/<file>.json`
+- `./.venv/bin/python src/main.py --weekly-reflection`
+- `./.venv/bin/python src/main.py --weekly-reflection --dry-run`
+- `./.venv/bin/python src/main.py --publish-highlight-vocab PAGE_ID`
+- `./.venv/bin/python -m pytest`
 
 Legacy compatibility commands such as `--weekly-review` and
 `--sync-vocab-comments` remain available for existing local workflows, but

@@ -16,6 +16,7 @@ import argparse
 import json
 import logging
 import re
+import shlex
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -104,6 +105,8 @@ class MainPipelineResult:
 
     kind: str
     value: str
+    expected_output_path: Optional[str] = None
+    rerun_command: Optional[str] = None
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
@@ -248,8 +251,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--transcript-json",
         type=Path,
         help=(
-            "Path to an existing transcript JSON. When provided with "
-            "--analysis-json, skips audio extraction and Whisper."
+            "Path to an existing transcript JSON. Skips audio extraction and "
+            "Whisper; without --analysis-json, creates a Codex request artifact."
         ),
     )
     return parser.parse_args(argv)
@@ -320,6 +323,43 @@ def weekly_review_request_output_path(week: str, output_dir: Path) -> Path:
 def analysis_request_output_path(title: str, data_dir: Path) -> Path:
     """Return where Codex analysis request JSON should be saved."""
     return data_dir / "analysis_requests" / f"{slugify(title)}.json"
+
+
+def analysis_output_path_from_request(request_path: Path) -> Path:
+    """Return the expected Codex analysis output path for a request artifact."""
+    return request_path.parent.parent / "analysis" / request_path.name
+
+
+def analysis_request_result(
+    request_path: Path,
+    transcript_path: Path,
+    source: str,
+    title: str,
+    source_type: str,
+) -> MainPipelineResult:
+    """Build the request result and exact command for the artifact handoff."""
+    expected_output_path = analysis_output_path_from_request(request_path)
+    rerun_command = shlex.join(
+        [
+            "./.venv/bin/python",
+            "src/main.py",
+            source,
+            "--title",
+            title,
+            "--source-type",
+            source_type,
+            "--transcript-json",
+            str(transcript_path),
+            "--analysis-json",
+            str(expected_output_path),
+        ]
+    )
+    return MainPipelineResult(
+        kind="analysis_request",
+        value=str(request_path),
+        expected_output_path=str(expected_output_path),
+        rerun_command=rerun_command,
+    )
 
 
 def save_analysis_request_json(
@@ -597,7 +637,13 @@ def publish_from_existing_transcript(
             transcript_text=transcript_text,
             output_path=analysis_request_output_path(title, load_settings().data_dir),
         )
-        return MainPipelineResult(kind="analysis_request", value=str(request_path))
+        return analysis_request_result(
+            request_path=request_path,
+            transcript_path=args.transcript_json.resolve(),
+            source=args.source,
+            title=title,
+            source_type=source_type,
+        )
 
     analysis = analyzer.validate_generated_analysis(
         read_generated_analysis_file(args.analysis_json)
@@ -854,9 +900,12 @@ def run_pipeline(args: argparse.Namespace) -> Optional[MainPipelineResult]:
             output_path=analysis_request_output_path(title, settings.data_dir),
         )
         LOGGER.info("Codex AI analysis request saved: %s", request_path)
-        return MainPipelineResult(
-            kind="analysis_request",
-            value=str(request_path),
+        return analysis_request_result(
+            request_path=request_path,
+            transcript_path=transcript_path,
+            source=args.source,
+            title=title,
+            source_type=source_type,
         )
 
     analysis = analyzer.validate_generated_analysis(
@@ -916,7 +965,18 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if result:
         if result.kind == "analysis_request":
-            print(f"Codex AI Analysis Request: {result.value}")
+            print("Codex AI Analysis Request:")
+            print(result.value)
+            if result.expected_output_path and result.rerun_command:
+                print()
+                print("Use $english-audio-learning-agent to read:")
+                print(result.value)
+                print()
+                print("Generate schema-conformant JSON at:")
+                print(result.expected_output_path)
+                print()
+                print("Then run:")
+                print(result.rerun_command)
         elif result.kind == "weekly_review_request":
             print(f"Weekly Review Request: {result.value}")
         elif result.kind == "weekly_review_page":

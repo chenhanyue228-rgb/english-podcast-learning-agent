@@ -1165,6 +1165,40 @@ def test_existing_transcript_without_analysis_creates_codex_request(
     request_path = Path(result.value)
     assert request_path.exists()
     assert "Existing transcript" in request_path.read_text(encoding="utf-8")
+    assert result.expected_output_path == str(
+        tmp_path / "analysis" / "existing_episode.json"
+    )
+    assert result.rerun_command is not None
+    assert "--transcript-json" in result.rerun_command
+    assert "--analysis-json" in result.rerun_command
+
+
+def test_main_prints_complete_analysis_artifact_handoff(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        app_main,
+        "run_pipeline",
+        lambda args: app_main.MainPipelineResult(
+            kind="analysis_request",
+            value="/project/data/analysis_requests/example.json",
+            expected_output_path="/project/data/analysis/example.json",
+            rerun_command=(
+                "./.venv/bin/python src/main.py source.mp3 "
+                "--transcript-json transcript.json --analysis-json analysis.json"
+            ),
+        ),
+    )
+
+    exit_code = app_main.main(["source.mp3"])
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Codex AI Analysis Request:\n/project/data/analysis_requests/example.json" in output
+    assert "Use $english-audio-learning-agent to read:" in output
+    assert "Use Codex" not in output
+    assert "Generate schema-conformant JSON at:" in output
+    assert "/project/data/analysis/example.json" in output
+    assert "Then run:" in output
+    assert "--transcript-json transcript.json --analysis-json analysis.json" in output
 
 
 def test_run_pipeline_ai_enabled_without_analysis_json_prepares_request(
