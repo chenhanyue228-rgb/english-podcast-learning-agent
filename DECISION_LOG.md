@@ -347,6 +347,12 @@ data_source_id + single_property
 
 Do not send `database_id` or `dual_property`.
 
+During recovery, an existing `dual_property` relation is a migration conflict,
+not a repair candidate. Setup must stop without changing it. A relation that
+points to a different Data Source must also stop without mutation. Final
+workspace validation checks both the target and the one-way mode before setup
+can be marked complete.
+
 ### Reason
 
 The product needs one-way source traceability. A two-way relation would add
@@ -407,3 +413,21 @@ Use one creation, validation, and reporting order:
 The order follows the dependency graph: Podcast Library is the relation target,
 Expression and Vocabulary are learning assets, and Weekly Review is the
 downstream reflection container.
+
+## DEC-018: Do Not Auto-Migrate Existing Two-Way Relations
+
+- Date: 2026-07-23
+- Status: Accepted for PR #7 safety hardening
+
+### Decision
+
+Do not silently convert an existing Notion `dual_property` relation into
+`single_property`. Stop recovery before any relation update and require a
+separate migration decision. Continue to repair only missing targets or missing
+relation modes when no two-way relation exists.
+
+### Reason
+
+Changing a two-way relation can alter or remove its reverse property. That is a
+data migration, not deterministic schema repair, and is outside the current
+Owner Acceptance remediation.

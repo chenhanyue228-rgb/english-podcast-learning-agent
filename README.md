@@ -31,6 +31,12 @@ Current state:
 - the pipeline and Notion publishing are stable
 - direct OpenAI providers are deprecated compatibility paths only
 - `OPENAI_API_KEY` is not required for the production Skill workflow
+- production `main` is merged through PR #6 and passes 407 tests with 3
+  expected compatibility warnings
+- PR #7 is an open, unmerged Notion setup candidate; its current regression
+  result is 453 passed with 3 expected warnings
+- Owner Acceptance remains blocked until the existing four Data Sources pass
+  real field and Relation recovery
 
 For the production runtime contract, read:
 

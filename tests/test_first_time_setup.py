@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import first_time_setup
+from src.notion.check_workspace import DatabaseValidationResult
 
 
 FAKE_TOKEN = "secret_test_token"
@@ -872,6 +873,60 @@ def test_validation_failure_retries_relations_and_keeps_progress(
     )
 
     assert relation_calls == ["wire", "wire"]
+
+
+def test_relation_semantic_validation_failure_preserves_existing_ids(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    env_path = root / ".env"
+    env_path.write_text(
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
+        f"{first_time_setup.SETUP_STATE_ENV}="
+        f"{first_time_setup.SETUP_STATE_COMPLETE}\n"
+        + "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items())
+        + "\n",
+        encoding="utf-8",
+    )
+    database_create_calls: list[dict] = []
+
+    class RejectDatabaseCreation:
+        def create(self, **kwargs):
+            database_create_calls.append(kwargs)
+            pytest.fail("must not create databases")
+
+    notion = SimpleNamespace(databases=RejectDatabaseCreation())
+    invalid_relation_result = DatabaseValidationResult(
+        name="Expression Database",
+        exists=True,
+        relation_mismatches=[
+            "Expression Database.Source Podcast: relation mode mismatch"
+        ],
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: None,
+    )
+
+    with pytest.raises(first_time_setup.FirstTimeSetupError, match="验证未通过"):
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=PARENT_URL,
+            notion=notion,
+            validator=lambda: [invalid_relation_result],
+            database_access_validator=lambda _notion, _ids: None,
+        )
+
+    saved = first_time_setup.read_env_values(env_path)
+    assert database_create_calls == []
+    assert saved[first_time_setup.SETUP_STATE_ENV] == (
+        first_time_setup.SETUP_STATE_IN_PROGRESS
+    )
+    for key, value in DATABASE_IDS.items():
+        assert saved[key] == value
 
 
 def test_inaccessible_existing_database_stops_without_overwrite(

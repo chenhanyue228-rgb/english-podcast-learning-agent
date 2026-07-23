@@ -33,6 +33,7 @@ from src.notion.schema import (
     REVIEW_STATUSES,
     SOURCE_TYPES,
     VOCABULARY_CATEGORIES,
+    WORKSPACE_DATABASE_ORDER,
 )
 
 
@@ -271,6 +272,32 @@ def update_database_properties(
         ) from exc
 
 
+def _relation_requires_repair(
+    *,
+    database_name: str,
+    property_name: str,
+    actual_relation: Mapping[str, Any],
+    expected_relation: Mapping[str, Any],
+) -> bool:
+    """Return whether a one-way relation is safely repairable in place."""
+    if "dual_property" in actual_relation:
+        raise WorkspaceSetupError(
+            f"Notion database '{database_name}' relation '{property_name}' "
+            "uses a dual-property relation mode. No existing relation was "
+            "changed."
+        )
+
+    target_id = actual_relation.get("data_source_id")
+    if target_id and target_id != expected_relation["data_source_id"]:
+        raise WorkspaceSetupError(
+            f"Notion database '{database_name}' relation '{property_name}' "
+            "points to a different data source. No existing relation was "
+            "changed."
+        )
+
+    return target_id is None or "single_property" not in actual_relation
+
+
 def ensure_data_source_schema(
     notion: Client,
     data_source_id: str,
@@ -303,6 +330,7 @@ def ensure_data_source_schema(
 
     expected_title_name = expected_title_names[0]
     current_title_name, current_title = title_entries[0]
+    relations_to_repair: set[str] = set()
     conflicting_title_name = actual_properties.get(expected_title_name)
     if (
         current_title_name != expected_title_name
@@ -328,13 +356,13 @@ def ensure_data_source_schema(
         if expected_type == "relation":
             actual_relation = actual.get("relation") or {}
             expected_relation = definition["relation"]
-            target_id = actual_relation.get("data_source_id")
-            if target_id and target_id != expected_relation["data_source_id"]:
-                raise WorkspaceSetupError(
-                    f"Notion database '{database_name}' relation "
-                    f"'{property_name}' points to a different data source. "
-                    "No existing relation was changed."
-                )
+            if _relation_requires_repair(
+                database_name=database_name,
+                property_name=property_name,
+                actual_relation=actual_relation,
+                expected_relation=expected_relation,
+            ):
+                relations_to_repair.add(property_name)
 
     updates: dict[str, Any] = {}
     if current_title_name != expected_title_name:
@@ -350,16 +378,8 @@ def ensure_data_source_schema(
             updates[property_name] = dict(definition)
             continue
 
-        if _property_type(definition) == "relation":
-            actual_relation = actual.get("relation") or {}
-            expected_relation = definition["relation"]
-            if (
-                actual_relation.get("data_source_id")
-                != expected_relation["data_source_id"]
-                or "single_property" not in actual_relation
-                or "dual_property" in actual_relation
-            ):
-                updates[property_name] = dict(definition)
+        if property_name in relations_to_repair:
+            updates[property_name] = dict(definition)
 
     if updates:
         update_database_properties(
@@ -631,12 +651,17 @@ def main() -> int:
                 "NOTION_PARENT_PAGE_ID in .env."
             )
 
-        database_ids = setup_workspace(parent_page_id=args.parent_page_id)
-        print("Created Notion databases:")
-        for key, value in database_ids.items():
-            print(f"{key}={value}")
-    except (WorkspaceSetupError, NotionConfigError) as exc:
-        print(f"Workspace setup failed: {exc}", file=sys.stderr)
+        setup_workspace(parent_page_id=args.parent_page_id)
+        print("Notion workspace setup completed:")
+        for database_name in WORKSPACE_DATABASE_ORDER:
+            print(f"- {database_name}: complete")
+    except (WorkspaceSetupError, NotionConfigError):
+        print(
+            "Workspace setup failed. No configuration values were displayed. "
+            "Check the integration permissions, parent page access, and "
+            "network, then retry.",
+            file=sys.stderr,
+        )
         return 1
 
     return 0

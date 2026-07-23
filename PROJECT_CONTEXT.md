@@ -36,7 +36,13 @@ Release status:
 - PR #4 merged the Phase 4.1B onboarding fixes into `main`
 - PR #5 merged the guided first-time-use flow into `main`
 - PR #6 merged the one-action/one-confirmation Notion guidance into `main`
-- 440 tests pass with 3 expected compatibility-provider deprecation warnings
+- production `main` passes 407 tests with 3 expected compatibility-provider
+  deprecation warnings
+- PR #7 is open and unmerged on
+  `fix/phase-4.1c-notion-api-and-setup-ux`
+- the PR #7 candidate passes 453 tests with 3 expected compatibility-provider
+  deprecation warnings
+- PR #7 status: `CHANGES_REQUIRED` fixes completed; awaiting re-review
 - external-user sessions: 0
 - Owner Acceptance started
 - Skill installation passed
@@ -170,6 +176,10 @@ Weekly Reflection is a compounding learning note rather than a recap.
 - Relation properties must use `data_source_id` with `single_property`.
 - The local safe-input window must confirm both hidden inputs without exposing
   the token, page URL, page ID, or database IDs.
+- Existing dual-property relations must stop recovery safely; they must not be
+  converted to one-way relations without an explicit migration decision.
+- Final workspace validation must check relation targets and relation modes,
+  not only the `relation` property type.
 - The merged artifact handoff has not yet been exercised in the owner's full
   learning journey.
 - External-user session count remains 0.

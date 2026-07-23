@@ -85,6 +85,18 @@ REQUIRED_DATABASE_PROPERTIES: dict[str, dict[str, str]] = {
     },
 }
 
+REQUIRED_DATABASE_RELATIONS: dict[str, dict[str, str]] = {
+    EXPRESSION_DATABASE: {
+        "Source Podcast": PODCAST_LIBRARY,
+    },
+    VOCABULARY_DATABASE: {
+        "Source": PODCAST_LIBRARY,
+    },
+    WEEKLY_REVIEW: {
+        "Podcasts": PODCAST_LIBRARY,
+    },
+}
+
 
 def category_color(category: str) -> str:
     """Return the visual highlight color assigned to an expression category."""

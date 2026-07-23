@@ -10,8 +10,15 @@ Phase 4 — Product Validation
 - v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
 - Production `main`: `87b96d9f68ad65d3356943b1f8196eeea8f9f3ee`
 - PR #6: merged
-- Tests: 440 passed
+- Production baseline tests: 407 passed, 3 expected warnings
 - Architecture: Stable
+
+## PR #7 Candidate
+
+- PR: #7, open and not merged
+- Branch: `fix/phase-4.1c-notion-api-and-setup-ux`
+- Candidate tests: 453 passed, 3 expected warnings
+- Review status: `CHANGES_REQUIRED` fixes completed; awaiting re-review
 
 ## Current Sprint
 
@@ -53,7 +60,11 @@ Resume Owner Acceptance
 9. Replace the `已有`/`没有` split with one guided connection path.
 10. Distinguish developer-dashboard “连接” from page-level “集成”.
 11. Hide both token and page-link input and confirm each is received.
-12. Review and merge the fix before resuming real setup.
+12. Stop safely when an existing relation uses `dual_property` or points to a
+    different data source.
+13. Validate all three relation targets and one-way modes before setup can be
+    marked complete.
+14. Re-review and merge the fix before resuming real setup.
 
 ## Out of Scope
 
@@ -90,8 +101,11 @@ Resume Owner Acceptance
 - No real credentials are committed.
 - No external-user readiness claim is made.
 
-Owner Acceptance started and is blocked before real Notion setup. External-user
-validation has not started.
+Owner Acceptance started and reached real first-time setup. Skill installation,
+Skill discovery, and the reply-gated guidance mechanism passed. Real setup
+created four database containers and saved all four Data Source IDs. Field and
+Relation recovery has not yet passed real acceptance, and the podcast-to-Notion
+journey has not started. External-user validation has not started.
 
 ## Current State
 

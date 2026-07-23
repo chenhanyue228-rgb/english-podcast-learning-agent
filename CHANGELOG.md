@@ -30,7 +30,7 @@ entries must be appended or clarified, not removed.
   `60de7aab6fa4904a5b5576e351d28cc70ff672df`.
 - Verified Skill installation and same-conversation continuation without a new
   conversation or Codex restart.
-- Recorded a P1 blocker before real Notion setup: the first Notion instruction
+- Recorded an initial P1 guidance blocker: the first Notion instruction
   combined multiple actions and used internal acceptance terminology that a
   normal user could not independently follow.
 - Changed the Notion first-time conversation to one action and one confirmation
@@ -90,7 +90,15 @@ entries must be appended or clarified, not removed.
   immediate non-sensitive receipt confirmation.
 - Fixed the formal database order to Podcast Library, Expression Database,
   Vocabulary Database, and Weekly Review.
-- Verified the remediation with 440 passing tests and 3 expected
+- Hardened relation recovery so existing `dual_property` relations and
+  relations with a different target stop without mutation.
+- Added final semantic validation for all three relation targets and one-way
+  relation modes.
+- Added explicit Fake Notion evidence that schema reconciliation does not
+  create, update, or delete page records.
+- Removed Data Source IDs and other configuration values from developer CLI
+  output and API failure summaries.
+- Verified the PR #7 candidate with 453 passing tests and 3 expected
   compatibility-provider deprecation warnings.
 - Kept Owner Acceptance blocked and external-user sessions at 0 pending review
   and merge of this remediation.
