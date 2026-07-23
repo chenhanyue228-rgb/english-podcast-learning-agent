@@ -227,7 +227,7 @@ def run_weekly_reflection_pipeline(
     logger.handlers.clear()
 
     if publish_result is not None:
-        LOGGER.info("Weekly reflection page created: %s", publish_result.page_id)
+        LOGGER.info("Weekly reflection page published.")
     return WeeklyReflectionPipelineResult(
         weekly_learning_context_path=weekly_learning_context_path,
         reflection_context_path=reflection_result.output_path,

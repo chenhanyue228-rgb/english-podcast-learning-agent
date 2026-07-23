@@ -31,21 +31,22 @@ Current state:
 - the pipeline and Notion publishing are stable
 - direct OpenAI providers are deprecated compatibility paths only
 - `OPENAI_API_KEY` is not required for the production Skill workflow
-- production `main` includes PR #8 through merge commit
-  `4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`
-- the PR #7 production baseline passed 453 tests with 3 expected
-  compatibility warnings
+- production `main` includes the partial-publish recovery and protected Owner
+  Acceptance Harness
 - real Notion in-place recovery passed with the existing four Data Sources
 - new databases created: 0
 - required fields and three single-property relations passed validation
 - unknown fields and existing records were preserved
 - setup state is `complete`
 - real recovery evidence has been reviewed and accepted
-- a P1 partial-publish recovery defect was found before the real Podcast
-  journey: retries did not restore missing Expression pages
-- the repair is implemented on a dedicated review branch and is not yet in
-  production `main`
-- the podcast-to-Notion journey is paused pending that repair
+- the partial-publish recovery behavior is fixed and covered by the Harness
+- a later read-only diagnosis found two same-name Notion database groups
+- the current local configuration points to the historical group rather than
+  the intended parent page
+- all production writers now require a shared target-binding proof before any
+  Notion write
+- the podcast-to-Notion journey is paused pending configuration switch and a
+  passing read-only binding diagnosis
 - Owner Acceptance remains blocked pending the podcast-to-Notion journey
 - external-user sessions remain 0
 - the product is not ready for external users
@@ -221,6 +222,8 @@ Notion
   intentionally separated, so failures are usually localizable.
 - If Notion publishing fails, verify the environment variables and runtime
   connectivity.
+- If target binding fails, do not retry a writer. Run the read-only diagnosis
+  and verify that all five target values belong to one parent page.
 - If an artifact is missing, rerun the previous stage rather than manually
   editing generated files.
 - If you are unsure which command to use, start with the Skill manifest:
@@ -261,6 +264,12 @@ Workflow commands:
 - `./.venv/bin/python src/main.py --publish-highlight-vocab PAGE_ID`
 - `./.venv/bin/python -m pytest`
 
+Read-only Notion target diagnosis:
+
+```bash
+./.venv/bin/python scripts/notion/diagnose_target_binding.py
+```
+
 Legacy compatibility commands such as `--weekly-review` and
 `--sync-vocab-comments` remain available for existing local workflows, but
 they are not part of the primary v1 user journey. Pink highlight capture is
@@ -274,3 +283,4 @@ the production Vocabulary workflow.
 - [Current architecture](docs/current_architecture.md)
 - [Codex Skill contract](docs/codex_skill_contract.md)
 - [Next steps](docs/next_steps.md)
+- [Notion target binding](docs/acceptance/notion_target_binding.md)

@@ -7,7 +7,7 @@ publishers, reporters, and setup scripts use the same database ID contract.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Optional, TypedDict
 
@@ -16,6 +16,7 @@ ENV_PATH = Path(".env")
 
 NOTION_TOKEN_ENV = "NOTION_TOKEN"
 NOTION_PARENT_PAGE_ID_ENV = "NOTION_PARENT_PAGE_ID"
+NOTION_TARGET_PARENT_PAGE_ID_ENV = "NOTION_TARGET_PARENT_PAGE_ID"
 PODCAST_DATABASE_ID_ENV = "NOTION_PODCAST_LIBRARY_DATABASE_ID"
 EXPRESSION_DATABASE_ID_ENV = "NOTION_EXPRESSION_DATABASE_ID"
 WEEKLY_DATABASE_ID_ENV = "NOTION_WEEKLY_REFLECTION_DATABASE_ID"
@@ -40,11 +41,12 @@ class NotionDatabaseMapping(TypedDict):
 class NotionConfig:
     """Validated Notion configuration loaded from environment variables."""
 
-    token: str
-    podcast_database_id: str
-    expression_database_id: str
-    weekly_database_id: str
-    vocabulary_database_id: str
+    token: str = field(repr=False)
+    podcast_database_id: str = field(repr=False)
+    expression_database_id: str = field(repr=False)
+    weekly_database_id: str = field(repr=False)
+    vocabulary_database_id: str = field(repr=False)
+    target_parent_page_id: str = field(repr=False)
 
     @property
     def database_mapping(self) -> NotionDatabaseMapping:
@@ -96,12 +98,16 @@ def load_notion_config(
 ) -> NotionConfig:
     """Load and validate all Notion configuration needed after setup.
 
-    Required variables:
+    Required database variables:
     - NOTION_TOKEN
     - NOTION_PODCAST_LIBRARY_DATABASE_ID
     - NOTION_EXPRESSION_DATABASE_ID
     - NOTION_WEEKLY_REFLECTION_DATABASE_ID
     - NOTION_VOCABULARY_DATABASE_ID
+
+    NOTION_TARGET_PARENT_PAGE_ID is loaded into the same authoritative model.
+    Read-only tools may inspect an older configuration without it, while every
+    production writer rejects the missing binding before any mutation.
     """
     if env is None:
         load_dotenv(dotenv_path)
@@ -137,6 +143,10 @@ def load_notion_config(
             VOCABULARY_DATABASE_ID_ENV,
             "Run python -m src.notion.setup_workspace to create the workspace.",
         ),
+        target_parent_page_id=env.get(
+            NOTION_TARGET_PARENT_PAGE_ID_ENV,
+            "",
+        ).strip(),
     )
 
 

@@ -57,6 +57,7 @@ def acceptance_config() -> AcceptanceConfig:
         expression_data_source_id="expression-data-source",
         vocabulary_data_source_id="vocabulary-data-source",
         weekly_data_source_id="weekly-data-source",
+        target_parent_page_id="target-parent-page",
     )
 
 
@@ -105,14 +106,23 @@ class FakeDataSources:
 
     def retrieve(self, **kwargs: Any) -> dict[str, Any]:
         self.retrieve_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("data_sources.retrieve")
         data_source_id = kwargs["data_source_id"]
         return {
             "id": data_source_id,
+            "name": self.workspace.role_by_data_source_id[data_source_id],
+            "parent": {
+                "type": "database_id",
+                "database_id": self.workspace.database_id_by_data_source_id[
+                    data_source_id
+                ],
+            },
             "properties": deepcopy(self.workspace.schemas[data_source_id]),
         }
 
     def update(self, **kwargs: Any) -> dict[str, Any]:
         self.update_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("data_sources.update")
         data_source_id = kwargs["data_source_id"]
         self.workspace.schemas[data_source_id].update(
             deepcopy(kwargs.get("properties", {}))
@@ -121,6 +131,7 @@ class FakeDataSources:
 
     def query(self, **kwargs: Any) -> dict[str, Any]:
         self.query_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("data_sources.query")
         data_source_id = kwargs["data_source_id"]
         pages = [
             page
@@ -192,6 +203,7 @@ class FakePages:
 
     def create(self, **kwargs: Any) -> dict[str, Any]:
         self.create_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("pages.create")
         data_source_id = kwargs["parent"]["data_source_id"]
         if data_source_id == self.workspace.config.podcast_data_source_id:
             page_id = self.workspace.next_id("target-podcast")
@@ -210,8 +222,19 @@ class FakePages:
         )
         return {"id": page_id, "url": f"https://notion.so/{page_id}"}
 
+    def retrieve(self, **kwargs: Any) -> dict[str, Any]:
+        self.workspace.api_calls.append("pages.retrieve")
+        page_id = kwargs["page_id"]
+        if page_id == self.workspace.database_parent_page_id:
+            return {"id": page_id, "object": "page"}
+        page = self.workspace.pages_by_id.get(page_id)
+        if page is None:
+            raise RuntimeError("fake_page_unavailable")
+        return page.to_api()
+
     def update(self, **kwargs: Any) -> dict[str, Any]:
         self.update_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("pages.update")
         page_id = kwargs["page_id"]
         page = self.workspace.pages_by_id[page_id]
         if "properties" in kwargs:
@@ -230,6 +253,7 @@ class FakePages:
 
     def delete(self, **kwargs: Any) -> dict[str, Any]:
         self.delete_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("pages.delete")
         page = self.workspace.pages_by_id.pop(kwargs["page_id"])
         return page.to_api()
 
@@ -242,6 +266,7 @@ class FakeBlocksChildren:
 
     def list(self, **kwargs: Any) -> dict[str, Any]:
         self.list_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("blocks.children.list")
         page = self.workspace.pages_by_id[kwargs["block_id"]]
         return {
             "results": deepcopy(page.children),
@@ -251,6 +276,7 @@ class FakeBlocksChildren:
 
     def append(self, **kwargs: Any) -> dict[str, Any]:
         self.append_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("blocks.children.append")
         self.workspace.pages_by_id[kwargs["block_id"]].children.extend(
             deepcopy(kwargs.get("children", []))
         )
@@ -264,20 +290,43 @@ class FakeBlocks:
 
     def delete(self, **kwargs: Any) -> dict[str, Any]:
         self.delete_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("blocks.delete")
         return {}
 
 
 class FakeDatabases:
-    def __init__(self) -> None:
+    def __init__(self, workspace: "FakeNotion") -> None:
+        self.workspace = workspace
+        self.retrieve_calls: list[dict[str, Any]] = []
         self.create_calls: list[dict[str, Any]] = []
         self.update_calls: list[dict[str, Any]] = []
 
+    def retrieve(self, **kwargs: Any) -> dict[str, Any]:
+        self.retrieve_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("databases.retrieve")
+        database_id = kwargs["database_id"]
+        role = self.workspace.role_by_database_id.get(database_id)
+        if role is None:
+            raise RuntimeError("fake_database_unavailable")
+        data_source_id = self.workspace.data_source_id_by_database_id[database_id]
+        return {
+            "id": database_id,
+            "title": [{"plain_text": role}],
+            "parent": {
+                "type": "page_id",
+                "page_id": self.workspace.database_parent_page_id,
+            },
+            "data_sources": [{"id": data_source_id, "name": role}],
+        }
+
     def create(self, **kwargs: Any) -> dict[str, Any]:
         self.create_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("databases.create")
         return {"id": "raw-created-database"}
 
     def update(self, **kwargs: Any) -> dict[str, Any]:
         self.update_calls.append(deepcopy(kwargs))
+        self.workspace.api_calls.append("databases.update")
         return {"id": kwargs.get("database_id")}
 
 
@@ -286,7 +335,29 @@ class FakeNotion:
 
     def __init__(self, *, seed_unrelated_records: bool = True) -> None:
         self.config = acceptance_config()
+        self.api_calls: list[str] = []
+        self.database_parent_page_id = self.config.target_parent_page_id
         self.data_source_ids = self.config.data_source_ids
+        self.role_by_data_source_id = {
+            data_source_id: role
+            for role, data_source_id in self.data_source_ids.items()
+        }
+        self.database_id_by_data_source_id = {
+            data_source_id: f"{role.casefold().replace(' ', '-')}-database"
+            for role, data_source_id in self.data_source_ids.items()
+        }
+        self.role_by_database_id = {
+            database_id: self.role_by_data_source_id[data_source_id]
+            for data_source_id, database_id in (
+                self.database_id_by_data_source_id.items()
+            )
+        }
+        self.data_source_id_by_database_id = {
+            database_id: data_source_id
+            for data_source_id, database_id in (
+                self.database_id_by_data_source_id.items()
+            )
+        }
         self.schemas = {
             data_source_id: _schema_properties(name, self.data_source_ids)
             for name, data_source_id in self.data_source_ids.items()
@@ -297,7 +368,7 @@ class FakeNotion:
         self.data_sources = FakeDataSources(self)
         self.pages = FakePages(self)
         self.blocks = FakeBlocks(self)
-        self.databases = FakeDatabases()
+        self.databases = FakeDatabases(self)
         if seed_unrelated_records:
             self.seed_unrelated_records()
 

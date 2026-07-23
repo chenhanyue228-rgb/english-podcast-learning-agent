@@ -23,7 +23,12 @@ from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
 
 from src.analyzer.models import LearningItem
 from src.notion.check_workspace import validate_database
-from src.notion.config import NotionConfig, load_dotenv, load_notion_config
+from src.notion.config import (
+    NotionConfig,
+    NotionConfigError,
+    load_dotenv,
+    load_notion_config,
+)
 from src.notion.learning_publisher import (
     CompletePodcastLearningPayload,
     publish_complete_learning_materials,
@@ -36,6 +41,20 @@ from src.notion.schema import (
     VOCABULARY_DATABASE,
     WEEKLY_REVIEW,
     WORKSPACE_DATABASE_ORDER,
+)
+from src.notion.target_binding import (
+    CONFIGURED_DATA_SOURCES_NOT_SAME_GROUP,
+    TARGET_BINDING_RETRIEVE_FAILED,
+    TARGET_BINDING_VALIDATION_FAILED,
+    TARGET_DATABASE_AMBIGUOUS,
+    TARGET_DATABASE_MISSING,
+    TARGET_DATABASE_ROLE_MISMATCH,
+    TARGET_PARENT_MISMATCH,
+    TARGET_PARENT_NOT_CONFIGURED,
+    TARGET_RELATION_MODE_INVALID,
+    TARGET_RELATION_OUTSIDE_GROUP,
+    NotionTargetBindingError,
+    validate_notion_target_binding,
 )
 
 
@@ -77,6 +96,7 @@ class AcceptanceConfig:
     expression_data_source_id: str = field(repr=False)
     vocabulary_data_source_id: str = field(repr=False)
     weekly_data_source_id: str = field(repr=False)
+    target_parent_page_id: str = field(repr=False)
     setup_state: str = field(repr=False, default=SETUP_STATE_COMPLETE)
 
     @classmethod
@@ -91,7 +111,18 @@ class AcceptanceConfig:
             expression_data_source_id=config.expression_database_id,
             vocabulary_data_source_id=config.vocabulary_database_id,
             weekly_data_source_id=config.weekly_database_id,
+            target_parent_page_id=config.target_parent_page_id,
             setup_state=setup_state,
+        )
+
+    def as_notion_config(self) -> NotionConfig:
+        return NotionConfig(
+            token=self.token,
+            podcast_database_id=self.podcast_data_source_id,
+            expression_database_id=self.expression_data_source_id,
+            vocabulary_database_id=self.vocabulary_data_source_id,
+            weekly_database_id=self.weekly_data_source_id,
+            target_parent_page_id=self.target_parent_page_id,
         )
 
     @property
@@ -117,11 +148,22 @@ def load_acceptance_config(
     if setup_state != SETUP_STATE_COMPLETE:
         raise AcceptanceConfigurationError("setup_state_not_complete")
 
-    notion_config = load_notion_config(env=env, dotenv_path=dotenv_path)
+    try:
+        notion_config = load_notion_config(env=env, dotenv_path=dotenv_path)
+    except NotionConfigError as exc:
+        if "NOTION_TARGET_PARENT_PAGE_ID" in str(exc):
+            raise AcceptanceConfigurationError(
+                TARGET_PARENT_NOT_CONFIGURED
+            ) from None
+        raise AcceptanceConfigurationError(
+            "four_data_sources_not_configured"
+        ) from None
     acceptance_config = AcceptanceConfig.from_notion_config(
         notion_config,
         setup_state=setup_state,
     )
+    if not acceptance_config.target_parent_page_id:
+        raise AcceptanceConfigurationError(TARGET_PARENT_NOT_CONFIGURED)
     configured_ids = list(acceptance_config.data_source_ids.values())
     if len(configured_ids) != 4 or len(set(configured_ids)) != 4:
         raise AcceptanceConfigurationError("four_data_sources_not_configured")
@@ -354,6 +396,10 @@ class AcceptancePolicy:
         if data_source_id not in self.allowed_data_source_ids:
             raise GuardViolation("unexpected_data_source_read_blocked")
 
+    def validate_parent_page_read(self, page_id: str) -> None:
+        if page_id != self.config.target_parent_page_id:
+            raise GuardViolation("unexpected_parent_page_read_blocked")
+
     def validate_page_create(self, kwargs: Mapping[str, Any]) -> str:
         parent = kwargs.get("parent")
         parent = parent if isinstance(parent, Mapping) else {}
@@ -452,6 +498,12 @@ class _GuardedPages:
         self._policy.register_created_page(kind, page_id)
         return response
 
+    def retrieve(self, **kwargs: Any) -> Any:
+        self._policy.validate_parent_page_read(
+            str(kwargs.get("page_id", "")).strip()
+        )
+        return self._raw.retrieve(**kwargs)
+
     def update(self, **kwargs: Any) -> Any:
         self._policy.validate_page_update(kwargs)
         return self._raw.update(**kwargs)
@@ -489,6 +541,12 @@ class _GuardedBlocks:
 
 
 class _GuardedDatabases:
+    def __init__(self, raw: Any) -> None:
+        self._raw = raw
+
+    def retrieve(self, **kwargs: Any) -> Any:
+        return self._raw.retrieve(**kwargs)
+
     def create(self, **kwargs: Any) -> Any:
         raise GuardViolation("database_creation_blocked")
 
@@ -510,7 +568,7 @@ class AcceptanceGuard:
         self.data_sources = _GuardedDataSources(notion.data_sources, policy)
         self.pages = _GuardedPages(notion.pages, policy)
         self.blocks = _GuardedBlocks(notion.blocks)
-        self.databases = _GuardedDatabases()
+        self.databases = _GuardedDatabases(notion.databases)
 
 
 class WorkspaceSnapshotter:
@@ -1004,6 +1062,13 @@ class AcceptanceReport:
     secrets_redacted: bool
     snapshot_cleanup_confirmed: bool
     counts: Mapping[str, int]
+    workflow_behavior_verified: bool = False
+    target_binding_verified: bool = False
+    configured_parent_matches_expected: bool = False
+    all_data_sources_same_group: bool = False
+    internal_relations_verified: bool = False
+    target_parent_fingerprint: str = ""
+    target_group_fingerprint: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         safe_counts = {
@@ -1061,6 +1126,35 @@ class AcceptanceReport:
             "snapshot_cleanup_confirmed": bool(
                 self.snapshot_cleanup_confirmed
             ),
+            "workflow_behavior_verified": bool(
+                self.workflow_behavior_verified
+            ),
+            "target_binding_verified": bool(self.target_binding_verified),
+            "configured_parent_matches_expected": bool(
+                self.configured_parent_matches_expected
+            ),
+            "all_data_sources_same_group": bool(
+                self.all_data_sources_same_group
+            ),
+            "internal_relations_verified": bool(
+                self.internal_relations_verified
+            ),
+            "target_parent_fingerprint": (
+                self.target_parent_fingerprint
+                if re.fullmatch(
+                    r"[0-9a-f]{8}",
+                    self.target_parent_fingerprint,
+                )
+                else "[REDACTED]"
+            ),
+            "target_group_fingerprint": (
+                self.target_group_fingerprint
+                if re.fullmatch(
+                    r"[0-9a-f]{8}",
+                    self.target_group_fingerprint,
+                )
+                else "[REDACTED]"
+            ),
             "counts": safe_counts,
         }
 
@@ -1110,6 +1204,10 @@ class OwnerAcceptanceRunner:
         pending_error: Optional[BaseException] = None
 
         try:
+            binding = validate_notion_target_binding(
+                guarded_notion,
+                self.config.as_notion_config(),
+            )
             _assert_workspace_schema_ready(guarded_notion, self.config)
             before = snapshotter.capture()
             snapshot_store.persist("before", before)
@@ -1135,6 +1233,8 @@ class OwnerAcceptanceRunner:
             second = snapshotter.capture()
             snapshot_store.persist("after-second", second)
             evidence = verifier.verify_second(first, second, evidence)
+        except NotionTargetBindingError as exc:
+            pending_error = AcceptanceFailure(exc.code)
         except (AcceptanceFailure, GuardViolation) as exc:
             pending_error = exc
         except Exception:
@@ -1163,6 +1263,21 @@ class OwnerAcceptanceRunner:
             guard_enforced=True,
             secrets_redacted=True,
             snapshot_cleanup_confirmed=True,
+            workflow_behavior_verified=True,
+            target_binding_verified=binding.valid,
+            configured_parent_matches_expected=(
+                binding.configured_parent_matches_expected
+            ),
+            all_data_sources_same_group=(
+                binding.all_data_sources_same_group
+            ),
+            internal_relations_verified=(
+                binding.internal_relations_verified
+            ),
+            target_parent_fingerprint=(
+                binding.target_parent_fingerprint
+            ),
+            target_group_fingerprint=binding.target_group_fingerprint,
             counts={
                 "podcast_added_on_first_publish": (
                     evidence.podcast_added_on_first_publish
@@ -1248,6 +1363,7 @@ _PUBLIC_FAILURE_CODES = frozenset(
         "unexpected_page_create_blocked",
         "unexpected_page_update_blocked",
         "unexpected_page_update_shape_blocked",
+        "unexpected_parent_page_read_blocked",
         "unexpected_podcast_create_blocked",
         "unexpected_podcast_created",
         "unrelated_record_changed",
@@ -1262,6 +1378,16 @@ _PUBLIC_FAILURE_CODES = frozenset(
         "weekly_review_write_blocked",
         "workspace_data_source_unavailable",
         "workspace_schema_incomplete",
+        TARGET_PARENT_NOT_CONFIGURED,
+        TARGET_PARENT_MISMATCH,
+        CONFIGURED_DATA_SOURCES_NOT_SAME_GROUP,
+        TARGET_DATABASE_MISSING,
+        TARGET_DATABASE_AMBIGUOUS,
+        TARGET_DATABASE_ROLE_MISMATCH,
+        TARGET_RELATION_OUTSIDE_GROUP,
+        TARGET_RELATION_MODE_INVALID,
+        TARGET_BINDING_RETRIEVE_FAILED,
+        TARGET_BINDING_VALIDATION_FAILED,
     }
 )
 

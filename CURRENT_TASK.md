@@ -8,7 +8,7 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Production `main`: `4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`
+- Production `main`: `9ba69dc3deb79c1ed3e64fe8d395c0d57a79943e`
 - PR #7: merged with Create a merge commit
 - PR #8: merged with Create a merge commit
 - Production verification: 453 passed, 3 expected warnings
@@ -24,32 +24,32 @@ External-user sessions: 0
 
 ## Goal
 
-Fix partial Podcast publishing recovery before starting the protected real
-podcast-to-Notion Owner Acceptance journey.
+Bind every production Notion writer to one explicitly configured parent page
+before resuming the protected podcast-to-Notion Owner Acceptance journey.
 
 ```text
-PR #8 merged
+PR #9 and Owner Acceptance Harness merged
 ↓
-Repair partial Podcast / Expression publishing recovery
+Enforce Data Source → Database → Parent binding
 ↓
-Review and merge the repair
+Switch all five target settings together
+↓
+Pass read-only diagnosis
 ↓
 Resume the protected podcast-to-Notion journey
 ```
 
 ## Current Tasks
 
-1. Make Expression schema validation complete before any Podcast page write.
-2. Reconcile existing and missing Expression pages on every complete Podcast
-   publish.
-3. Make partial Expression creation safely recoverable without duplicate
-   Podcast or Expression pages.
-4. Keep the existing four Data Source IDs and parent page unchanged.
-5. Keep the real podcast-to-Notion Owner Acceptance journey paused until this
-   P1 repair is reviewed and merged.
-6. Keep Vocabulary and Weekly Review outside the podcast write unless the
-   accepted workflow explicitly requires them.
-7. Keep external-user testing paused.
+1. Validate all four configured Data Sources, databases, and their common
+   direct parent before any production write.
+2. Require `NOTION_TARGET_PARENT_PAGE_ID` for all production writes.
+3. Reject mixed groups, parent mismatch, cross-group relations, and
+   `dual_property` relations with stable redacted errors.
+4. Keep the historical group and its records unchanged.
+5. Keep real Owner Acceptance blocked until the repair is reviewed, merged,
+   the five target settings are switched, and read-only diagnosis passes.
+6. Keep external-user testing paused.
 
 ## Out of Scope
 
@@ -110,12 +110,16 @@ not started.
 - Real recovery evidence was reviewed and accepted by the AI Tech Lead.
 - PR #8 was merged with merge commit
   `4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`.
-- A new P1 was confirmed: a retry after partial Expression publishing updates
-  the existing Podcast page but does not restore missing Expression pages.
-- The P1 repair is implemented on
-  `fix/phase-4.1c-podcast-partial-publish-recovery` and awaits review and merge.
-- The real podcast-to-Notion journey is paused until the P1 repair is reviewed
-  and merged.
+- PR #9 partial-publish recovery is merged and its exact retry behavior passes.
+- The Owner Acceptance Harness is merged.
+- A read-only diagnosis found two complete same-name database groups.
+- Current configured group fingerprint: `8b0ff792`.
+- Intended group fingerprint: `f80be05b`.
+- The intended group is accessible, schema-valid, internally related, and
+  empty.
+- The historical group retains one BE 598 Podcast and 19 related Expressions.
+- The real podcast-to-Notion journey is paused until target-binding repair is
+  reviewed, configuration is switched, and diagnosis passes.
 - The next uncompleted Owner Acceptance gate remains the podcast-to-Notion
   journey.
 - The existing databases must not be deleted or recreated.

@@ -19,6 +19,8 @@ import httpx
 from notion_client import APIResponseError, Client
 
 from src.notion.config import load_dotenv
+from src.notion.schema import PODCAST_LIBRARY
+from src.notion.target_binding import ensure_notion_target_binding_for_write
 
 
 LOGGER = logging.getLogger(__name__)
@@ -205,6 +207,10 @@ def create_podcast_page(
         notion = notion or create_notion_client(token)
         podcast_database_id = podcast_database_id or configured_database_id
 
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={PODCAST_LIBRARY: podcast_database_id},
+    )
     LOGGER.info("Creating Notion Podcast Library page: %s", payload.title)
     try:
         response = notion.pages.create(

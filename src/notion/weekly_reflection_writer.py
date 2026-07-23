@@ -18,6 +18,8 @@ from typing import Any, Mapping, Optional, Sequence
 from notion_client import APIResponseError, Client
 
 from src.notion.config import load_dotenv
+from src.notion.schema import PODCAST_LIBRARY, WEEKLY_REVIEW
+from src.notion.target_binding import ensure_notion_target_binding_for_write
 from src.notion.uploader import create_notion_client
 from src.weekly_review.generator import _normalize_legacy_output
 from src.workflow.notion_client import query_database
@@ -992,6 +994,13 @@ def publish_weekly_reflection(
         notion = notion or create_notion_client(notion_token)
         weekly_reflection_database_id = weekly_reflection_database_id or load_weekly_reflection_database_id()
 
+    configured_role_ids = {WEEKLY_REVIEW: weekly_reflection_database_id}
+    if podcast_database_id:
+        configured_role_ids[PODCAST_LIBRARY] = podcast_database_id
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids=configured_role_ids,
+    )
     try:
         existing_page_id = find_existing_weekly_reflection_page(
             notion,

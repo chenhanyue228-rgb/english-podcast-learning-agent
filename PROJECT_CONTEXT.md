@@ -24,8 +24,8 @@ The system helps users build long-term personal English learning memory.
 **Status:** `OWNER_ACCEPTANCE_BLOCKED`
 
 The current stable release remains **v1.1.0**, built from release commit
-`80cbab01ea266e487a0359ddbec562959070d8a0`. Production `main` includes PR #8
-through merge commit `4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`.
+`80cbab01ea266e487a0359ddbec562959070d8a0`. Production `main` is
+`9ba69dc3deb79c1ed3e64fe8d395c0d57a79943e`.
 
 Release status:
 
@@ -46,11 +46,15 @@ Release status:
 - unknown fields and existing records preserved: PASS
 - setup state: `complete`
 - recovery evidence reviewed and accepted
-- a P1 partial-publish recovery defect was found before the real
-  podcast-to-Notion journey: retries did not restore missing Expression pages
-- the repair is implemented on a dedicated review branch and is not yet in
-  production `main`
-- the real podcast-to-Notion journey is paused pending that repair
+- partial Podcast/Expression publishing recovery is merged and verified
+- the protected Owner Acceptance Harness is merged
+- read-only diagnosis found two same-name Notion database groups
+- the current configuration targets the historical group instead of the
+  intended parent
+- the intended group is accessible, schema-valid, internally related, and
+  empty
+- the real podcast-to-Notion journey is paused pending target-binding repair,
+  coordinated configuration switch, and a passing read-only diagnosis
 - external-user sessions: 0
 - Owner Acceptance started
 - Skill installation passed
@@ -188,9 +192,9 @@ Resolved during Phase 4.1C:
 
 Current risks:
 
-1. Partial Podcast publishing cannot yet recover missing Expression pages when
-   a retry finds the Podcast page already exists.
-2. The recovered production workspace has not yet completed a real
+1. Production target binding must be enforced and reviewed before the five
+   target configuration values are switched.
+2. The intended production workspace has not yet completed a real
    podcast-to-Notion journey.
 3. Real Podcast Library and Expression Database output has not yet been
    reviewed after recovery.
@@ -209,11 +213,12 @@ full regression suite, and completed the reviewed v1.1.0 release.
 
 ## Immediate Milestone
 
-- Repair and review partial Podcast / Expression publishing recovery.
-- Keep the real podcast-to-Notion Owner Acceptance journey paused until the
-  repair is merged.
+- Review and merge the Notion target-binding repair.
+- Switch all four Data Source settings and the expected parent setting as one
+  operation, without changing the token.
+- Run the read-only target-binding diagnosis and require PASS.
 - Then run one protected real podcast-to-Notion Owner Acceptance journey
-  against the existing workspace.
+  against the intended empty workspace.
 - Review output quality, database placement, relation behavior, and
   idempotency.
 - Do not start external-user testing.

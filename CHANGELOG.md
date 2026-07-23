@@ -72,6 +72,25 @@ entries must be appended or clarified, not removed.
 - Prepared Owner Acceptance with status `READY_FOR_ONBOARDING_PR`.
 - External-user testing has not started; external-user session count remains 0.
 
+### Phase 4.1C Notion Target Binding
+
+- Confirmed two complete Notion database groups with identical visible names.
+- Preserved the historical group, including one BE 598 Podcast and 19 related
+  Expressions; no cleanup or migration was performed.
+- Verified the intended `英语音频学习助手` group through read-only access:
+  four unique databases, complete schemas, three internal single-property
+  relations, no cross-group relations, and zero records.
+- Added `NOTION_TARGET_PARENT_PAGE_ID` as the production write boundary.
+- Added a shared validator for Data Source, database, direct parent, schema,
+  and internal relation binding.
+- Protected Podcast, Vocabulary, Weekly Reflection, legacy publisher, and
+  example-data write paths before any mutation.
+- Strengthened the Owner Acceptance Harness so binding validation precedes
+  snapshots and publisher calls.
+- Added a permanently read-only, redacted target-binding diagnosis CLI.
+- Kept Owner Acceptance blocked and external-user sessions at 0 pending review,
+  coordinated configuration switch, diagnosis PASS, and a new Podcast run.
+
 ### Phase 4.1C Notion API and Setup Remediation
 
 - Recorded the real Owner Acceptance finding that Notion's current UI uses
