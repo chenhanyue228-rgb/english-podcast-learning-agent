@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, TYPE_CHECKING
 
 from src.notion.config import NotionConfigError, load_notion_config
-from src.notion.schema import REQUIRED_DATABASE_PROPERTIES
+from src.notion.schema import REQUIRED_DATABASE_PROPERTIES, WORKSPACE_DATABASE_ORDER
 
 if TYPE_CHECKING:
     from notion_client import Client
@@ -50,9 +50,7 @@ def fetch_database(notion: "Client", database_id: str, name: str) -> dict[str, A
             return notion.data_sources.retrieve(data_source_id=database_id)
         return notion.databases.retrieve(database_id=database_id)
     except APIResponseError as exc:
-        raise RuntimeError(
-            f"{name} could not be retrieved: {exc.code} {exc.message}"
-        ) from exc
+        raise RuntimeError(f"{name} could not be retrieved: {exc}") from exc
 
 
 def validate_database(
@@ -94,13 +92,14 @@ def validate_workspace() -> list[DatabaseValidationResult]:
     database_ids = {
         "Podcast Library": config.podcast_database_id,
         "Expression Database": config.expression_database_id,
-        "Weekly Review": config.weekly_database_id,
         "Vocabulary Database": config.vocabulary_database_id,
+        "Weekly Review": config.weekly_database_id,
     }
 
     results: list[DatabaseValidationResult] = []
 
-    for name, database_id in database_ids.items():
+    for name in WORKSPACE_DATABASE_ORDER:
+        database_id = database_ids[name]
         try:
             database = fetch_database(notion, database_id, name)
             results.append(

@@ -95,7 +95,130 @@ def select_property(options: list[str]) -> dict[str, Any]:
 
 
 def relation_property(data_source_id: str) -> dict[str, Any]:
-    return {"relation": {"data_source_id": data_source_id}}
+    return {
+        "relation": {
+            "data_source_id": data_source_id,
+            "single_property": {},
+        }
+    }
+
+
+def podcast_library_properties() -> dict[str, Any]:
+    return {
+        "Title": title_property(),
+        "URL": {"url": {}},
+        "Source Type": select_property(SOURCE_TYPES),
+        "Date": {"date": {}},
+        "Topic": select_property([]),
+        "Difficulty": select_property([]),
+        "Short Summary": rich_text_property(),
+    }
+
+
+def expression_database_properties(podcast_library_id: str) -> dict[str, Any]:
+    return {
+        "Expression": title_property(),
+        "Category": select_property([*EXPRESSION_CATEGORIES]),
+        "Commonness": select_property(COMMONNESS_LEVELS),
+        "Review Status": select_property(REVIEW_STATUSES),
+        "Source Podcast": relation_property(podcast_library_id),
+    }
+
+
+def vocabulary_database_properties(podcast_library_id: str) -> dict[str, Any]:
+    return {
+        "Name": title_property(),
+        "Original Context": rich_text_property(),
+        "Meaning": rich_text_property(),
+        "Professional Category": select_property(VOCABULARY_CATEGORIES),
+        "Source": relation_property(podcast_library_id),
+        "Source Page ID": rich_text_property(),
+        "First Seen": {"date": {}},
+        "Review Status": select_property(REVIEW_STATUSES),
+        "Last Review": {"date": {}},
+        "Usage Example": rich_text_property(),
+        "Personal Note": rich_text_property(),
+    }
+
+
+def weekly_review_properties(podcast_library_id: str) -> dict[str, Any]:
+    return {
+        "Week": title_property(),
+        "Date": {"date": {}},
+        "Podcasts": relation_property(podcast_library_id),
+    }
+
+
+def _property_type(property_definition: Mapping[str, Any]) -> str:
+    property_types = [
+        key
+        for key in property_definition
+        if key not in {"id", "name", "type"}
+    ]
+    if len(property_types) != 1:
+        raise WorkspaceSetupError("Notion property definition is invalid.")
+    return property_types[0]
+
+
+def retrieve_data_source(
+    notion: Client,
+    data_source_id: str,
+    database_name: str,
+) -> dict[str, Any]:
+    try:
+        return notion.data_sources.retrieve(data_source_id=data_source_id)
+    except APIResponseError as exc:
+        raise WorkspaceSetupError(
+            f"Failed to retrieve Notion database '{database_name}': {exc}"
+        ) from exc
+
+
+def _validate_data_source_properties(
+    database_name: str,
+    data_source: Mapping[str, Any],
+    expected_properties: Mapping[str, Mapping[str, Any]],
+) -> None:
+    actual_properties = data_source.get("properties") or {}
+
+    for property_name, definition in expected_properties.items():
+        expected_type = _property_type(definition)
+        actual = actual_properties.get(property_name)
+        if actual is None:
+            raise WorkspaceSetupError(
+                f"Notion database '{database_name}' is missing property "
+                f"'{property_name}'."
+            )
+        if actual.get("type") != expected_type:
+            raise WorkspaceSetupError(
+                f"Notion database '{database_name}' property '{property_name}' "
+                f"has type '{actual.get('type')}', expected '{expected_type}'."
+            )
+
+        if expected_type == "relation":
+            actual_relation = actual.get("relation") or {}
+            expected_relation = definition["relation"]
+            if (
+                actual_relation.get("data_source_id")
+                != expected_relation["data_source_id"]
+                or "single_property" not in actual_relation
+                or "dual_property" in actual_relation
+            ):
+                raise WorkspaceSetupError(
+                    f"Notion database '{database_name}' relation "
+                    f"'{property_name}' is incompatible with the required "
+                    "single-property relation."
+                )
+
+    title_properties = [
+        property_data
+        for property_data in actual_properties.values()
+        if property_data.get("type") == "title"
+    ]
+    if len(title_properties) != 1:
+        raise WorkspaceSetupError(
+            f"Notion database '{database_name}' must contain exactly one title "
+            "property."
+        )
 
 
 def create_database(
@@ -103,44 +226,159 @@ def create_database(
     parent_page_id: str,
     name: str,
     properties: dict[str, Any],
+    on_data_source_created: Optional[Callable[[str], None]] = None,
 ) -> str:
     try:
         response = notion.databases.create(
             parent={"type": "page_id", "page_id": parent_page_id},
             title=[{"type": "text", "text": {"content": name}}],
-            properties=properties,
+            initial_data_source={"properties": properties},
         )
     except APIResponseError as exc:
         raise WorkspaceSetupError(
-            f"Failed to create Notion database '{name}': {exc.code} {exc.message}"
+            f"Failed to create Notion database '{name}': {exc}"
         ) from exc
 
     data_sources = response.get("data_sources") or []
-    data_source_id = data_sources[0].get("id") if data_sources else response.get("id")
+    data_source_id = data_sources[0].get("id") if data_sources else None
     if not data_source_id:
         raise WorkspaceSetupError(
             f"Notion did not return a data source ID for database '{name}'."
         )
 
+    if on_data_source_created is not None:
+        on_data_source_created(data_source_id)
+
+    data_source = retrieve_data_source(notion, data_source_id, name)
+    _validate_data_source_properties(name, data_source, properties)
     return data_source_id
 
 
 def update_database_properties(
     notion: Client,
-    database_id: str,
+    data_source_id: str,
     properties: dict[str, Any],
     database_name: str,
 ) -> None:
     try:
-        if hasattr(notion, "data_sources"):
-            notion.data_sources.update(data_source_id=database_id, properties=properties)
-        else:
-            notion.databases.update(database_id=database_id, properties=properties)
+        notion.data_sources.update(
+            data_source_id=data_source_id,
+            properties=properties,
+        )
     except APIResponseError as exc:
         raise WorkspaceSetupError(
-            f"Failed to update Notion database '{database_name}': "
-            f"{exc.code} {exc.message}"
+            f"Failed to update Notion database '{database_name}': {exc}"
         ) from exc
+
+
+def ensure_data_source_schema(
+    notion: Client,
+    data_source_id: str,
+    database_name: str,
+    expected_properties: Mapping[str, Mapping[str, Any]],
+) -> None:
+    """Add or repair known properties without deleting user-defined fields."""
+    data_source = retrieve_data_source(notion, data_source_id, database_name)
+    actual_properties = data_source.get("properties") or {}
+    title_entries = [
+        (name, property_data)
+        for name, property_data in actual_properties.items()
+        if property_data.get("type") == "title"
+    ]
+    if len(title_entries) != 1:
+        raise WorkspaceSetupError(
+            f"Notion database '{database_name}' must contain exactly one title "
+            "property before it can be repaired."
+        )
+
+    expected_title_names = [
+        name
+        for name, definition in expected_properties.items()
+        if _property_type(definition) == "title"
+    ]
+    if len(expected_title_names) != 1:
+        raise WorkspaceSetupError(
+            f"Notion database '{database_name}' has an invalid title schema."
+        )
+
+    expected_title_name = expected_title_names[0]
+    current_title_name, current_title = title_entries[0]
+    conflicting_title_name = actual_properties.get(expected_title_name)
+    if (
+        current_title_name != expected_title_name
+        and conflicting_title_name is not None
+        and conflicting_title_name.get("type") != "title"
+    ):
+        raise WorkspaceSetupError(
+            f"Notion database '{database_name}' cannot rename its title to "
+            f"'{expected_title_name}' because that name is already used."
+        )
+
+    for property_name, definition in expected_properties.items():
+        actual = actual_properties.get(property_name)
+        if actual is None:
+            continue
+        expected_type = _property_type(definition)
+        if actual.get("type") != expected_type:
+            raise WorkspaceSetupError(
+                f"Notion database '{database_name}' property '{property_name}' "
+                f"has type '{actual.get('type')}', expected '{expected_type}'. "
+                "No existing property was changed."
+            )
+        if expected_type == "relation":
+            actual_relation = actual.get("relation") or {}
+            expected_relation = definition["relation"]
+            target_id = actual_relation.get("data_source_id")
+            if target_id and target_id != expected_relation["data_source_id"]:
+                raise WorkspaceSetupError(
+                    f"Notion database '{database_name}' relation "
+                    f"'{property_name}' points to a different data source. "
+                    "No existing relation was changed."
+                )
+
+    updates: dict[str, Any] = {}
+    if current_title_name != expected_title_name:
+        title_key = current_title.get("id") or current_title_name
+        updates[title_key] = {"name": expected_title_name}
+
+    for property_name, definition in expected_properties.items():
+        if _property_type(definition) == "title":
+            continue
+
+        actual = actual_properties.get(property_name)
+        if actual is None:
+            updates[property_name] = dict(definition)
+            continue
+
+        if _property_type(definition) == "relation":
+            actual_relation = actual.get("relation") or {}
+            expected_relation = definition["relation"]
+            if (
+                actual_relation.get("data_source_id")
+                != expected_relation["data_source_id"]
+                or "single_property" not in actual_relation
+                or "dual_property" in actual_relation
+            ):
+                updates[property_name] = dict(definition)
+
+    if updates:
+        update_database_properties(
+            notion=notion,
+            data_source_id=data_source_id,
+            database_name=database_name,
+            properties=updates,
+        )
+
+    repaired_data_source = retrieve_data_source(
+        notion,
+        data_source_id,
+        database_name,
+    )
+    _validate_data_source_properties(
+        database_name,
+        repaired_data_source,
+        expected_properties,
+    )
 
 
 def create_base_databases(
@@ -175,69 +413,89 @@ def create_base_databases(
             parent_page_id=parent_page_id,
             name=name,
             properties=properties,
+            on_data_source_created=(
+                None
+                if on_database_created is None
+                else lambda data_source_id: on_database_created(
+                    env_key,
+                    data_source_id,
+                )
+            ),
         )
         database_ids[env_key] = database_id
-        if on_database_created is not None:
-            on_database_created(env_key, database_id)
         return database_id
 
     podcast_library_id = get_or_create(
         "NOTION_PODCAST_LIBRARY_DATABASE_ID",
         "Podcast Library",
-        {
-            "Title": title_property(),
-            "URL": {"url": {}},
-            "Source Type": select_property(SOURCE_TYPES),
-            "Date": {"date": {}},
-            "Topic": select_property([]),
-            "Difficulty": select_property([]),
-            "Short Summary": rich_text_property(),
-        },
+        podcast_library_properties(),
     )
 
     get_or_create(
         "NOTION_EXPRESSION_DATABASE_ID",
         "Expression Database",
-        {
-            "Expression": title_property(),
-            "Category": select_property(
-                [
-                    *EXPRESSION_CATEGORIES,
-                ]
-            ),
-            "Commonness": select_property(COMMONNESS_LEVELS),
-            "Review Status": select_property(REVIEW_STATUSES),
-        },
-    )
-
-    get_or_create(
-        "NOTION_WEEKLY_REFLECTION_DATABASE_ID",
-        "Weekly Review",
-        {
-            "Week": title_property(),
-            "Date": {"date": {}},
-        },
+        expression_database_properties(podcast_library_id),
     )
 
     get_or_create(
         "NOTION_VOCABULARY_DATABASE_ID",
         "Vocabulary Database",
-        {
-            "Name": title_property(),
-            "Original Context": rich_text_property(),
-            "Meaning": rich_text_property(),
-            "Professional Category": select_property(VOCABULARY_CATEGORIES),
-            "Source": relation_property(podcast_library_id),
-            "Source Page ID": rich_text_property(),
-            "First Seen": {"date": {}},
-            "Review Status": select_property(REVIEW_STATUSES),
-            "Last Review": {"date": {}},
-            "Usage Example": rich_text_property(),
-            "Personal Note": rich_text_property(),
-        },
+        vocabulary_database_properties(podcast_library_id),
+    )
+
+    get_or_create(
+        "NOTION_WEEKLY_REFLECTION_DATABASE_ID",
+        "Weekly Review",
+        weekly_review_properties(podcast_library_id),
     )
 
     return database_ids
+
+
+def reconcile_workspace_schema(
+    notion: Client,
+    database_ids: Mapping[str, str],
+) -> None:
+    """Repair known non-relation fields in existing data sources in place."""
+    podcast_library_id = database_ids["NOTION_PODCAST_LIBRARY_DATABASE_ID"]
+    schemas = (
+        (
+            database_ids["NOTION_PODCAST_LIBRARY_DATABASE_ID"],
+            "Podcast Library",
+            podcast_library_properties(),
+        ),
+        (
+            database_ids["NOTION_EXPRESSION_DATABASE_ID"],
+            "Expression Database",
+            expression_database_properties(podcast_library_id),
+        ),
+        (
+            database_ids["NOTION_VOCABULARY_DATABASE_ID"],
+            "Vocabulary Database",
+            vocabulary_database_properties(podcast_library_id),
+        ),
+        (
+            database_ids.get(
+                "NOTION_WEEKLY_REFLECTION_DATABASE_ID",
+                database_ids.get("NOTION_WEEKLY_REVIEW_DATABASE_ID", ""),
+            ),
+            "Weekly Review",
+            weekly_review_properties(podcast_library_id),
+        ),
+    )
+
+    for data_source_id, database_name, properties in schemas:
+        non_relation_properties = {
+            name: definition
+            for name, definition in properties.items()
+            if _property_type(definition) != "relation"
+        }
+        ensure_data_source_schema(
+            notion=notion,
+            data_source_id=data_source_id,
+            database_name=database_name,
+            expected_properties=non_relation_properties,
+        )
 
 
 def wire_database_relations(notion: Client, database_ids: dict[str, str]) -> None:
@@ -249,27 +507,34 @@ def wire_database_relations(notion: Client, database_ids: dict[str, str]) -> Non
     )
     vocabulary_database_id = database_ids["NOTION_VOCABULARY_DATABASE_ID"]
 
-    update_database_properties(
+    ensure_data_source_schema(
         notion=notion,
-        database_id=expression_database_id,
+        data_source_id=expression_database_id,
         database_name="Expression Database",
-        properties={"Source Podcast": relation_property(podcast_library_id)},
-    )
-
-    update_database_properties(
-        notion=notion,
-        database_id=weekly_review_id,
-        database_name="Weekly Review",
-        properties={
-            "Podcasts": relation_property(podcast_library_id),
+        expected_properties={
+            "Expression": title_property(),
+            "Source Podcast": relation_property(podcast_library_id),
         },
     )
 
-    update_database_properties(
+    ensure_data_source_schema(
         notion=notion,
-        database_id=vocabulary_database_id,
+        data_source_id=vocabulary_database_id,
         database_name="Vocabulary Database",
-        properties={"Source": relation_property(podcast_library_id)},
+        expected_properties={
+            "Name": title_property(),
+            "Source": relation_property(podcast_library_id),
+        },
+    )
+
+    ensure_data_source_schema(
+        notion=notion,
+        data_source_id=weekly_review_id,
+        database_name="Weekly Review",
+        expected_properties={
+            "Week": title_property(),
+            "Podcasts": relation_property(podcast_library_id),
+        },
     )
 
 
@@ -301,6 +566,7 @@ def setup_workspace(parent_page_id: str, notion: Optional[Client] = None) -> dic
     normalized_parent_page_id = normalize_notion_id(parent_page_id)
     update_env_file({NOTION_PARENT_PAGE_ID_ENV: normalized_parent_page_id})
     database_ids = create_base_databases(notion_client, normalized_parent_page_id)
+    reconcile_workspace_schema(notion_client, database_ids)
     wire_database_relations(notion_client, database_ids)
     update_env_file(database_ids)
     return database_ids
@@ -342,7 +608,7 @@ def print_onboarding() -> None:
                 "7. Run: ./.venv/bin/python -m src.notion.setup_workspace --parent-page-id <page_url_or_id>",
                 "8. Run: ./.venv/bin/python -m src.notion.check_workspace",
                 "",
-                "The setup creates Podcast Library, Expression Database, Weekly Review, and Vocabulary Database.",
+                "The setup creates Podcast Library, Expression Database, Vocabulary Database, and Weekly Review.",
                 "Weekly Review stores the Weekly Reflection learning note.",
             ]
         )

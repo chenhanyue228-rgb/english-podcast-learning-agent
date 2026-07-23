@@ -13,6 +13,13 @@ EXPRESSION_DATABASE = "Expression Database"
 WEEKLY_REVIEW = "Weekly Review"
 VOCABULARY_DATABASE = "Vocabulary Database"
 
+WORKSPACE_DATABASE_ORDER = (
+    PODCAST_LIBRARY,
+    EXPRESSION_DATABASE,
+    VOCABULARY_DATABASE,
+    WEEKLY_REVIEW,
+)
+
 SOURCE_TYPES = ["YouTube", "Podcast", "Local Audio"]
 EXPRESSION_CATEGORIES = [
     "Native Expression",
