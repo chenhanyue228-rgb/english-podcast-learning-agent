@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import getpass
 import os
+import re
 import sys
 import tempfile
 from contextlib import contextmanager
@@ -36,6 +37,7 @@ from src.notion.setup_workspace import (  # noqa: E402
     create_base_databases,
     create_notion_client,
     normalize_notion_id,
+    reconcile_workspace_schema,
     wire_database_relations,
 )
 
@@ -52,8 +54,8 @@ PROJECT_MARKERS = (
 DATABASE_ENV_KEYS = (
     PODCAST_DATABASE_ID_ENV,
     EXPRESSION_DATABASE_ID_ENV,
-    WEEKLY_DATABASE_ID_ENV,
     VOCABULARY_DATABASE_ID_ENV,
+    WEEKLY_DATABASE_ID_ENV,
 )
 
 SETUP_STATE_ENV = "EPLA_NOTION_SETUP_STATE"
@@ -63,15 +65,15 @@ SETUP_STATE_COMPLETE = "complete"
 DATABASE_ENV_NAMES = {
     PODCAST_DATABASE_ID_ENV: "Podcast Library",
     EXPRESSION_DATABASE_ID_ENV: "Expression Database",
-    WEEKLY_DATABASE_ID_ENV: "Weekly Review",
     VOCABULARY_DATABASE_ID_ENV: "Vocabulary Database",
+    WEEKLY_DATABASE_ID_ENV: "Weekly Review",
 }
 
 DATABASE_NAMES_ZH = {
     "Podcast Library": "播客资料库",
     "Expression Database": "表达资料库",
-    "Weekly Review": "每周复盘资料库",
     "Vocabulary Database": "词汇资料库",
+    "Weekly Review": "每周复盘资料库",
 }
 
 
@@ -210,10 +212,10 @@ def configured_database_ids(values: Mapping[str, str]) -> dict[str, str]:
         EXPRESSION_DATABASE_ID_ENV: values.get(
             EXPRESSION_DATABASE_ID_ENV, ""
         ).strip(),
-        WEEKLY_DATABASE_ID_ENV: weekly_id,
         VOCABULARY_DATABASE_ID_ENV: values.get(
             VOCABULARY_DATABASE_ID_ENV, ""
         ).strip(),
+        WEEKLY_DATABASE_ID_ENV: weekly_id,
     }
 
 
@@ -385,6 +387,14 @@ def run_first_time_setup(
         ) from exc
 
     try:
+        reconcile_workspace_schema(notion_client, database_ids)
+    except Exception as exc:
+        raise FirstTimeSetupError(
+            "Notion 数据库字段修复未完成。已有数据库编号和内容均已保留；"
+            "请检查权限和网络后重新运行，系统会继续原地补齐字段。"
+        ) from exc
+
+    try:
         wire_database_relations(notion_client, database_ids)
     except Exception as exc:
         raise FirstTimeSetupError(
@@ -433,21 +443,52 @@ def _safe_error_message(error: Exception, secrets: Sequence[str]) -> str:
     for secret in secrets:
         if secret:
             message = message.replace(secret, "[已隐藏]")
+    message = re.sub(r"https?://\S+", "[已隐藏链接]", message)
+    message = re.sub(
+        r"\b[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\b",
+        "[已隐藏编号]",
+        message,
+    )
+    message = re.sub(r"\b[0-9a-fA-F]{32}\b", "[已隐藏编号]", message)
     return message
 
 
 def main(
     *,
     getpass_fn: Callable[[str], str] = getpass.getpass,
-    input_fn: Callable[[str], str] = input,
+    input_fn: Optional[Callable[[str], str]] = None,
 ) -> int:
+    # ``input_fn`` remains for call-site compatibility; private values are
+    # deliberately collected only through ``getpass_fn``.
+    del input_fn
     token = ""
     parent_page = ""
 
     try:
         project_root = locate_project_root()
-        token = getpass_fn("请粘贴 Notion 访问密钥（输入内容不会显示）：")
-        parent_page = input_fn("请粘贴 Notion 父页面完整链接：")
+        print("英语音频学习助手第一次设置", flush=True)
+        print("", flush=True)
+        print("接下来需要输入两项内容。", flush=True)
+        print("", flush=True)
+        print("第 1/2 步：Notion 访问密钥", flush=True)
+        print("", flush=True)
+        print("粘贴时屏幕不会显示字符，这是正常的。", flush=True)
+        print("粘贴完成后请按回车。", flush=True)
+        token = getpass_fn("")
+        print("", flush=True)
+        print("访问密钥已接收，内容未显示。", flush=True)
+        print("", flush=True)
+        print("第 2/2 步：Notion 页面链接", flush=True)
+        print("", flush=True)
+        print(
+            "请粘贴刚才复制的“英语音频学习助手”页面完整链接。",
+            flush=True,
+        )
+        print("为了保护隐私，链接也不会显示。", flush=True)
+        print("粘贴完成后请按回车。", flush=True)
+        parent_page = getpass_fn("")
+        print("", flush=True)
+        print("页面链接已接收，正在检查连接和页面权限。", flush=True)
         result = run_first_time_setup(
             project_root=project_root,
             token=token,
@@ -455,23 +496,39 @@ def main(
         )
     except FirstTimeSetupError as exc:
         safe_message = _safe_error_message(exc, (token, parent_page))
-        print(f"第一次设置失败：{safe_message}", file=sys.stderr)
-        return 1
-    except Exception as exc:
-        safe_message = _safe_error_message(exc, (token, parent_page))
         print(
-            f"第一次设置失败：未能完成本地设置。{safe_message}",
+            f"第一次设置失败：{safe_message}",
             file=sys.stderr,
+            flush=True,
+        )
+        print(
+            "请修正后重新双击 start_setup.command。",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+    except Exception:
+        print(
+            "第一次设置失败：未能完成本地设置。",
+            file=sys.stderr,
+            flush=True,
+        )
+        print(
+            "请重新双击 start_setup.command；如果仍然失败，请只提供"
+            "非敏感错误摘要。",
+            file=sys.stderr,
+            flush=True,
         )
         return 1
 
     action = "已创建并验证" if result.created_databases else "已验证现有"
-    print("")
-    print(f"第一次设置已经完成，{action} Notion 工作区：")
-    print(format_chinese_validation(result.validation_results))
-    print("")
+    print("", flush=True)
+    print(f"第一次设置已经完成，{action} Notion 工作区：", flush=True)
+    print(format_chinese_validation(result.validation_results), flush=True)
+    print("", flush=True)
     print(
-        "现在请发送一个苹果播客单集链接、播客订阅源链接或本地音频文件。"
+        "现在请发送一个苹果播客单集链接、播客订阅源链接或本地音频文件。",
+        flush=True,
     )
     return 0
 

@@ -15,7 +15,11 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, TYPE_CHECKING
 
 from src.notion.config import NotionConfigError, load_notion_config
-from src.notion.schema import REQUIRED_DATABASE_PROPERTIES
+from src.notion.schema import (
+    REQUIRED_DATABASE_PROPERTIES,
+    REQUIRED_DATABASE_RELATIONS,
+    WORKSPACE_DATABASE_ORDER,
+)
 
 if TYPE_CHECKING:
     from notion_client import Client
@@ -29,6 +33,7 @@ class DatabaseValidationResult:
     exists: bool = False
     missing_properties: list[str] = field(default_factory=list)
     type_mismatches: list[str] = field(default_factory=list)
+    relation_mismatches: list[str] = field(default_factory=list)
     error: Optional[str] = None
 
     @property
@@ -37,6 +42,7 @@ class DatabaseValidationResult:
             self.exists
             and not self.missing_properties
             and not self.type_mismatches
+            and not self.relation_mismatches
             and self.error is None
         )
 
@@ -50,15 +56,14 @@ def fetch_database(notion: "Client", database_id: str, name: str) -> dict[str, A
             return notion.data_sources.retrieve(data_source_id=database_id)
         return notion.databases.retrieve(database_id=database_id)
     except APIResponseError as exc:
-        raise RuntimeError(
-            f"{name} could not be retrieved: {exc.code} {exc.message}"
-        ) from exc
+        raise RuntimeError(f"{name} could not be retrieved from Notion.") from exc
 
 
 def validate_database(
     name: str,
     database: dict[str, Any],
     required_properties: dict[str, str],
+    expected_relation_targets: Optional[dict[str, str]] = None,
 ) -> DatabaseValidationResult:
     """Validate that a database has each required property with the right type."""
     result = DatabaseValidationResult(name=name, exists=True)
@@ -74,6 +79,21 @@ def validate_database(
         if actual_type != expected_type:
             result.type_mismatches.append(
                 f"{name}.{property_name}: expected {expected_type}, got {actual_type}"
+            )
+            continue
+
+        expected_target = (expected_relation_targets or {}).get(property_name)
+        if expected_type != "relation" or expected_target is None:
+            continue
+
+        relation = actual_property.get("relation") or {}
+        if relation.get("data_source_id") != expected_target:
+            result.relation_mismatches.append(
+                f"{name}.{property_name}: relation target mismatch"
+            )
+        if "single_property" not in relation or "dual_property" in relation:
+            result.relation_mismatches.append(
+                f"{name}.{property_name}: relation mode mismatch"
             )
 
     return result
@@ -94,17 +114,29 @@ def validate_workspace() -> list[DatabaseValidationResult]:
     database_ids = {
         "Podcast Library": config.podcast_database_id,
         "Expression Database": config.expression_database_id,
-        "Weekly Review": config.weekly_database_id,
         "Vocabulary Database": config.vocabulary_database_id,
+        "Weekly Review": config.weekly_database_id,
     }
 
     results: list[DatabaseValidationResult] = []
 
-    for name, database_id in database_ids.items():
+    for name in WORKSPACE_DATABASE_ORDER:
+        database_id = database_ids[name]
         try:
             database = fetch_database(notion, database_id, name)
+            expected_relation_targets = {
+                property_name: database_ids[target_database]
+                for property_name, target_database in (
+                    REQUIRED_DATABASE_RELATIONS.get(name) or {}
+                ).items()
+            }
             results.append(
-                validate_database(name, database, REQUIRED_DATABASE_PROPERTIES[name])
+                validate_database(
+                    name,
+                    database,
+                    REQUIRED_DATABASE_PROPERTIES[name],
+                    expected_relation_targets,
+                )
             )
         except RuntimeError as exc:
             results.append(DatabaseValidationResult(name=name, error=str(exc)))
@@ -117,12 +149,14 @@ def format_validation_report(results: list[DatabaseValidationResult]) -> str:
     lines: list[str] = []
     missing: list[str] = []
     mismatches: list[str] = []
+    relation_mismatches: list[str] = []
     errors: list[str] = []
 
     for result in results:
         lines.append(f"{'✓' if result.is_valid else '✗'} {result.name}")
         missing.extend(result.missing_properties)
         mismatches.extend(result.type_mismatches)
+        relation_mismatches.extend(result.relation_mismatches)
         if result.error:
             errors.append(result.error)
 
@@ -134,6 +168,11 @@ def format_validation_report(results: list[DatabaseValidationResult]) -> str:
         lines.append("")
         lines.append("Type mismatches:")
         lines.extend(mismatches)
+
+    if relation_mismatches:
+        lines.append("")
+        lines.append("Relation mismatches:")
+        lines.extend(relation_mismatches)
 
     if errors:
         lines.append("")

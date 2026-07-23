@@ -13,6 +13,13 @@ EXPRESSION_DATABASE = "Expression Database"
 WEEKLY_REVIEW = "Weekly Review"
 VOCABULARY_DATABASE = "Vocabulary Database"
 
+WORKSPACE_DATABASE_ORDER = (
+    PODCAST_LIBRARY,
+    EXPRESSION_DATABASE,
+    VOCABULARY_DATABASE,
+    WEEKLY_REVIEW,
+)
+
 SOURCE_TYPES = ["YouTube", "Podcast", "Local Audio"]
 EXPRESSION_CATEGORIES = [
     "Native Expression",
@@ -75,6 +82,18 @@ REQUIRED_DATABASE_PROPERTIES: dict[str, dict[str, str]] = {
         "Last Review": "date",
         "Usage Example": "rich_text",
         "Personal Note": "rich_text",
+    },
+}
+
+REQUIRED_DATABASE_RELATIONS: dict[str, dict[str, str]] = {
+    EXPRESSION_DATABASE: {
+        "Source Podcast": PODCAST_LIBRARY,
+    },
+    VOCABULARY_DATABASE: {
+        "Source": PODCAST_LIBRARY,
+    },
+    WEEKLY_REVIEW: {
+        "Podcasts": PODCAST_LIBRARY,
     },
 }
 

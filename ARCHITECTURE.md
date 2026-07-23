@@ -84,6 +84,32 @@ Notion is the knowledge storage layer. It stores:
 - Vocabulary Database records
 - Weekly Review / Weekly Reflection records
 
+Notion's current API model separates the storage container from its schema:
+
+- a **Database** is the page-level container created under the user's learning
+  page
+- a **Data Source** owns properties and records inside that container
+- database creation supplies initial fields through
+  `initial_data_source.properties`
+- later property retrieval and updates use the data source API
+- relations target a `data_source_id`, not a database container ID
+- the production workspace uses one-way `single_property` relations
+
+First-time setup persists each returned data source ID immediately. Recovery
+reuses those IDs, adds only missing known properties, preserves unknown user
+properties and records, and stops safely on a property type conflict. This is
+an API compatibility correction; the four-database product model is unchanged.
+
+Relation recovery is intentionally conservative. A missing relation, missing
+target, or missing mode may be repaired to the approved one-way relation. A
+relation that points to another Data Source or contains `dual_property` stops
+before any relation update. Converting an existing two-way relation requires a
+separate migration decision because it can affect the reverse property.
+
+Final workspace validation checks both the relation target and relation mode
+for Expression Database, Vocabulary Database, and Weekly Review. A field is not
+accepted merely because its Notion type is `relation`.
+
 ## 4. Codex Artifact Runtime
 
 The production runtime can be summarized as:

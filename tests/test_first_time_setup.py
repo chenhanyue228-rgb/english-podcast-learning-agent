@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import first_time_setup
+from src.notion.check_workspace import DatabaseValidationResult
 
 
 FAKE_TOKEN = "secret_test_token"
@@ -20,10 +21,19 @@ OTHER_PARENT_URL = "https://www.notion.so/Other-fedcba9876543210fedcba9876543210
 DATABASE_IDS = {
     "NOTION_PODCAST_LIBRARY_DATABASE_ID": "podcast-id",
     "NOTION_EXPRESSION_DATABASE_ID": "expression-id",
-    "NOTION_WEEKLY_REFLECTION_DATABASE_ID": "weekly-id",
     "NOTION_VOCABULARY_DATABASE_ID": "vocabulary-id",
+    "NOTION_WEEKLY_REFLECTION_DATABASE_ID": "weekly-id",
 }
 DATABASE_ORDER = tuple(DATABASE_IDS)
+
+
+@pytest.fixture(autouse=True)
+def mock_schema_reconciler(monkeypatch) -> None:
+    monkeypatch.setattr(
+        first_time_setup,
+        "reconcile_workspace_schema",
+        lambda _notion, _ids: None,
+    )
 
 
 def create_missing_database_ids(
@@ -71,8 +81,8 @@ def valid_results():
     return [
         SimpleNamespace(name="Podcast Library", is_valid=True),
         SimpleNamespace(name="Expression Database", is_valid=True),
-        SimpleNamespace(name="Weekly Review", is_valid=True),
         SimpleNamespace(name="Vocabulary Database", is_valid=True),
+        SimpleNamespace(name="Weekly Review", is_valid=True),
     ]
 
 
@@ -115,6 +125,7 @@ def test_secure_update_env_without_example_creates_file(tmp_path: Path) -> None:
 def test_main_uses_hidden_token_input(monkeypatch, tmp_path: Path) -> None:
     root = make_project_root(tmp_path)
     prompts: list[str] = []
+    hidden_values = iter((FAKE_TOKEN, PARENT_URL))
 
     monkeypatch.setattr(first_time_setup, "locate_project_root", lambda: root)
     monkeypatch.setattr(
@@ -126,13 +137,11 @@ def test_main_uses_hidden_token_input(monkeypatch, tmp_path: Path) -> None:
     )
 
     status_code = first_time_setup.main(
-        getpass_fn=lambda prompt: prompts.append(prompt) or FAKE_TOKEN,
-        input_fn=lambda _prompt: PARENT_URL,
+        getpass_fn=lambda prompt: prompts.append(prompt) or next(hidden_values),
     )
 
     assert status_code == 0
-    assert prompts
-    assert "不会显示" in prompts[0]
+    assert len(prompts) == 2
 
 
 def test_empty_token_is_rejected_before_save(tmp_path: Path) -> None:
@@ -161,16 +170,15 @@ def test_main_does_not_print_token(monkeypatch, tmp_path: Path, capsys) -> None:
         ),
     )
 
-    assert (
-        first_time_setup.main(
-            getpass_fn=lambda _prompt: FAKE_TOKEN,
-            input_fn=lambda _prompt: PARENT_URL,
-        )
-        == 0
-    )
+    hidden_values = iter((FAKE_TOKEN, PARENT_URL))
+    assert first_time_setup.main(
+        getpass_fn=lambda _prompt: next(hidden_values),
+    ) == 0
     captured = capsys.readouterr()
     assert FAKE_TOKEN not in captured.out
     assert FAKE_TOKEN not in captured.err
+    assert PARENT_URL not in captured.out
+    assert PARENT_URL not in captured.err
 
 
 def test_error_output_redacts_token(monkeypatch, tmp_path: Path, capsys) -> None:
@@ -184,16 +192,75 @@ def test_error_output_redacts_token(monkeypatch, tmp_path: Path, capsys) -> None
 
     monkeypatch.setattr(first_time_setup, "run_first_time_setup", fail)
 
+    hidden_values = iter((FAKE_TOKEN, PARENT_URL))
     assert (
         first_time_setup.main(
-            getpass_fn=lambda _prompt: FAKE_TOKEN,
-            input_fn=lambda _prompt: PARENT_URL,
+            getpass_fn=lambda _prompt: next(hidden_values),
         )
         == 1
     )
     captured = capsys.readouterr()
     assert FAKE_TOKEN not in captured.err
     assert "[已隐藏]" in captured.err
+
+
+def test_main_explains_both_hidden_input_steps_and_confirms_receipt(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    root = make_project_root(tmp_path)
+    hidden_values = iter((FAKE_TOKEN, PARENT_URL))
+    monkeypatch.setattr(first_time_setup, "locate_project_root", lambda: root)
+    monkeypatch.setattr(
+        first_time_setup,
+        "run_first_time_setup",
+        lambda **kwargs: first_time_setup.FirstTimeSetupResult(
+            DATABASE_IDS,
+            False,
+            valid_results(),
+        ),
+    )
+
+    assert first_time_setup.main(
+        getpass_fn=lambda _prompt: next(hidden_values),
+    ) == 0
+
+    output = capsys.readouterr().out
+    phrases = (
+        "第 1/2 步：Notion 访问密钥",
+        "访问密钥已接收，内容未显示。",
+        "第 2/2 步：Notion 页面链接",
+        "为了保护隐私，链接也不会显示。",
+        "页面链接已接收，正在检查连接和页面权限。",
+    )
+    positions = [output.index(phrase) for phrase in phrases]
+    assert positions == sorted(positions)
+    assert FAKE_TOKEN not in output
+    assert PARENT_URL not in output
+
+
+def test_main_does_not_use_visible_input_for_page_link(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    hidden_values = iter((FAKE_TOKEN, PARENT_URL))
+    monkeypatch.setattr(first_time_setup, "locate_project_root", lambda: root)
+    monkeypatch.setattr(
+        first_time_setup,
+        "run_first_time_setup",
+        lambda **kwargs: first_time_setup.FirstTimeSetupResult(
+            DATABASE_IDS,
+            False,
+            valid_results(),
+        ),
+    )
+
+    assert first_time_setup.main(
+        getpass_fn=lambda _prompt: next(hidden_values),
+        input_fn=lambda _prompt: pytest.fail("visible input must not be used"),
+    ) == 0
 
 
 def test_secure_update_preserves_other_configuration(tmp_path: Path) -> None:
@@ -808,6 +875,60 @@ def test_validation_failure_retries_relations_and_keeps_progress(
     assert relation_calls == ["wire", "wire"]
 
 
+def test_relation_semantic_validation_failure_preserves_existing_ids(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    env_path = root / ".env"
+    env_path.write_text(
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
+        f"{first_time_setup.SETUP_STATE_ENV}="
+        f"{first_time_setup.SETUP_STATE_COMPLETE}\n"
+        + "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items())
+        + "\n",
+        encoding="utf-8",
+    )
+    database_create_calls: list[dict] = []
+
+    class RejectDatabaseCreation:
+        def create(self, **kwargs):
+            database_create_calls.append(kwargs)
+            pytest.fail("must not create databases")
+
+    notion = SimpleNamespace(databases=RejectDatabaseCreation())
+    invalid_relation_result = DatabaseValidationResult(
+        name="Expression Database",
+        exists=True,
+        relation_mismatches=[
+            "Expression Database.Source Podcast: relation mode mismatch"
+        ],
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: None,
+    )
+
+    with pytest.raises(first_time_setup.FirstTimeSetupError, match="验证未通过"):
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=PARENT_URL,
+            notion=notion,
+            validator=lambda: [invalid_relation_result],
+            database_access_validator=lambda _notion, _ids: None,
+        )
+
+    saved = first_time_setup.read_env_values(env_path)
+    assert database_create_calls == []
+    assert saved[first_time_setup.SETUP_STATE_ENV] == (
+        first_time_setup.SETUP_STATE_IN_PROGRESS
+    )
+    for key, value in DATABASE_IDS.items():
+        assert saved[key] == value
+
+
 def test_inaccessible_existing_database_stops_without_overwrite(
     monkeypatch,
     tmp_path: Path,
@@ -847,6 +968,102 @@ def test_inaccessible_existing_database_stops_without_overwrite(
     )
 
 
+def test_schema_reconcile_runs_before_relations_and_validation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    (root / ".env").write_text(
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
+        f"{first_time_setup.SETUP_STATE_ENV}="
+        f"{first_time_setup.SETUP_STATE_IN_PROGRESS}\n"
+        + "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items())
+        + "\n",
+        encoding="utf-8",
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        lambda _notion, _parent, **kwargs: calls.append("create")
+        or dict(kwargs["existing_ids"]),
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "reconcile_workspace_schema",
+        lambda _notion, _ids: calls.append("reconcile"),
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: calls.append("wire"),
+    )
+
+    first_time_setup.run_first_time_setup(
+        project_root=root,
+        token=FAKE_TOKEN,
+        parent_page=PARENT_URL,
+        notion=object(),
+        validator=lambda: calls.append("validate") or valid_results(),
+        database_access_validator=lambda _notion, _ids: calls.append("access"),
+    )
+
+    assert calls == ["access", "create", "reconcile", "wire", "validate"]
+
+
+def test_schema_reconcile_failure_keeps_ids_and_in_progress_state(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    env_path = root / ".env"
+    env_path.write_text(
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
+        f"{first_time_setup.SETUP_STATE_ENV}="
+        f"{first_time_setup.SETUP_STATE_COMPLETE}\n"
+        + "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items())
+        + "\n",
+        encoding="utf-8",
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        lambda _notion, _parent, **kwargs: calls.append("create")
+        or dict(kwargs["existing_ids"]),
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "reconcile_workspace_schema",
+        lambda _notion, _ids: (_ for _ in ()).throw(
+            RuntimeError("simulated schema conflict")
+        ),
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: calls.append("wire"),
+    )
+
+    with pytest.raises(first_time_setup.FirstTimeSetupError, match="字段修复"):
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=PARENT_URL,
+            notion=object(),
+            validator=lambda: calls.append("validate") or valid_results(),
+            database_access_validator=lambda _notion, _ids: calls.append("access"),
+        )
+
+    saved = first_time_setup.read_env_values(env_path)
+    assert calls == ["access", "create"]
+    assert saved[first_time_setup.SETUP_STATE_ENV] == (
+        first_time_setup.SETUP_STATE_IN_PROGRESS
+    )
+    for key, value in DATABASE_IDS.items():
+        assert saved[key] == value
+
+
 def test_success_report_is_chinese() -> None:
     report = first_time_setup.format_chinese_validation(valid_results())
 
@@ -867,10 +1084,10 @@ def test_main_returns_nonzero_on_failure(monkeypatch, tmp_path: Path) -> None:
         ),
     )
 
+    hidden_values = iter((FAKE_TOKEN, PARENT_URL))
     assert (
         first_time_setup.main(
-            getpass_fn=lambda _prompt: FAKE_TOKEN,
-            input_fn=lambda _prompt: PARENT_URL,
+            getpass_fn=lambda _prompt: next(hidden_values),
         )
         == 1
     )
@@ -920,6 +1137,9 @@ def test_start_command_uses_its_own_directory_and_project_venv() -> None:
     assert "--skip-tests" in content
     assert "import notion_client" not in content
     assert "scripts/first_time_setup.py" in content
+    assert 'LANG="en_US.UTF-8"' in content
+    assert 'LC_CTYPE="en_US.UTF-8"' in content
+    assert "重新双击 start_setup.command" in content
     assert "sudo" not in content
     assert "NOTION_TOKEN=" not in content
 

@@ -8,10 +8,21 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Production `main`: `60de7aab6fa4904a5b5576e351d28cc70ff672df`
-- PR #5: merged
-- Tests: 407 passed
+- Pre-PR #7 production baseline:
+  `87b96d9f68ad65d3356943b1f8196eeea8f9f3ee`
+- PR #6: merged
+- Production baseline tests: 407 passed, 3 expected warnings
 - Architecture: Stable
+
+## PR #7 Merge Candidate
+
+- PR #7 remediation implementation reviewed
+- Branch: `fix/phase-4.1c-notion-api-and-setup-ux`
+- Candidate verification: 453 passed, 3 expected warnings
+- Review result: `READY_TO_MERGE`
+- Existing four Data Source IDs must be reused
+- Real Owner Acceptance remains pending
+- External-user sessions: 0
 
 ## Current Sprint
 
@@ -23,35 +34,41 @@ External-user sessions: 0
 
 ## Goal
 
-Fix the P1 Notion first-time guidance blocker discovered during Owner
-Acceptance, then restart the acceptance flow from the post-install handoff.
+Fix the P1 Notion data source field and relation compatibility blocker
+discovered during Owner Acceptance, then resume setup against the already
+created databases without creating duplicates.
 
 ```text
-One understandable Notion action
+Saved data source IDs
 ↓
-User confirmation
+In-place schema reconciliation
 ↓
-Next understandable Notion action
+Single-property relations
 ↓
-Safe local setup
+Full validation
 ↓
-Codex-operated podcast-to-Notion flow
+Resume Owner Acceptance
 ```
 
 ## Current Tasks
 
-1. Make `skill/SKILL.md` the canonical user-visible Notion conversation.
-2. Require the `已有` path to wait for `已打开 Notion`, `页面已创建`,
-   `连接已添加`, and `链接已复制` in order.
-3. Require the `没有` path to wait for `开发者页面已打开`, `连接已创建`,
-   and `密钥已保存` before the page flow.
-4. Prevent local setup from starting before `链接已复制`.
-5. Remove internal acceptance terminology from normal-user instructions.
-6. Add recovery copy for a missing Notion connection menu.
-7. Add sequence, reply-gate, forbidden-copy, and launch-timing tests.
-8. Review and merge the focused fix.
-9. Reinstall the Skill from the latest `main`.
-10. Restart Owner Acceptance without starting external-user testing.
+1. Pin the Notion SDK version verified for the current data source API.
+2. Create database containers with `initial_data_source.properties`.
+3. Persist and reuse returned `data_source_id` values.
+4. Reconcile all four existing data source schemas in place.
+5. Rename the sole title property without creating a second title.
+6. Preserve unknown user properties and stop on type conflicts.
+7. Configure Expression, Vocabulary, and Weekly Review relations with
+   `single_property`.
+8. Fix the database creation, validation, and reporting order.
+9. Replace the `已有`/`没有` split with one guided connection path.
+10. Distinguish developer-dashboard “连接” from page-level “集成”.
+11. Hide both token and page-link input and confirm each is received.
+12. Stop safely when an existing relation uses `dual_property` or points to a
+    different data source.
+13. Validate all three relation targets and one-way modes before setup can be
+    marked complete.
+14. Re-review and merge the fix before resuming real setup.
 
 ## Out of Scope
 
@@ -71,12 +88,16 @@ Codex-operated podcast-to-Notion flow
 - A new conversation is not mandatory.
 - The user does not need to memorize an instruction.
 - The user does not locate the project directory or type `cd`.
-- The token and complete parent-page URL are entered in a local safe interface.
+- The token and complete page URL are entered in a local safe interface.
 - Codex prepares the runtime and starts the setup flow.
-- Codex and Python create and validate the four databases.
+- Codex and Python create only missing databases and reconcile existing data
+  source fields in place.
 - Interrupted setup resumes from saved database IDs without creating duplicates.
 - Existing database IDs are checked before reuse.
 - Resumed setup safely stops before any operation if the parent page differs.
+- Existing unknown fields and records are preserved.
+- Type conflicts stop safely without deleting properties.
+- Relations use `data_source_id` and `single_property`.
 - Relations and schema validation pass before setup is marked complete.
 - Codex actively prompts for a podcast after setup.
 - Codex operates the podcast-to-Notion workflow.
@@ -84,8 +105,11 @@ Codex-operated podcast-to-Notion flow
 - No real credentials are committed.
 - No external-user readiness claim is made.
 
-Owner Acceptance started and is blocked before real Notion setup. External-user
-validation has not started.
+Owner Acceptance started and reached real first-time setup. Skill installation,
+Skill discovery, and the reply-gated guidance mechanism passed. Real setup
+created four database containers and saved all four Data Source IDs. Field and
+Relation recovery has not yet passed real acceptance, and the podcast-to-Notion
+journey has not started. External-user validation has not started.
 
 ## Current State
 
@@ -93,11 +117,17 @@ validation has not started.
 - Skill installation passed in the owner's real Codex environment.
 - The installation conversation discovered the Skill on the next turn without
   a new conversation or restart.
-- The first Notion instruction exposed a P1 usability blocker.
-- No real Notion setup or database creation was attempted.
+- The reply-gated Notion conversation mechanism passed Owner Acceptance.
+- Real setup created four database containers and saved their identifiers.
+- The current API rejected legacy relation payloads and left data source
+  fields incomplete.
+- The existing databases must be repaired in place; they must not be deleted
+  or recreated.
 - The safe first-time setup tool and its interruption recovery are implemented.
 - Safe per-database setup recovery and dependency verification are implemented.
 - Parent-page consistency protection is implemented for setup recovery.
+- The real Notion UI terminology requires “连接” in the developer dashboard
+  and “集成” on the learning page.
 - The Notion plugin is documented as optional and outside the production write path.
 - Owner Acceptance is `OWNER_ACCEPTANCE_BLOCKED`.
 - External-user sessions: 0.
