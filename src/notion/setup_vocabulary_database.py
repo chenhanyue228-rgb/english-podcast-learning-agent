@@ -1,65 +1,75 @@
-"""Sync the Vocabulary Database schema for an existing Notion workspace.
+"""Safely align Vocabulary schema in an already-bound Notion workspace.
 
-This script is intentionally narrower than ``setup_workspace``. It is meant
-for the case where Podcast Library, Expression Database, and Weekly Review
-already exist, and Vocabulary Database needs to be created or brought into
-schema alignment without touching Podcast Library or Expression Database.
-
-The script does not run automatically. It only creates the database when
-invoked manually.
+Workspace creation belongs to ``src.notion.setup_workspace``. This legacy
+entrypoint remains only for compatibility and refuses to create databases or
+repair a partially configured workspace.
 """
 
 from __future__ import annotations
 
-import os
 import sys
 from typing import Any, Optional
 
 from notion_client import APIResponseError, Client
 
-from src.notion.config import (
-    NOTION_PARENT_PAGE_ID_ENV,
-    NOTION_TOKEN_ENV,
-    EXPRESSION_DATABASE_ID_ENV,
-    WEEKLY_DATABASE_ID_ENV,
-    PODCAST_DATABASE_ID_ENV,
-    VOCABULARY_DATABASE_ID_ENV,
-    load_dotenv,
+from src.notion.config import NotionConfig, load_notion_config
+from src.notion.schema import (
+    PODCAST_LIBRARY,
+    REVIEW_STATUSES,
+    VOCABULARY_CATEGORIES,
+    VOCABULARY_DATABASE,
 )
 from src.notion.setup_workspace import (
     create_notion_client,
     rich_text_property,
     select_property,
     title_property,
-    update_env_file,
 )
-from src.notion.schema import REVIEW_STATUSES, VOCABULARY_CATEGORIES
+from src.notion.target_binding import (
+    TARGET_PARENT_MISMATCH,
+    NotionTargetBindingError,
+    ensure_notion_target_binding_for_write,
+    normalize_notion_id,
+)
+
+
+LEGACY_VOCABULARY_DATABASE_CREATION_DISABLED = (
+    "legacy_vocabulary_database_creation_disabled"
+)
+VOCABULARY_SCHEMA_UPDATE_FAILED = "vocabulary_schema_update_failed"
+VOCABULARY_SCHEMA_SYNC_FAILED = "vocabulary_schema_sync_failed"
 
 
 class VocabularyDatabaseSetupError(RuntimeError):
-    """Raised when the Vocabulary Database cannot be created."""
+    """A stable, redacted failure from the legacy schema compatibility CLI."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
 
 
-def _require_env(variable_name: str) -> str:
-    value = os.getenv(variable_name, "").strip()
-    if not value:
-        raise VocabularyDatabaseSetupError(
-            f"Missing required environment variable {variable_name}."
-        )
-    return value
-
-
-def _relation_property(target_data_source_id: str, relation_name: str) -> dict[str, Any]:
+def _relation_property(target_data_source_id: str) -> dict[str, Any]:
     return {
         "relation": {
             "data_source_id": target_data_source_id,
-            "single_property": {
-                "synced_property_name": relation_name,
-            },
-            "dual_property": {
-                "synced_property_name": relation_name,
-            },
+            "single_property": {},
         }
+    }
+
+
+def _vocabulary_properties(podcast_library_id: str) -> dict[str, Any]:
+    return {
+        "Name": title_property(),
+        "Original Context": rich_text_property(),
+        "Meaning": rich_text_property(),
+        "Professional Category": select_property(VOCABULARY_CATEGORIES),
+        "Source": _relation_property(podcast_library_id),
+        "Source Page ID": rich_text_property(),
+        "First Seen": {"date": {}},
+        "Review Status": select_property(REVIEW_STATUSES),
+        "Last Review": {"date": {}},
+        "Usage Example": rich_text_property(),
+        "Personal Note": rich_text_property(),
     }
 
 
@@ -68,162 +78,97 @@ def _create_database(
     parent_page_id: str,
     podcast_library_id: str,
 ) -> str:
-    try:
-        response = notion.databases.create(
-            parent={"type": "page_id", "page_id": parent_page_id},
-            title=[{"type": "text", "text": {"content": "Vocabulary Database"}}],
-            properties={
-                "Name": title_property(),
-                "Original Context": rich_text_property(),
-                "Meaning": rich_text_property(),
-                "Professional Category": select_property(VOCABULARY_CATEGORIES),
-                "Source": _relation_property(podcast_library_id, "Vocabulary"),
-                "Source Page ID": rich_text_property(),
-                "First Seen": {"date": {}},
-                "Review Status": select_property(REVIEW_STATUSES),
-                "Last Review": {"date": {}},
-                "Usage Example": rich_text_property(),
-                "Personal Note": rich_text_property(),
-            },
-        )
-    except APIResponseError as exc:
-        detail = getattr(exc, "message", None) or getattr(exc, "detail", None) or str(exc)
-        raise VocabularyDatabaseSetupError(
-            f"Failed to create Vocabulary Database: {exc.code} {detail}"
-        ) from exc
-
-    data_sources = response.get("data_sources") or []
-    database_id = data_sources[0].get("id") if data_sources else response.get("id")
-    if not database_id:
-        raise VocabularyDatabaseSetupError(
-            "Notion did not return a data source ID for Vocabulary Database."
-        )
-    return str(database_id)
+    del notion, parent_page_id, podcast_library_id
+    raise VocabularyDatabaseSetupError(
+        LEGACY_VOCABULARY_DATABASE_CREATION_DISABLED
+    )
 
 
 def _update_database(
     notion: Client,
     database_id: str,
     podcast_library_id: str,
+    *,
+    config: Optional[NotionConfig] = None,
 ) -> None:
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={
+            VOCABULARY_DATABASE: database_id,
+            PODCAST_LIBRARY: podcast_library_id,
+        },
+        config=config,
+    )
+    if not hasattr(notion, "data_sources") or not hasattr(
+        notion.data_sources,
+        "update",
+    ):
+        raise VocabularyDatabaseSetupError(VOCABULARY_SCHEMA_UPDATE_FAILED)
+
     try:
-        if hasattr(notion, "data_sources") and hasattr(notion.data_sources, "update"):
-            notion.data_sources.update(
-                data_source_id=database_id,
-                properties={
-                    "Name": title_property(),
-                    "Original Context": rich_text_property(),
-                    "Meaning": rich_text_property(),
-                    "Professional Category": select_property(VOCABULARY_CATEGORIES),
-                    "Source": _relation_property(podcast_library_id, "Vocabulary"),
-                    "Source Page ID": rich_text_property(),
-                    "First Seen": {"date": {}},
-                    "Review Status": select_property(REVIEW_STATUSES),
-                    "Last Review": {"date": {}},
-                    "Usage Example": rich_text_property(),
-                    "Personal Note": rich_text_property(),
-                },
-            )
-        else:
-            notion.databases.update(
-                database_id=database_id,
-                properties={
-                    "Name": title_property(),
-                    "Original Context": rich_text_property(),
-                    "Meaning": rich_text_property(),
-                    "Professional Category": select_property(VOCABULARY_CATEGORIES),
-                    "Source": _relation_property(podcast_library_id, "Vocabulary"),
-                    "Source Page ID": rich_text_property(),
-                    "First Seen": {"date": {}},
-                    "Review Status": select_property(REVIEW_STATUSES),
-                    "Last Review": {"date": {}},
-                    "Usage Example": rich_text_property(),
-                    "Personal Note": rich_text_property(),
-                },
-            )
-    except APIResponseError as exc:
-        detail = getattr(exc, "message", None) or getattr(exc, "detail", None) or str(exc)
+        notion.data_sources.update(
+            data_source_id=database_id,
+            properties=_vocabulary_properties(podcast_library_id),
+        )
+    except APIResponseError:
         raise VocabularyDatabaseSetupError(
-            f"Failed to update Vocabulary Database: {exc.code} {detail}"
-        ) from exc
+            VOCABULARY_SCHEMA_UPDATE_FAILED
+        ) from None
+    except Exception:
+        raise VocabularyDatabaseSetupError(
+            VOCABULARY_SCHEMA_UPDATE_FAILED
+        ) from None
 
 
-def create_vocabulary_database(parent_page_id: str, notion: Optional[Client] = None) -> str:
-    load_dotenv()
-    notion_client = notion or create_notion_client()
-    podcast_library_id = _require_env(PODCAST_DATABASE_ID_ENV)
-    database_id = _create_database(notion_client, parent_page_id, podcast_library_id)
-    update_env_file({VOCABULARY_DATABASE_ID_ENV: database_id})
-    return database_id
+def create_vocabulary_database(
+    parent_page_id: str,
+    notion: Optional[Client] = None,
+) -> str:
+    del parent_page_id, notion
+    raise VocabularyDatabaseSetupError(
+        LEGACY_VOCABULARY_DATABASE_CREATION_DISABLED
+    )
 
 
 def sync_vocabulary_database_schema(
     notion: Optional[Client] = None,
     parent_page_id: Optional[str] = None,
 ) -> str:
-    """Create or update the Vocabulary Database and wire it to Weekly Review."""
-    load_dotenv()
-    notion_client = notion or create_notion_client()
-    podcast_library_id = _require_env(PODCAST_DATABASE_ID_ENV)
-    vocabulary_database_id = os.getenv(VOCABULARY_DATABASE_ID_ENV, "").strip()
-    weekly_review_database_id = os.getenv(WEEKLY_DATABASE_ID_ENV, "").strip()
-    expression_database_id = os.getenv(EXPRESSION_DATABASE_ID_ENV, "").strip()
+    """Update Vocabulary schema only after the complete target proof passes."""
+    config = load_notion_config()
+    if parent_page_id and normalize_notion_id(parent_page_id) != (
+        normalize_notion_id(config.target_parent_page_id)
+    ):
+        raise NotionTargetBindingError(TARGET_PARENT_MISMATCH)
 
-    if vocabulary_database_id:
-        _update_database(notion_client, vocabulary_database_id, podcast_library_id)
-    else:
-        if not parent_page_id:
-            raise VocabularyDatabaseSetupError(
-                f"Missing required environment variable {VOCABULARY_DATABASE_ID_ENV} "
-                "and no parent page id was provided for creation."
-            )
-        vocabulary_database_id = _create_database(
-            notion_client,
-            parent_page_id,
-            podcast_library_id,
-        )
-        update_env_file({VOCABULARY_DATABASE_ID_ENV: vocabulary_database_id})
-
-    if weekly_review_database_id:
-        try:
-            if hasattr(notion_client, "data_sources") and hasattr(notion_client.data_sources, "update"):
-                notion_client.data_sources.update(
-                    data_source_id=weekly_review_database_id,
-                    properties={
-                        "Vocabulary": _relation_property(vocabulary_database_id, "Vocabulary")
-                    },
-                )
-            else:
-                notion_client.databases.update(
-                    database_id=weekly_review_database_id,
-                    properties={
-                        "Vocabulary": _relation_property(vocabulary_database_id, "Vocabulary")
-                    },
-                )
-        except APIResponseError as exc:
-            detail = getattr(exc, "message", None) or getattr(exc, "detail", None) or str(exc)
-            raise VocabularyDatabaseSetupError(
-                f"Failed to update Weekly Review relation: {exc.code} {detail}"
-            ) from exc
-
-    if expression_database_id:
-        # No schema changes are required for Expression Database in this step.
-        pass
-
-    return vocabulary_database_id
+    notion_client = notion or create_notion_client(config.token)
+    ensure_notion_target_binding_for_write(notion_client, config=config)
+    _update_database(
+        notion_client,
+        config.vocabulary_database_id,
+        config.podcast_database_id,
+        config=config,
+    )
+    return config.vocabulary_database_id
 
 
 def main() -> int:
     try:
-        load_dotenv()
-        parent_page_id = os.getenv(NOTION_PARENT_PAGE_ID_ENV, "").strip() or None
-        database_id = sync_vocabulary_database_schema(parent_page_id=parent_page_id)
-    except Exception as exc:
-        print(f"Vocabulary Database setup failed: {exc}", file=sys.stderr)
+        sync_vocabulary_database_schema()
+    except NotionTargetBindingError as exc:
+        print(f"Vocabulary Database setup failed: {exc.code}", file=sys.stderr)
+        return 1
+    except VocabularyDatabaseSetupError as exc:
+        print(f"Vocabulary Database setup failed: {exc.code}", file=sys.stderr)
+        return 1
+    except Exception:
+        print(
+            f"Vocabulary Database setup failed: {VOCABULARY_SCHEMA_SYNC_FAILED}",
+            file=sys.stderr,
+        )
         return 1
 
-    print("Vocabulary Database synced:")
-    print(f"{VOCABULARY_DATABASE_ID_ENV}={database_id}")
+    print("Vocabulary Database schema synced.")
     return 0
 
 

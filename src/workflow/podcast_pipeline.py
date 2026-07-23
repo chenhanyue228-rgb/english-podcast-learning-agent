@@ -29,6 +29,11 @@ from src.notion.renderers import (
     expression_body_blocks as render_expression_body_blocks,
     podcast_body_blocks,
 )
+from src.notion.schema import EXPRESSION_DATABASE, PODCAST_LIBRARY
+from src.notion.target_binding import (
+    ensure_notion_page_belongs_to_role,
+    ensure_notion_target_binding_for_write,
+)
 
 if TYPE_CHECKING:
     from notion_client import Client
@@ -272,6 +277,13 @@ class NotionPodcastPublisher:
         transcript: Transcript,
         analysis: LearningAnalysis,
     ) -> str:
+        ensure_notion_target_binding_for_write(
+            self.notion,
+            configured_role_ids={
+                PODCAST_LIBRARY: self.podcast_db_id,
+                EXPRESSION_DATABASE: self.expression_db_id,
+            },
+        )
         response = self.notion.pages.create(
             parent={"data_source_id": self.podcast_db_id},
             properties={
@@ -297,6 +309,18 @@ class NotionPodcastPublisher:
         transcript: Transcript,
         expressions: Sequence[LearningExpression],
     ) -> list[str]:
+        ensure_notion_target_binding_for_write(
+            self.notion,
+            configured_role_ids={
+                PODCAST_LIBRARY: self.podcast_db_id,
+                EXPRESSION_DATABASE: self.expression_db_id,
+            },
+        )
+        ensure_notion_page_belongs_to_role(
+            self.notion,
+            podcast_page_id,
+            PODCAST_LIBRARY,
+        )
         page_ids: list[str] = []
         for expression in expressions:
             response = self.notion.pages.create(
@@ -327,6 +351,18 @@ class NotionPodcastPublisher:
         analysis: LearningAnalysis,
         expressions: Sequence[LearningExpression],
     ) -> None:
+        ensure_notion_target_binding_for_write(
+            self.notion,
+            configured_role_ids={
+                PODCAST_LIBRARY: self.podcast_db_id,
+                EXPRESSION_DATABASE: self.expression_db_id,
+            },
+        )
+        ensure_notion_page_belongs_to_role(
+            self.notion,
+            podcast_page_id,
+            PODCAST_LIBRARY,
+        )
         self.notion.blocks.children.append(
             block_id=podcast_page_id,
             children=podcast_body_blocks(
@@ -355,8 +391,10 @@ def create_notion_publisher() -> NotionPodcastPublisher:
         ) from exc
 
     config = load_notion_config()
+    notion = Client(auth=config.token)
+    ensure_notion_target_binding_for_write(notion, config=config)
     return NotionPodcastPublisher(
-        notion=Client(auth=config.token),
+        notion=notion,
         podcast_db_id=config.podcast_database_id,
         expression_db_id=config.expression_database_id,
     )

@@ -121,6 +121,7 @@ def main() -> int:
             result.report,
             secrets=(
                 config.token,
+                config.target_parent_page_id,
                 *config.data_source_ids.values(),
             ),
         )

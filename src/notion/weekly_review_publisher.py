@@ -8,6 +8,11 @@ from typing import Any, Mapping, Optional, Sequence
 from notion_client import APIResponseError, Client
 
 from src.notion.config import load_notion_config
+from src.notion.schema import VOCABULARY_DATABASE, WEEKLY_REVIEW
+from src.notion.target_binding import (
+    ensure_notion_page_belongs_to_role,
+    ensure_notion_target_binding_for_write,
+)
 from src.notion.uploader import create_notion_client
 
 
@@ -370,7 +375,20 @@ def publish_weekly_review(
         weekly_database_id = weekly_database_id or config.weekly_database_id
         vocabulary_database_id = vocabulary_database_id or config.vocabulary_database_id
 
+    configured_role_ids = {WEEKLY_REVIEW: weekly_database_id}
+    if vocabulary_database_id:
+        configured_role_ids[VOCABULARY_DATABASE] = vocabulary_database_id
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids=configured_role_ids,
+    )
     page_id = find_existing_weekly_review_page(notion, weekly_database_id, payload.week)
+    if page_id:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            page_id,
+            WEEKLY_REVIEW,
+        )
     try:
         if page_id:
             response = notion.pages.update(

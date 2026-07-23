@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 
 import pytest
 
@@ -29,6 +30,8 @@ from src.notion.learning_publisher import (
     LearningPublisherError,
     publish_complete_learning_materials,
 )
+from src.notion import learning_publisher, target_binding
+from src.notion.target_binding import validate_notion_target_binding
 
 from tests.acceptance.fakes import (
     FakeNotion,
@@ -128,10 +131,54 @@ def test_first_publish_snapshot_comparison_passes() -> None:
     )
     assert result.report.pr_9_status == "MERGED"
     assert result.report.final_pr_9_integration_verified is True
+    assert result.report.workflow_behavior_verified is True
+    assert result.report.target_binding_verified is True
+    assert result.report.configured_parent_matches_expected is True
+    assert result.report.all_data_sources_same_group is True
+    assert result.report.internal_relations_verified is True
+    assert len(result.report.target_parent_fingerprint) == 8
+    assert len(result.report.target_group_fingerprint) == 8
     assert result.evidence.podcast_added_on_first_publish == 1
     assert result.evidence.expressions_added_on_first_publish == 2
     assert len(workspace.target_podcast_pages()) == 1
     assert len(workspace.target_expression_pages()) == 2
+    first_snapshot_query = workspace.api_calls.index("data_sources.query")
+    assert "data_sources.retrieve" in workspace.api_calls[:first_snapshot_query]
+    assert "databases.retrieve" in workspace.api_calls[:first_snapshot_query]
+    assert "pages.retrieve" in workspace.api_calls[:first_snapshot_query]
+    assert not {
+        "pages.create",
+        "pages.update",
+        "blocks.children.append",
+        "data_sources.update",
+        "databases.create",
+        "databases.update",
+        "pages.delete",
+        "blocks.delete",
+    }.intersection(workspace.api_calls[:first_snapshot_query])
+
+
+def test_owner_acceptance_allows_verified_target_page_reads(
+    monkeypatch,
+) -> None:
+    workspace = FakeNotion()
+    monkeypatch.setattr(
+        learning_publisher,
+        "ensure_notion_target_binding_for_write",
+        target_binding.ensure_notion_target_binding_for_write,
+    )
+    monkeypatch.setattr(
+        learning_publisher,
+        "ensure_notion_page_belongs_to_role",
+        target_binding.ensure_notion_page_belongs_to_role,
+    )
+
+    result = OwnerAcceptanceRunner(workspace, workspace.config).run(
+        complete_payload()
+    )
+
+    assert result.report.status == "passed"
+    assert workspace.api_calls.count("pages.retrieve") >= 2
 
 
 def test_second_publish_adds_nothing() -> None:
@@ -387,6 +434,10 @@ def test_pr_9_partial_failure_recovery_reaches_acceptable_final_state() -> None:
     workspace = FakeNotion()
     payload = complete_payload()
     workspace.pages.fail_expression_create_at = 2
+    validate_notion_target_binding(
+        workspace,
+        workspace.config.as_notion_config(),
+    )
 
     with pytest.raises(LearningPublisherError):
         publish_complete_learning_materials(
@@ -432,9 +483,74 @@ def test_config_requires_complete_setup_and_four_distinct_data_sources() -> None
         "NOTION_EXPRESSION_DATABASE_ID": "expression",
         "NOTION_VOCABULARY_DATABASE_ID": "vocabulary",
         "NOTION_WEEKLY_REFLECTION_DATABASE_ID": "weekly",
+        "NOTION_TARGET_PARENT_PAGE_ID": "target-parent",
     }
 
     config = load_acceptance_config(env=env)
 
     assert config.setup_state == "complete"
     assert len(set(config.data_source_ids.values())) == 4
+    assert config.target_parent_page_id == "target-parent"
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    (
+        ("parent", "target_parent_mismatch"),
+        ("mixed", "configured_data_sources_not_same_group"),
+        ("relation", "target_relation_outside_group"),
+    ),
+)
+def test_target_binding_failure_prevents_snapshot_and_publisher(
+    mutation: str,
+    expected_code: str,
+) -> None:
+    workspace = FakeNotion()
+    publisher_calls = 0
+
+    def publisher(*_args, **_kwargs):
+        nonlocal publisher_calls
+        publisher_calls += 1
+
+    if mutation == "parent":
+        workspace.config = replace(
+            workspace.config,
+            target_parent_page_id="different-target-parent",
+        )
+    elif mutation == "mixed":
+        original_retrieve = workspace.databases.retrieve
+        podcast_database_id = workspace.database_id_by_data_source_id[
+            workspace.config.podcast_data_source_id
+        ]
+
+        def mixed_retrieve(**kwargs):
+            response = original_retrieve(**kwargs)
+            if kwargs["database_id"] == podcast_database_id:
+                response["parent"]["page_id"] = "different-target-parent"
+            return response
+
+        workspace.databases.retrieve = mixed_retrieve
+    else:
+        workspace.schemas[
+            workspace.config.expression_data_source_id
+        ]["Source Podcast"]["relation"]["data_source_id"] = (
+            "outside-podcast-data-source"
+        )
+
+    with pytest.raises(AcceptanceFailure, match=expected_code):
+        OwnerAcceptanceRunner(
+            workspace,
+            workspace.config,
+            publisher=publisher,
+        ).run(complete_payload())
+
+    assert publisher_calls == 0
+    assert workspace.data_sources.query_calls == []
+    assert workspace.pages.create_calls == []
+    assert workspace.pages.update_calls == []
+    assert workspace.pages.delete_calls == []
+    assert workspace.blocks.children.append_calls == []
+    assert workspace.blocks.delete_calls == []
+    assert workspace.data_sources.update_calls == []
+    assert workspace.databases.create_calls == []
+    assert workspace.databases.update_calls == []

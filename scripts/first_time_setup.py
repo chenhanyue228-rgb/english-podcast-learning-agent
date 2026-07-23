@@ -27,6 +27,7 @@ from src.notion.config import (  # noqa: E402
     EXPRESSION_DATABASE_ID_ENV,
     LEGACY_WEEKLY_DATABASE_ID_ENV,
     NOTION_PARENT_PAGE_ID_ENV,
+    NOTION_TARGET_PARENT_PAGE_ID_ENV,
     NOTION_TOKEN_ENV,
     PODCAST_DATABASE_ID_ENV,
     VOCABULARY_DATABASE_ID_ENV,
@@ -338,6 +339,7 @@ def run_first_time_setup(
     base_updates = {
         NOTION_TOKEN_ENV: safe_token,
         NOTION_PARENT_PAGE_ID_ENV: normalized_parent_id,
+        NOTION_TARGET_PARENT_PAGE_ID_ENV: normalized_parent_id,
         SETUP_STATE_ENV: SETUP_STATE_IN_PROGRESS,
     }
     if database_ids[WEEKLY_DATABASE_ID_ENV]:
@@ -405,6 +407,7 @@ def run_first_time_setup(
     runtime_values = {
         NOTION_TOKEN_ENV: safe_token,
         NOTION_PARENT_PAGE_ID_ENV: normalized_parent_id,
+        NOTION_TARGET_PARENT_PAGE_ID_ENV: normalized_parent_id,
         **database_ids,
     }
     with temporary_environment(runtime_values):

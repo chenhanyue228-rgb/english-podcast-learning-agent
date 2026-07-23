@@ -11,6 +11,11 @@ from typing import Any, Mapping, Optional, TYPE_CHECKING
 
 from notion_client import APIResponseError
 
+from src.notion.schema import PODCAST_LIBRARY, VOCABULARY_DATABASE
+from src.notion.target_binding import (
+    ensure_notion_page_belongs_to_role,
+    ensure_notion_target_binding_for_write,
+)
 from src.notion.uploader import create_notion_client
 
 if TYPE_CHECKING:
@@ -262,6 +267,16 @@ def create_vocabulary_page(
 
             vocabulary_database_id = load_notion_config().vocabulary_database_id
 
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={VOCABULARY_DATABASE: vocabulary_database_id},
+    )
+    if payload.source_page_id:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            payload.source_page_id,
+            PODCAST_LIBRARY,
+        )
     try:
         response = notion.pages.create(
             parent={"data_source_id": vocabulary_database_id},
@@ -291,6 +306,17 @@ def update_vocabulary_page(
     if notion is None:
         notion = create_notion_client()
 
+    ensure_notion_page_belongs_to_role(
+        notion,
+        page_id,
+        VOCABULARY_DATABASE,
+    )
+    if payload.source_page_id:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            payload.source_page_id,
+            PODCAST_LIBRARY,
+        )
     try:
         response = notion.pages.update(
             page_id=page_id,
@@ -319,6 +345,16 @@ def upsert_vocabulary_page(
 
             vocabulary_database_id = load_notion_config().vocabulary_database_id
 
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={VOCABULARY_DATABASE: vocabulary_database_id},
+    )
+    if payload.source_page_id:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            payload.source_page_id,
+            PODCAST_LIBRARY,
+        )
     existing = find_existing_vocabulary_page(notion, vocabulary_database_id, payload.word)
     if existing:
         updated = update_vocabulary_page(existing.get("id", ""), payload, notion=notion)

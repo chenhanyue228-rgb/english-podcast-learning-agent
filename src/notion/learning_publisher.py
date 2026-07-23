@@ -12,7 +12,16 @@ from notion_client import APIResponseError, Client
 from src.analyzer.models import AIAnalysisResult, LearningItem
 from src.notion.config import load_notion_config
 from src.notion.renderers import expression_body_blocks, podcast_body_blocks
-from src.notion.schema import COMMONNESS_LEVELS, category_color
+from src.notion.schema import (
+    COMMONNESS_LEVELS,
+    EXPRESSION_DATABASE,
+    PODCAST_LIBRARY,
+    category_color,
+)
+from src.notion.target_binding import (
+    ensure_notion_page_belongs_to_role,
+    ensure_notion_target_binding_for_write,
+)
 from src.notion.uploader import create_notion_client
 
 logger = logging.getLogger(__name__)
@@ -175,6 +184,13 @@ def ensure_expression_database_schema(
     podcast_database_id: str,
 ) -> None:
     """Validate Expression schema and repair only a missing Commonness field."""
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={
+            EXPRESSION_DATABASE: expression_database_id,
+            PODCAST_LIBRARY: podcast_database_id,
+        },
+    )
     properties = notion_database_properties(notion, expression_database_id)
     validate_expression_database_schema(
         properties,
@@ -223,10 +239,7 @@ def ensure_expression_database_schema(
             "Failed to update Expression Database schema."
         ) from exc
 
-    logger.info(
-        "Added missing Commonness property to Expression Database %s",
-        expression_database_id,
-    )
+    logger.info("Added missing Commonness property to Expression Database.")
 
     repaired_properties = notion_database_properties(
         notion,
@@ -323,6 +336,11 @@ def update_podcast_learning_page(
     if not transcript.strip():
         raise LearningPublisherError("Transcript text is required.")
 
+    ensure_notion_page_belongs_to_role(
+        notion,
+        podcast_page_id,
+        PODCAST_LIBRARY,
+    )
     learning_items = analysis.all_learning_items()
     try:
         notion.pages.update(
@@ -351,6 +369,15 @@ def create_expression_page(
     podcast_page_id: str,
     item: LearningItem,
 ) -> str:
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={EXPRESSION_DATABASE: expression_database_id},
+    )
+    ensure_notion_page_belongs_to_role(
+        notion,
+        podcast_page_id,
+        PODCAST_LIBRARY,
+    )
     try:
         response = notion.pages.create(
             parent={"data_source_id": expression_database_id},
@@ -394,6 +421,10 @@ def create_complete_podcast_learning_page(
     if not payload.transcript.strip():
         raise LearningPublisherError("Transcript text is required.")
 
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={PODCAST_LIBRARY: podcast_database_id},
+    )
     try:
         response = notion.pages.create(
             parent={"data_source_id": podcast_database_id},
@@ -487,6 +518,11 @@ def update_complete_podcast_page_properties(
     payload: CompletePodcastLearningPayload,
 ) -> None:
     """Refresh properties for an exact repeat without duplicating page content."""
+    ensure_notion_page_belongs_to_role(
+        notion,
+        page_id,
+        PODCAST_LIBRARY,
+    )
     try:
         notion.pages.update(
             page_id=page_id,
@@ -647,6 +683,13 @@ def publish_complete_learning_materials(
         podcast_database_id = podcast_database_id or config.podcast_database_id
         expression_database_id = expression_database_id or config.expression_database_id
 
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={
+            PODCAST_LIBRARY: podcast_database_id,
+            EXPRESSION_DATABASE: expression_database_id,
+        },
+    )
     ensure_expression_database_schema(
         notion,
         expression_database_id,
@@ -673,7 +716,7 @@ def publish_complete_learning_materials(
             page_id=podcast_page_id,
             payload=payload,
         )
-        logger.info("Updated existing Podcast Library page: %s", podcast_page_id)
+        logger.info("Updated an existing Podcast Library page.")
     else:
         podcast_page_id, podcast_page_url = create_complete_podcast_learning_page(
             notion=notion,
@@ -714,6 +757,18 @@ def publish_learning_materials(
         expression_database_id = expression_database_id or config.expression_database_id
         podcast_database_id = podcast_database_id or config.podcast_database_id
 
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={
+            PODCAST_LIBRARY: podcast_database_id,
+            EXPRESSION_DATABASE: expression_database_id,
+        },
+    )
+    ensure_notion_page_belongs_to_role(
+        notion,
+        payload.podcast_page_id,
+        PODCAST_LIBRARY,
+    )
     ensure_expression_database_schema(
         notion,
         expression_database_id,
