@@ -297,6 +297,35 @@ def run_first_time_setup(
     database_ids = configured_database_ids(existing_values)
     state = database_configuration_state(database_ids)
     setup_state = existing_values.get(SETUP_STATE_ENV, "").strip()
+    existing_parent_page = existing_values.get(
+        NOTION_PARENT_PAGE_ID_ENV, ""
+    ).strip()
+    parent_must_match = any(database_ids.values()) or setup_state in {
+        SETUP_STATE_IN_PROGRESS,
+        SETUP_STATE_COMPLETE,
+    }
+
+    if parent_must_match:
+        if not existing_parent_page:
+            raise FirstTimeSetupError(
+                "检测到已有设置缺少 Notion 父页面编号。为避免把数据库拆分到"
+                "不同页面，首次设置已安全停止；请让 Codex 检查现有配置。"
+            )
+        try:
+            existing_parent_id = normalize_notion_id(existing_parent_page)
+        except WorkspaceSetupError as exc:
+            raise FirstTimeSetupError(
+                "无法识别已有 Notion 父页面配置。为避免修改现有数据库，"
+                "首次设置已安全停止；请让 Codex 检查现有配置。"
+            ) from exc
+
+        if existing_parent_id != normalized_parent_id:
+            raise FirstTimeSetupError(
+                "检测到父页面与已有设置不一致。已有数据库属于之前配置的"
+                "父页面。为避免把数据库拆分到不同页面，首次设置已安全停止。"
+                "请使用原来的 Notion 父页面链接，或让 Codex 检查并清理"
+                "测试配置。"
+            )
 
     if state == "partial" and setup_state != SETUP_STATE_IN_PROGRESS:
         raise FirstTimeSetupError(

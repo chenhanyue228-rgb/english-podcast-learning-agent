@@ -28,6 +28,10 @@ entries must be appended or clarified, not removed.
 
 - Made first-time Notion database creation resumable with per-database
   progress persistence and safe retry.
+- Bound resumed setup to the original Notion parent page so missing databases
+  cannot be created under a different page.
+- Verified the parent-page consistency closure with 407 passing tests and 3
+  expected compatibility-provider deprecation warnings.
 - Added existing-database access checks and mandatory relation rewiring before
   setup completion.
 - Made the macOS setup entry verify the complete project dependency set.

@@ -12,6 +12,11 @@ from scripts import first_time_setup
 
 FAKE_TOKEN = "secret_test_token"
 PARENT_URL = "https://www.notion.so/English-0123456789abcdef0123456789abcdef"
+PARENT_ID = "01234567-89ab-cdef-0123-456789abcdef"
+SAME_PARENT_URL = (
+    "https://www.notion.so/0123456789abcdef0123456789abcdef?source=copy_link"
+)
+OTHER_PARENT_URL = "https://www.notion.so/Other-fedcba9876543210fedcba9876543210"
 DATABASE_IDS = {
     "NOTION_PODCAST_LIBRARY_DATABASE_ID": "podcast-id",
     "NOTION_EXPRESSION_DATABASE_ID": "expression-id",
@@ -284,7 +289,11 @@ def test_complete_database_configuration_rewires_and_validates(
 ) -> None:
     root = make_project_root(tmp_path)
     (root / ".env").write_text(
-        "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items()) + "\n",
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
+        f"{first_time_setup.SETUP_STATE_ENV}="
+        f"{first_time_setup.SETUP_STATE_COMPLETE}\n"
+        + "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items())
+        + "\n",
         encoding="utf-8",
     )
     calls: list[str] = []
@@ -356,6 +365,7 @@ def test_partial_database_configuration_stops_before_create(
 ) -> None:
     root = make_project_root(tmp_path)
     (root / ".env").write_text(
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
         "NOTION_PODCAST_LIBRARY_DATABASE_ID=podcast-id\n",
         encoding="utf-8",
     )
@@ -373,6 +383,197 @@ def test_partial_database_configuration_stops_before_create(
             notion=object(),
             validator=valid_results,
         )
+
+
+def test_partial_in_progress_with_same_parent_resumes_missing_databases(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    (root / ".env").write_text(
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
+        f"{first_time_setup.SETUP_STATE_ENV}="
+        f"{first_time_setup.SETUP_STATE_IN_PROGRESS}\n"
+        "NOTION_PODCAST_LIBRARY_DATABASE_ID=podcast-id\n",
+        encoding="utf-8",
+    )
+    created: list[str] = []
+
+    def creator(_notion, _parent, **kwargs):
+        existing_ids = kwargs["existing_ids"]
+        created.extend(
+            env_key for env_key in DATABASE_ORDER if not existing_ids.get(env_key)
+        )
+        return create_missing_database_ids(_notion, _parent, **kwargs)
+
+    monkeypatch.setattr(first_time_setup, "create_base_databases", creator)
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: None,
+    )
+
+    result = first_time_setup.run_first_time_setup(
+        project_root=root,
+        token=FAKE_TOKEN,
+        parent_page=PARENT_URL,
+        notion=object(),
+        validator=valid_results,
+        database_access_validator=lambda _notion, _ids: None,
+    )
+
+    assert created == list(DATABASE_ORDER[1:])
+    assert result.database_ids == DATABASE_IDS
+
+
+@pytest.mark.parametrize(
+    ("database_lines", "setup_state"),
+    [
+        ("NOTION_PODCAST_LIBRARY_DATABASE_ID=podcast-id\n", "in_progress"),
+        (
+            "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items())
+            + "\n",
+            "complete",
+        ),
+    ],
+    ids=["partial-in-progress", "complete"],
+)
+def test_existing_setup_with_different_parent_stops_before_all_operations(
+    monkeypatch,
+    tmp_path: Path,
+    database_lines: str,
+    setup_state: str,
+) -> None:
+    root = make_project_root(tmp_path)
+    env_path = root / ".env"
+    original = (
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
+        f"{first_time_setup.SETUP_STATE_ENV}={setup_state}\n"
+        f"{database_lines}"
+    )
+    env_path.write_text(original, encoding="utf-8")
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        lambda *_args, **_kwargs: calls.append("create"),
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda *_args, **_kwargs: calls.append("wire"),
+    )
+
+    with pytest.raises(
+        first_time_setup.FirstTimeSetupError,
+        match="父页面与已有设置不一致",
+    ) as error:
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=OTHER_PARENT_URL,
+            notion=object(),
+            validator=lambda: calls.append("validate") or valid_results(),
+            database_access_validator=lambda *_args: calls.append("access"),
+        )
+
+    assert calls == []
+    assert env_path.read_text(encoding="utf-8") == original
+    assert FAKE_TOKEN not in str(error.value)
+
+
+def test_same_parent_id_in_different_url_formats_is_allowed(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    (root / ".env").write_text(
+        "NOTION_PARENT_PAGE_ID=0123456789abcdef0123456789abcdef\n"
+        f"{first_time_setup.SETUP_STATE_ENV}="
+        f"{first_time_setup.SETUP_STATE_COMPLETE}\n"
+        + "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items())
+        + "\n",
+        encoding="utf-8",
+    )
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        create_missing_database_ids,
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: calls.append("wire"),
+    )
+
+    first_time_setup.run_first_time_setup(
+        project_root=root,
+        token=FAKE_TOKEN,
+        parent_page=SAME_PARENT_URL,
+        notion=object(),
+        validator=lambda: calls.append("validate") or valid_results(),
+        database_access_validator=lambda _notion, _ids: calls.append("access"),
+    )
+
+    assert calls == ["access", "wire", "validate"]
+
+
+@pytest.mark.parametrize(
+    ("database_lines", "setup_state"),
+    [
+        ("NOTION_PODCAST_LIBRARY_DATABASE_ID=podcast-id\n", "in_progress"),
+        (
+            "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items())
+            + "\n",
+            "complete",
+        ),
+    ],
+    ids=["partial-in-progress", "complete"],
+)
+def test_existing_database_ids_without_parent_stop_without_operations(
+    monkeypatch,
+    tmp_path: Path,
+    database_lines: str,
+    setup_state: str,
+) -> None:
+    root = make_project_root(tmp_path)
+    env_path = root / ".env"
+    original = (
+        f"{first_time_setup.SETUP_STATE_ENV}={setup_state}\n"
+        f"{database_lines}"
+    )
+    env_path.write_text(original, encoding="utf-8")
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        lambda *_args, **_kwargs: calls.append("create"),
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda *_args, **_kwargs: calls.append("wire"),
+    )
+
+    with pytest.raises(
+        first_time_setup.FirstTimeSetupError,
+        match="缺少 Notion 父页面编号",
+    ):
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=PARENT_URL,
+            notion=object(),
+            validator=lambda: calls.append("validate") or valid_results(),
+            database_access_validator=lambda *_args: calls.append("access"),
+        )
+
+    assert calls == []
+    assert env_path.read_text(encoding="utf-8") == original
 
 
 def test_tests_never_require_real_notion(monkeypatch, tmp_path: Path) -> None:
@@ -616,6 +817,7 @@ def test_inaccessible_existing_database_stops_without_overwrite(
     original = (
         f"{first_time_setup.SETUP_STATE_ENV}="
         f"{first_time_setup.SETUP_STATE_IN_PROGRESS}\n"
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
         "NOTION_PODCAST_LIBRARY_DATABASE_ID=podcast-id\n"
     )
     env_path.write_text(original, encoding="utf-8")
