@@ -24,8 +24,8 @@ The system helps users build long-term personal English learning memory.
 **Status:** `OWNER_ACCEPTANCE_BLOCKED`
 
 The current stable release remains **v1.1.0**, built from release commit
-`80cbab01ea266e487a0359ddbec562959070d8a0`. Production `main` includes PR #7
-through merge commit `68cf0db509600862c002c66659478522ff290e35`.
+`80cbab01ea266e487a0359ddbec562959070d8a0`. Production `main` includes PR #8
+through merge commit `4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`.
 
 Release status:
 
@@ -36,6 +36,7 @@ Release status:
 - PR #5 merged the guided first-time-use flow into `main`
 - PR #6 merged the one-action/one-confirmation Notion guidance into `main`
 - PR #7 merged the Notion API and setup remediation into `main`
+- PR #8 merged the accepted real recovery evidence into `main`
 - production verification: 453 tests passed with 3 expected
   compatibility-provider deprecation warnings
 - real Notion in-place recovery: PASS
@@ -45,7 +46,11 @@ Release status:
 - unknown fields and existing records preserved: PASS
 - setup state: `complete`
 - recovery evidence reviewed and accepted
-- real Owner Acceptance remains pending the podcast-to-Notion journey
+- a P1 partial-publish recovery defect was found before the real
+  podcast-to-Notion journey: retries did not restore missing Expression pages
+- the repair is implemented on a dedicated review branch and is not yet in
+  production `main`
+- the real podcast-to-Notion journey is paused pending that repair
 - external-user sessions: 0
 - Owner Acceptance started
 - Skill installation passed
@@ -183,14 +188,16 @@ Resolved during Phase 4.1C:
 
 Current risks:
 
-1. The recovered production workspace has not yet completed a real
+1. Partial Podcast publishing cannot yet recover missing Expression pages when
+   a retry finds the Podcast page already exists.
+2. The recovered production workspace has not yet completed a real
    podcast-to-Notion journey.
-2. Real Podcast Library and Expression Database output has not yet been
+3. Real Podcast Library and Expression Database output has not yet been
    reviewed after recovery.
-3. End-to-end retry and idempotency have not yet been verified in the
+4. End-to-end retry and idempotency have not yet been verified in the
    recovered owner workspace.
-4. External-user sessions remain 0.
-5. Learning-asset usefulness has not been validated with external users.
+5. External-user sessions remain 0.
+6. Learning-asset usefulness has not been validated with external users.
 
 ## Historical Milestones
 
@@ -202,9 +209,11 @@ full regression suite, and completed the reviewed v1.1.0 release.
 
 ## Immediate Milestone
 
-- Merge PR #8.
-- Run one protected real podcast-to-Notion Owner Acceptance journey against
-  the existing workspace.
+- Repair and review partial Podcast / Expression publishing recovery.
+- Keep the real podcast-to-Notion Owner Acceptance journey paused until the
+  repair is merged.
+- Then run one protected real podcast-to-Notion Owner Acceptance journey
+  against the existing workspace.
 - Review output quality, database placement, relation behavior, and
   idempotency.
 - Do not start external-user testing.

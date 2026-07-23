@@ -111,6 +111,19 @@ entries must be appended or clarified, not removed.
 - Real recovery evidence was reviewed and accepted by the AI Tech Lead.
 - Recovery result: PASS.
 - PR #8 records the accepted recovery evidence.
+- Merged PR #8 with Create a merge commit
+  (`4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`).
+- Confirmed a P1 partial-publish recovery defect before the real Podcast
+  journey: when Expression creation fails after the Podcast page is created,
+  an exact retry updates the Podcast page but does not restore missing
+  Expression pages.
+- Paused the real podcast-to-Notion journey until the partial-publish recovery
+  repair is reviewed and merged.
+- Added pre-write Expression schema validation, three-field Expression
+  identity checks, full reconciliation, duplicate-conflict stops, and
+  retry-safe creation of only missing Expression pages.
+- Verified the repair branch with 463 passing tests and 3 expected
+  compatibility-provider deprecation warnings.
 - Kept Owner Acceptance blocked pending the podcast-to-Notion journey.
 - External-user sessions remain 0.
 

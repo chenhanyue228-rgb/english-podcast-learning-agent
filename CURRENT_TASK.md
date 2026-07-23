@@ -8,8 +8,9 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Production `main`: `68cf0db509600862c002c66659478522ff290e35`
+- Production `main`: `4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`
 - PR #7: merged with Create a merge commit
+- PR #8: merged with Create a merge commit
 - Production verification: 453 passed, 3 expected warnings
 - Architecture: Stable
 
@@ -23,28 +24,29 @@ External-user sessions: 0
 
 ## Goal
 
-Merge the reviewed recovery evidence and prepare the protected real
+Fix partial Podcast publishing recovery before starting the protected real
 podcast-to-Notion Owner Acceptance journey.
 
 ```text
-Real Notion recovery evidence accepted
+PR #8 merged
 ↓
-Merge PR #8
+Repair partial Podcast / Expression publishing recovery
 ↓
-Select one supported podcast input
+Review and merge the repair
 ↓
-Run protected podcast-to-Notion journey
-↓
-Review real Notion output and idempotency
+Resume the protected podcast-to-Notion journey
 ```
 
 ## Current Tasks
 
-1. Merge the reviewed recovery evidence.
-2. Keep the existing four Data Source IDs and parent page unchanged.
-3. Run one protected podcast-to-Notion Owner Acceptance journey.
-4. Verify Podcast Library and Expression Database output.
-5. Verify retry/idempotency behavior without duplicate records.
+1. Make Expression schema validation complete before any Podcast page write.
+2. Reconcile existing and missing Expression pages on every complete Podcast
+   publish.
+3. Make partial Expression creation safely recoverable without duplicate
+   Podcast or Expression pages.
+4. Keep the existing four Data Source IDs and parent page unchanged.
+5. Keep the real podcast-to-Notion Owner Acceptance journey paused until this
+   P1 repair is reviewed and merged.
 6. Keep Vocabulary and Weekly Review outside the podcast write unless the
    accepted workflow explicitly requires them.
 7. Keep external-user testing paused.
@@ -106,8 +108,16 @@ not started.
 - Unknown fields and existing records were preserved.
 - Setup state is `complete`.
 - Real recovery evidence was reviewed and accepted by the AI Tech Lead.
-- PR #8 remains pending merge.
-- The next uncompleted Owner Acceptance gate is the podcast-to-Notion journey.
+- PR #8 was merged with merge commit
+  `4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`.
+- A new P1 was confirmed: a retry after partial Expression publishing updates
+  the existing Podcast page but does not restore missing Expression pages.
+- The P1 repair is implemented on
+  `fix/phase-4.1c-podcast-partial-publish-recovery` and awaits review and merge.
+- The real podcast-to-Notion journey is paused until the P1 repair is reviewed
+  and merged.
+- The next uncompleted Owner Acceptance gate remains the podcast-to-Notion
+  journey.
 - The existing databases must not be deleted or recreated.
 - The safe first-time setup tool and its interruption recovery are implemented.
 - Safe per-database setup recovery and dependency verification are implemented.

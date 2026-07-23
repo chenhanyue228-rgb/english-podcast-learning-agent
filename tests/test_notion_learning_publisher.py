@@ -107,6 +107,152 @@ class FakeNotion:
         )
 
 
+class StatefulPages:
+    def __init__(self, state):
+        self.state = state
+        self.update_calls = []
+        self.create_calls = []
+
+    def update(self, **kwargs):
+        self.update_calls.append(kwargs)
+        self.state.events.append(("pages.update", kwargs["page_id"]))
+        return {"id": kwargs["page_id"]}
+
+    def create(self, **kwargs):
+        self.create_calls.append(kwargs)
+        parent_id = kwargs["parent"]["data_source_id"]
+        if parent_id == "podcast_db":
+            self.state.events.append(("pages.create", "podcast"))
+            page_id = f"podcast_page_{self.state.next_podcast_number}"
+            self.state.next_podcast_number += 1
+            properties = kwargs["properties"]
+            page = {
+                "id": page_id,
+                "url": f"https://notion.test/{page_id}",
+            }
+            source_url = properties["URL"]["url"]
+            if source_url:
+                self.state.podcasts_by_url[source_url] = page
+            title = properties["Title"]["title"][0]["text"]["content"]
+            source_type = properties["Source Type"]["select"]["name"]
+            self.state.podcasts_by_local_identity[(title, source_type)] = page
+            return page
+
+        self.state.expression_create_attempts += 1
+        self.state.events.append(
+            ("pages.create", f"expression:{self.state.expression_create_attempts}")
+        )
+        if (
+            self.state.fail_expression_create_at
+            == self.state.expression_create_attempts
+        ):
+            raise RuntimeError("simulated expression create failure")
+
+        properties = kwargs["properties"]
+        text = properties["Expression"]["title"][0]["text"]["content"]
+        category = properties["Category"]["select"]["name"]
+        podcast_page_id = properties["Source Podcast"]["relation"][0]["id"]
+        page_id = f"expression_page_{self.state.next_expression_number}"
+        self.state.next_expression_number += 1
+        key = (text, category, podcast_page_id)
+        self.state.expressions.setdefault(key, []).append(page_id)
+        return {"id": page_id}
+
+
+class StatefulDataSources:
+    def __init__(self, state, properties=None, retrieve_error=None):
+        self.state = state
+        self.properties = properties or {
+            "Expression": {"type": "title"},
+            "Category": {"type": "select"},
+            "Commonness": {"type": "select"},
+            "Source Podcast": {"type": "relation"},
+            "Review Status": {"type": "select"},
+        }
+        self.retrieve_error = retrieve_error
+        self.retrieve_calls = []
+        self.update_calls = []
+        self.query_calls = []
+
+    def retrieve(self, **kwargs):
+        self.retrieve_calls.append(kwargs)
+        self.state.events.append(("data_sources.retrieve", "expression"))
+        if self.retrieve_error:
+            raise self.retrieve_error
+        return {"properties": self.properties}
+
+    def update(self, **kwargs):
+        self.update_calls.append(kwargs)
+        self.state.events.append(("data_sources.update", "expression"))
+        self.properties["Commonness"] = {"type": "select"}
+        return {"id": "expression_db"}
+
+    def query(self, **kwargs):
+        self.query_calls.append(kwargs)
+        if kwargs["data_source_id"] == "podcast_db":
+            self.state.events.append(("data_sources.query", "podcast"))
+            query_filter = kwargs["filter"]
+            if "url" in query_filter:
+                page = self.state.podcasts_by_url.get(
+                    query_filter["url"]["equals"]
+                )
+            else:
+                title = query_filter["and"][0]["title"]["equals"]
+                source_type = query_filter["and"][1]["select"]["equals"]
+                page = self.state.podcasts_by_local_identity.get(
+                    (title, source_type)
+                )
+            return {"results": [page] if page else []}
+
+        self.state.events.append(("data_sources.query", "expression"))
+        query_filter = kwargs["filter"]["and"]
+        text = query_filter[0]["title"]["equals"]
+        category = query_filter[1]["select"]["equals"]
+        podcast_page_id = query_filter[2]["relation"]["contains"]
+        page_ids = self.state.expressions.get(
+            (text, category, podcast_page_id),
+            [],
+        )
+        return {"results": [{"id": page_id} for page_id in page_ids[:2]]}
+
+
+class StatefulCompletePublishNotion:
+    def __init__(self, properties=None, retrieve_error=None):
+        self.events = []
+        self.podcasts_by_url = {}
+        self.podcasts_by_local_identity = {}
+        self.expressions = {}
+        self.next_podcast_number = 1
+        self.next_expression_number = 1
+        self.expression_create_attempts = 0
+        self.fail_expression_create_at = None
+        self.pages = StatefulPages(self)
+        self.blocks = FakeBlocks()
+        self.data_sources = StatefulDataSources(
+            self,
+            properties=properties,
+            retrieve_error=retrieve_error,
+        )
+
+    def add_podcast(
+        self,
+        page_id,
+        source_url=None,
+        title="Better Episode Title",
+        source_type="Podcast",
+    ):
+        page = {"id": page_id, "url": f"https://notion.test/{page_id}"}
+        if source_url:
+            self.podcasts_by_url[source_url] = page
+        self.podcasts_by_local_identity[(title, source_type)] = page
+
+    def add_expression(self, text, category, podcast_page_id, page_id):
+        self.expressions.setdefault(
+            (text, category, podcast_page_id),
+            [],
+        ).append(page_id)
+
+
 class ErrorWithoutMessage:
     code = "bad_request"
 
@@ -151,6 +297,52 @@ def analysis_result() -> AIAnalysisResult:
                 commonness="Medium",
             )
         ],
+    )
+
+
+def learning_item(text: str, category: str = "Business Phrase") -> LearningItem:
+    return LearningItem(
+        text=text,
+        category=category,
+        meaning=f"Meaning of {text}.",
+        chinese_meaning=f"{text} 的中文解释",
+        usage_context="Use it in a professional context.",
+        context_sentence=f"Teams use {text} at work.",
+        example_sentence=f"We should use {text} in the next meeting.",
+        highlight_color="blue",
+        commonness="High",
+    )
+
+
+def analysis_with_items(*items: LearningItem) -> AIAnalysisResult:
+    return AIAnalysisResult(
+        summary=Summary(
+            english="English summary",
+            chinese="中文解释",
+            key_points=["Point one"],
+        ),
+        podcast_metadata=PodcastMetadata(
+            title="Better Episode Title",
+            topic="AI",
+            difficulty="Intermediate",
+            short_summary="Short AI summary.",
+        ),
+        learning_items=list(items),
+    )
+
+
+def complete_payload(
+    analysis: AIAnalysisResult = None,
+    source_url: str = "https://example.com/episode",
+    source_type: str = "Podcast",
+    title: str = "Original Title",
+) -> CompletePodcastLearningPayload:
+    return CompletePodcastLearningPayload(
+        title=title,
+        source_url=source_url,
+        source_type=source_type,
+        transcript="Companies need to take ownership.",
+        analysis=analysis or analysis_result(),
     )
 
 
@@ -415,14 +607,80 @@ def test_publish_complete_learning_materials_creates_podcast_then_expressions() 
 
 
 def test_publish_complete_learning_materials_updates_exact_repeat_without_duplicates() -> None:
-    notion = FakeNotion(
-        query_results=[
-            {
-                "id": "existing_podcast_page",
-                "url": "https://notion.so/existing_podcast_page",
-            }
-        ]
+    source_url = "https://podcasts.apple.com/podcast/id123?i=456"
+    notion = StatefulCompletePublishNotion()
+    notion.add_podcast(
+        "existing_podcast_page",
+        source_url=source_url,
     )
+    notion.add_expression(
+        "take ownership",
+        "Business Phrase",
+        "existing_podcast_page",
+        "existing_expression_1",
+    )
+    notion.add_expression(
+        "What we're seeing is...",
+        "Sentence Pattern",
+        "existing_podcast_page",
+        "existing_expression_2",
+    )
+
+    result = publish_complete_learning_materials(
+        CompletePodcastLearningPayload(
+            title="Original Title",
+            source_url=source_url,
+            source_type="Podcast",
+            transcript="Companies need to take ownership.",
+            analysis=analysis_result(),
+        ),
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+
+    assert result.podcast_page_id == "existing_podcast_page"
+    assert result.podcast_page_url == "https://notion.test/existing_podcast_page"
+    assert result.expression_page_ids == [
+        "existing_expression_1",
+        "existing_expression_2",
+    ]
+    assert notion.pages.create_calls == []
+    assert notion.blocks.children.append_calls == []
+    assert len(notion.pages.update_calls) == 1
+    assert notion.pages.update_calls[0]["page_id"] == "existing_podcast_page"
+    query_call = notion.data_sources.query_calls[0]
+    assert query_call["data_source_id"] == "podcast_db"
+    assert query_call["filter"] == {
+        "property": "URL",
+        "url": {"equals": source_url},
+    }
+    assert all(
+        call["page_size"] == 2
+        for call in notion.data_sources.query_calls[1:]
+    )
+
+
+def test_publish_complete_learning_materials_recovers_missing_expression_for_existing_podcast() -> None:
+    class PartialPublishDataSources(FakeDataSources):
+        def query(self, **kwargs):
+            self.query_calls.append(kwargs)
+            if kwargs["data_source_id"] == "podcast_db":
+                return {
+                    "results": [
+                        {
+                            "id": "existing_podcast_page",
+                            "url": "https://notion.so/existing_podcast_page",
+                        }
+                    ]
+                }
+            expression = kwargs["filter"]["and"][0]["title"]["equals"]
+            if expression == "take ownership":
+                return {"results": [{"id": "existing_expression_page"}]}
+            return {"results": []}
+
+    notion = FakeNotion()
+    notion.data_sources = PartialPublishDataSources()
 
     result = publish_complete_learning_materials(
         CompletePodcastLearningPayload(
@@ -437,18 +695,359 @@ def test_publish_complete_learning_materials_updates_exact_repeat_without_duplic
         expression_database_id="expression_db",
     )
 
-    assert result.podcast_page_id == "existing_podcast_page"
-    assert result.podcast_page_url == "https://notion.so/existing_podcast_page"
-    assert result.expression_page_ids == []
-    assert notion.pages.create_calls == []
-    assert notion.blocks.children.append_calls == []
-    assert notion.pages.update_calls[0]["page_id"] == "existing_podcast_page"
-    query_call = notion.data_sources.query_calls[0]
-    assert query_call["data_source_id"] == "podcast_db"
-    assert query_call["filter"] == {
-        "property": "URL",
-        "url": {"equals": "https://podcasts.apple.com/podcast/id123?i=456"},
+    assert result.expression_page_ids == [
+        "existing_expression_page",
+        "expression_1",
+    ]
+    assert len(notion.pages.create_calls) == 1
+    assert notion.pages.create_calls[0]["parent"] == {
+        "data_source_id": "expression_db"
     }
+
+
+def test_complete_publish_checks_schema_before_any_page_write() -> None:
+    notion = StatefulCompletePublishNotion()
+
+    result = publish_complete_learning_materials(
+        complete_payload(),
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+
+    assert result.podcast_page_id == "podcast_page_1"
+    assert len(result.expression_page_ids) == 2
+    assert notion.events[0] == ("data_sources.retrieve", "expression")
+    first_page_write = next(
+        index
+        for index, event in enumerate(notion.events)
+        if event[0] in {"pages.create", "pages.update"}
+    )
+    assert notion.events.index(("data_sources.retrieve", "expression")) < first_page_write
+    podcast_creates = [
+        call
+        for call in notion.pages.create_calls
+        if call["parent"] == {"data_source_id": "podcast_db"}
+    ]
+    expression_creates = [
+        call
+        for call in notion.pages.create_calls
+        if call["parent"] == {"data_source_id": "expression_db"}
+    ]
+    assert len(podcast_creates) == 1
+    assert len(expression_creates) == 2
+    expression_query_indexes = [
+        index
+        for index, event in enumerate(notion.events)
+        if event == ("data_sources.query", "expression")
+    ]
+    first_expression_create_index = next(
+        index
+        for index, event in enumerate(notion.events)
+        if event == ("pages.create", "expression:1")
+    )
+    assert max(expression_query_indexes) < first_expression_create_index
+    first_expression_query = next(
+        call
+        for call in notion.data_sources.query_calls
+        if call["data_source_id"] == "expression_db"
+    )
+    assert first_expression_query == {
+        "data_source_id": "expression_db",
+        "filter": {
+            "and": [
+                {
+                    "property": "Expression",
+                    "title": {"equals": "take ownership"},
+                },
+                {
+                    "property": "Category",
+                    "select": {"equals": "Business Phrase"},
+                },
+                {
+                    "property": "Source Podcast",
+                    "relation": {"contains": "podcast_page_1"},
+                },
+            ]
+        },
+        "page_size": 2,
+    }
+    assert all(
+        call["properties"]["Source Podcast"]
+        == {"relation": [{"id": "podcast_page_1"}]}
+        for call in expression_creates
+    )
+
+
+def test_complete_publish_recovers_after_mid_expression_create_failure() -> None:
+    analysis = analysis_with_items(
+        learning_item("expression A"),
+        learning_item("expression B"),
+        learning_item("expression C"),
+    )
+    payload = complete_payload(analysis=analysis)
+    notion = StatefulCompletePublishNotion()
+    notion.fail_expression_create_at = 2
+
+    with pytest.raises(LearningPublisherError, match="expression B"):
+        publish_complete_learning_materials(
+            payload,
+            notion=notion,
+            podcast_database_id="podcast_db",
+            expression_database_id="expression_db",
+        )
+
+    assert notion.expressions == {
+        ("expression A", "Business Phrase", "podcast_page_1"): [
+            "expression_page_1"
+        ]
+    }
+
+    notion.fail_expression_create_at = None
+    result = publish_complete_learning_materials(
+        payload,
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+
+    assert result.podcast_page_id == "podcast_page_1"
+    assert result.expression_page_ids == [
+        "expression_page_1",
+        "expression_page_2",
+        "expression_page_3",
+    ]
+    podcast_creates = [
+        call
+        for call in notion.pages.create_calls
+        if call["parent"] == {"data_source_id": "podcast_db"}
+    ]
+    expression_a_creates = [
+        call
+        for call in notion.pages.create_calls
+        if call["parent"] == {"data_source_id": "expression_db"}
+        and call["properties"]["Expression"]["title"][0]["text"]["content"]
+        == "expression A"
+    ]
+    assert len(podcast_creates) == 1
+    assert len(expression_a_creates) == 1
+    assert all(len(page_ids) == 1 for page_ids in notion.expressions.values())
+    assert len(notion.expressions) == 3
+
+
+def test_complete_publish_stops_before_expression_create_on_duplicate_conflict() -> None:
+    source_url = "https://example.com/duplicate"
+    notion = StatefulCompletePublishNotion()
+    notion.add_podcast("podcast_existing", source_url=source_url)
+    notion.add_expression(
+        "expression A",
+        "Business Phrase",
+        "podcast_existing",
+        "duplicate_page_1",
+    )
+    notion.add_expression(
+        "expression A",
+        "Business Phrase",
+        "podcast_existing",
+        "duplicate_page_2",
+    )
+    analysis = analysis_with_items(
+        learning_item("expression A"),
+        learning_item("expression B"),
+    )
+
+    with pytest.raises(LearningPublisherError) as exc_info:
+        publish_complete_learning_materials(
+            complete_payload(analysis=analysis, source_url=source_url),
+            notion=notion,
+            podcast_database_id="podcast_db",
+            expression_database_id="expression_db",
+        )
+
+    error = str(exc_info.value)
+    assert error == (
+        "Duplicate Expression records found for one expected learning item."
+    )
+    assert "duplicate_page_1" not in error
+    assert "podcast_existing" not in error
+    assert len(notion.data_sources.query_calls) == 3
+    expression_creates = [
+        call
+        for call in notion.pages.create_calls
+        if call["parent"] == {"data_source_id": "expression_db"}
+    ]
+    assert expression_creates == []
+
+
+def test_complete_publish_schema_retrieve_failure_has_no_page_writes_or_sensitive_error() -> None:
+    sensitive_values = [
+        "secret-token-value",
+        "database-sensitive-id",
+        "data-source-sensitive-id",
+        "page-sensitive-id",
+        "https://notion.so/private",
+    ]
+    notion = StatefulCompletePublishNotion(
+        retrieve_error=RuntimeError(" ".join(sensitive_values))
+    )
+
+    with pytest.raises(LearningPublisherError) as exc_info:
+        publish_complete_learning_materials(
+            complete_payload(),
+            notion=notion,
+            podcast_database_id="podcast_db",
+            expression_database_id="expression_db",
+        )
+
+    assert str(exc_info.value) == "Failed to inspect Expression Database schema."
+    assert all(value not in str(exc_info.value) for value in sensitive_values)
+    assert notion.pages.create_calls == []
+    assert notion.pages.update_calls == []
+    assert notion.blocks.children.append_calls == []
+
+
+def test_complete_publish_repairs_commonness_before_page_create() -> None:
+    notion = StatefulCompletePublishNotion(
+        properties={
+            "Expression": {"type": "title"},
+            "Category": {"type": "select"},
+            "Source Podcast": {"type": "relation"},
+            "Review Status": {"type": "select"},
+        }
+    )
+
+    publish_complete_learning_materials(
+        complete_payload(),
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+
+    schema_update_index = notion.events.index(
+        ("data_sources.update", "expression")
+    )
+    first_page_create_index = next(
+        index
+        for index, event in enumerate(notion.events)
+        if event[0] == "pages.create"
+    )
+    assert schema_update_index < first_page_create_index
+
+
+def test_complete_publish_treats_same_text_in_different_categories_as_distinct() -> None:
+    analysis = analysis_with_items(
+        learning_item("challenge assumptions", "Business Phrase"),
+        learning_item("challenge assumptions", "Collocation"),
+    )
+    notion = StatefulCompletePublishNotion()
+
+    result = publish_complete_learning_materials(
+        complete_payload(analysis=analysis),
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+
+    assert len(result.expression_page_ids) == 2
+    filters = [
+        call["filter"]
+        for call in notion.data_sources.query_calls
+        if call["data_source_id"] == "expression_db"
+    ]
+    assert [query_filter["and"][1]["select"]["equals"] for query_filter in filters] == [
+        "Business Phrase",
+        "Collocation",
+    ]
+    assert len(notion.expressions) == 2
+
+
+def test_complete_publish_treats_same_expression_for_different_podcasts_as_distinct() -> None:
+    analysis = analysis_with_items(learning_item("fundraising"))
+    notion = StatefulCompletePublishNotion()
+
+    first = publish_complete_learning_materials(
+        complete_payload(
+            analysis=analysis,
+            source_url="https://example.com/episode-one",
+        ),
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+    second = publish_complete_learning_materials(
+        complete_payload(
+            analysis=analysis,
+            source_url="https://example.com/episode-two",
+        ),
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+
+    assert first.podcast_page_id != second.podcast_page_id
+    assert first.expression_page_ids != second.expression_page_ids
+    assert len(notion.expressions) == 2
+    assert {
+        key[2] for key in notion.expressions
+    } == {first.podcast_page_id, second.podcast_page_id}
+
+
+def test_complete_publish_uses_title_and_source_type_for_local_audio_identity() -> None:
+    notion = StatefulCompletePublishNotion()
+    notion.add_podcast(
+        "local_audio_page",
+        title="Better Episode Title",
+        source_type="Local Audio",
+    )
+    analysis = analysis_with_items(learning_item("active listening"))
+
+    result = publish_complete_learning_materials(
+        complete_payload(
+            analysis=analysis,
+            source_url=None,
+            source_type="Local Audio",
+            title="Recording",
+        ),
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+
+    assert result.podcast_page_id == "local_audio_page"
+    assert notion.data_sources.query_calls[0]["filter"] == {
+        "and": [
+            {
+                "property": "Title",
+                "title": {"equals": "Better Episode Title"},
+            },
+            {
+                "property": "Source Type",
+                "select": {"equals": "Local Audio"},
+            },
+        ]
+    }
+
+
+def test_complete_publish_does_not_write_vocabulary_or_weekly_databases() -> None:
+    notion = StatefulCompletePublishNotion()
+
+    publish_complete_learning_materials(
+        complete_payload(),
+        notion=notion,
+        podcast_database_id="podcast_db",
+        expression_database_id="expression_db",
+    )
+
+    parent_ids = {
+        call["parent"]["data_source_id"] for call in notion.pages.create_calls
+    }
+    query_ids = {
+        call["data_source_id"] for call in notion.data_sources.query_calls
+    }
+    assert parent_ids == {"podcast_db", "expression_db"}
+    assert query_ids == {"podcast_db", "expression_db"}
+    assert "vocabulary_db" not in parent_ids | query_ids
+    assert "weekly_db" not in parent_ids | query_ids
 
 
 def test_update_podcast_learning_page_requires_transcript() -> None:
@@ -469,8 +1068,8 @@ def test_publish_learning_materials_requires_expression_page_id() -> None:
 
     class BrokenNotion(FakeNotion):
         def __init__(self):
+            super().__init__()
             self.pages = BrokenPages()
-            self.blocks = FakeBlocks()
 
     with pytest.raises(LearningPublisherError, match="page ID"):
         publish_learning_materials(

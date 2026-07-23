@@ -91,16 +91,10 @@ def notion_database_properties(notion: Client, database_id: str) -> set[str]:
             response = notion.data_sources.retrieve(data_source_id=database_id)
         else:
             response = notion.databases.retrieve(database_id=database_id)
-    except APIResponseError as exc:
-        logger.warning(
-            "Could not inspect Notion database %s: %s",
-            database_id,
-            api_error_message(exc),
-        )
-        return set()
     except Exception as exc:
-        logger.warning("Could not inspect Notion database %s: %s", database_id, exc)
-        return set()
+        raise LearningPublisherError(
+            "Failed to inspect Expression Database schema."
+        ) from exc
 
     return set(response.get("properties", {}).keys())
 
@@ -130,19 +124,18 @@ def ensure_expression_database_schema(notion: Client, expression_database_id: st
                 properties=commonness_property,
             )
         else:
-            logger.warning(
-                "Notion client does not expose a database update API; "
-                "skipping Commonness schema migration for %s",
-                expression_database_id,
+            raise LearningPublisherError(
+                "Notion client cannot update Expression Database schema."
             )
-            return
+    except LearningPublisherError:
+        raise
     except APIResponseError as exc:
         raise LearningPublisherError(
-            f"Failed to update Expression Database schema: {api_error_message(exc)}"
+            "Failed to update Expression Database schema."
         ) from exc
     except Exception as exc:
         raise LearningPublisherError(
-            f"Failed to update Expression Database schema: {exc}"
+            "Failed to update Expression Database schema."
         ) from exc
 
     logger.info(
@@ -414,6 +407,116 @@ def update_complete_podcast_page_properties(
         ) from exc
 
 
+def expression_identity_filter(
+    item: LearningItem,
+    podcast_page_id: str,
+) -> dict[str, Any]:
+    """Build the stable Notion identity for one Podcast expression."""
+    return {
+        "and": [
+            {
+                "property": "Expression",
+                "title": {"equals": item.text},
+            },
+            {
+                "property": "Category",
+                "select": {"equals": item.category},
+            },
+            {
+                "property": "Source Podcast",
+                "relation": {"contains": podcast_page_id},
+            },
+        ]
+    }
+
+
+def find_existing_expression_page_ids(
+    notion: Client,
+    expression_database_id: str,
+    podcast_page_id: str,
+    item: LearningItem,
+) -> list[str]:
+    """Return all exact Expression page matches for one stable identity."""
+    try:
+        if not hasattr(notion, "data_sources") or not hasattr(
+            notion.data_sources,
+            "query",
+        ):
+            raise LearningPublisherError(
+                "Notion client cannot query existing Expression records."
+            )
+        response = notion.data_sources.query(
+            data_source_id=expression_database_id,
+            filter=expression_identity_filter(item, podcast_page_id),
+            page_size=2,
+        )
+    except LearningPublisherError:
+        raise
+    except Exception as exc:
+        raise LearningPublisherError(
+            "Failed to inspect existing Expression records."
+        ) from exc
+
+    results = response.get("results", [])
+    if not isinstance(results, list):
+        raise LearningPublisherError(
+            "Notion returned an invalid Expression query result."
+        )
+    page_ids: list[str] = []
+    for result in results:
+        page_id = (
+            str(result.get("id", "")).strip()
+            if isinstance(result, dict)
+            else ""
+        )
+        if not page_id:
+            raise LearningPublisherError(
+                "Existing Expression record did not include a page ID."
+            )
+        page_ids.append(page_id)
+    return page_ids
+
+
+def reconcile_expression_pages(
+    notion: Client,
+    expression_database_id: str,
+    podcast_page_id: str,
+    items: Sequence[LearningItem],
+) -> list[str]:
+    """Reuse exact Expression matches and create only missing pages."""
+    expected: list[tuple[LearningItem, list[str]]] = []
+    for item in items:
+        expected.append(
+            (
+                item,
+                find_existing_expression_page_ids(
+                    notion=notion,
+                    expression_database_id=expression_database_id,
+                    podcast_page_id=podcast_page_id,
+                    item=item,
+                ),
+            )
+        )
+
+    if any(len(page_ids) > 1 for _, page_ids in expected):
+        raise LearningPublisherError(
+            "Duplicate Expression records found for one expected learning item."
+        )
+
+    page_ids: list[str] = []
+    for item, existing_page_ids in expected:
+        page_ids.append(
+            (existing_page_ids[0] if existing_page_ids else None)
+            or create_expression_page(
+                notion=notion,
+                expression_database_id=expression_database_id,
+                podcast_page_id=podcast_page_id,
+                item=item,
+            )
+        )
+    return page_ids
+
+
 def publish_complete_learning_materials(
     payload: CompletePodcastLearningPayload,
     notion: Optional[Client] = None,
@@ -426,6 +529,8 @@ def publish_complete_learning_materials(
         notion = notion or create_notion_client(config.token)
         podcast_database_id = podcast_database_id or config.podcast_database_id
         expression_database_id = expression_database_id or config.expression_database_id
+
+    ensure_expression_database_schema(notion, expression_database_id)
 
     existing_page = find_existing_complete_podcast_page(
         notion=notion,
@@ -445,36 +550,26 @@ def publish_complete_learning_materials(
             payload=payload,
         )
         logger.info("Updated existing Podcast Library page: %s", podcast_page_id)
-        return LearningPublishResult(
-            podcast_page_id=podcast_page_id,
-            expression_page_ids=[],
-            podcast_page_url=(
-                str(podcast_page_url) if podcast_page_url is not None else None
-            ),
-        )
-
-    podcast_page_id, podcast_page_url = create_complete_podcast_learning_page(
-        notion=notion,
-        podcast_database_id=podcast_database_id,
-        payload=payload,
-    )
-
-    ensure_expression_database_schema(notion, expression_database_id)
-
-    expression_page_ids = [
-        create_expression_page(
+    else:
+        podcast_page_id, podcast_page_url = create_complete_podcast_learning_page(
             notion=notion,
-            expression_database_id=expression_database_id,
-            podcast_page_id=podcast_page_id,
-            item=item,
+            podcast_database_id=podcast_database_id,
+            payload=payload,
         )
-        for item in payload.analysis.all_learning_items()
-    ]
+
+    expression_page_ids = reconcile_expression_pages(
+        notion=notion,
+        expression_database_id=expression_database_id,
+        podcast_page_id=podcast_page_id,
+        items=payload.analysis.all_learning_items(),
+    )
 
     return LearningPublishResult(
         podcast_page_id=podcast_page_id,
         expression_page_ids=expression_page_ids,
-        podcast_page_url=podcast_page_url,
+        podcast_page_url=(
+            str(podcast_page_url) if podcast_page_url is not None else None
+        ),
     )
 
 
