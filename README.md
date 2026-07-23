@@ -31,7 +31,9 @@ Current state:
 - the pipeline and Notion publishing are stable
 - direct OpenAI providers are deprecated compatibility paths only
 - `OPENAI_API_KEY` is not required for the production Skill workflow
-- production `main` includes PR #7 and passes 453 tests with 3 expected
+- production `main` includes PR #8 through merge commit
+  `4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`
+- the PR #7 production baseline passed 453 tests with 3 expected
   compatibility warnings
 - real Notion in-place recovery passed with the existing four Data Sources
 - new databases created: 0
@@ -39,6 +41,11 @@ Current state:
 - unknown fields and existing records were preserved
 - setup state is `complete`
 - real recovery evidence has been reviewed and accepted
+- a P1 partial-publish recovery defect was found before the real Podcast
+  journey: retries did not restore missing Expression pages
+- the repair is implemented on a dedicated review branch and is not yet in
+  production `main`
+- the podcast-to-Notion journey is paused pending that repair
 - Owner Acceptance remains blocked pending the podcast-to-Notion journey
 - external-user sessions remain 0
 - the product is not ready for external users

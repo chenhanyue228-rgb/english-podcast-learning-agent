@@ -17,6 +17,7 @@ from src.notion.uploader import create_notion_client
 
 logger = logging.getLogger(__name__)
 
+
 class LearningPublisherError(RuntimeError):
     """Raised when AI learning material cannot be published to Notion."""
 
@@ -84,30 +85,108 @@ def api_error_message(exc: APIResponseError) -> str:
     return f"{code} {detail}".strip()
 
 
-def notion_database_properties(notion: Client, database_id: str) -> set[str]:
-    """Return the available property names for a Notion database."""
+EXPRESSION_PROPERTY_TYPES = {
+    "Expression": "title",
+    "Category": "select",
+    "Commonness": "select",
+    "Source Podcast": "relation",
+    "Review Status": "select",
+}
+
+
+def notion_database_properties(
+    notion: Client,
+    database_id: str,
+) -> dict[str, Any]:
+    """Return the property definitions for a Notion database."""
     try:
         if hasattr(notion, "data_sources"):
             response = notion.data_sources.retrieve(data_source_id=database_id)
         else:
             response = notion.databases.retrieve(database_id=database_id)
-    except APIResponseError as exc:
-        logger.warning(
-            "Could not inspect Notion database %s: %s",
-            database_id,
-            api_error_message(exc),
-        )
-        return set()
     except Exception as exc:
-        logger.warning("Could not inspect Notion database %s: %s", database_id, exc)
-        return set()
+        raise LearningPublisherError(
+            "Failed to inspect Expression Database schema."
+        ) from exc
 
-    return set(response.get("properties", {}).keys())
+    properties = response.get("properties", {})
+    if not isinstance(properties, dict):
+        raise LearningPublisherError(
+            "Expression Database returned an invalid schema."
+        )
+    return properties
 
 
-def ensure_expression_database_schema(notion: Client, expression_database_id: str) -> None:
-    """Add the Commonness property to older Expression databases when missing."""
-    if "Commonness" in notion_database_properties(notion, expression_database_id):
+def normalized_notion_id(value: Any) -> str:
+    """Normalize UUID formatting for safe Notion data source comparisons."""
+    return str(value or "").strip().replace("-", "").casefold()
+
+
+def validate_expression_database_schema(
+    properties: dict[str, Any],
+    podcast_database_id: str,
+    *,
+    require_commonness: bool,
+) -> None:
+    """Validate the complete Expression schema without mutating Notion."""
+    if not podcast_database_id.strip():
+        raise LearningPublisherError(
+            "Podcast Library data source configuration is required."
+        )
+
+    for property_name, expected_type in EXPRESSION_PROPERTY_TYPES.items():
+        actual = properties.get(property_name)
+        if actual is None:
+            if property_name == "Commonness" and not require_commonness:
+                continue
+            raise LearningPublisherError(
+                f"Expression Database schema is missing required property "
+                f"'{property_name}'."
+            )
+        if not isinstance(actual, dict) or actual.get("type") != expected_type:
+            raise LearningPublisherError(
+                f"Expression Database property '{property_name}' has an "
+                "incompatible type."
+            )
+
+    source_podcast = properties["Source Podcast"]
+    relation = source_podcast.get("relation")
+    if not isinstance(relation, dict):
+        raise LearningPublisherError(
+            "Expression Database relation 'Source Podcast' is incompatible."
+        )
+    if normalized_notion_id(relation.get("data_source_id")) != normalized_notion_id(
+        podcast_database_id
+    ):
+        raise LearningPublisherError(
+            "Expression Database relation 'Source Podcast' targets an "
+            "incompatible data source."
+        )
+    if "single_property" not in relation or "dual_property" in relation:
+        raise LearningPublisherError(
+            "Expression Database relation 'Source Podcast' must use "
+            "single_property mode."
+        )
+
+
+def ensure_expression_database_schema(
+    notion: Client,
+    expression_database_id: str,
+    podcast_database_id: str,
+) -> None:
+    """Validate Expression schema and repair only a missing Commonness field."""
+    properties = notion_database_properties(notion, expression_database_id)
+    validate_expression_database_schema(
+        properties,
+        podcast_database_id,
+        require_commonness=False,
+    )
+    if "Commonness" in properties:
+        validate_expression_database_schema(
+            properties,
+            podcast_database_id,
+            require_commonness=True,
+        )
         return
 
     commonness_property = {
@@ -130,24 +209,33 @@ def ensure_expression_database_schema(notion: Client, expression_database_id: st
                 properties=commonness_property,
             )
         else:
-            logger.warning(
-                "Notion client does not expose a database update API; "
-                "skipping Commonness schema migration for %s",
-                expression_database_id,
+            raise LearningPublisherError(
+                "Notion client cannot update Expression Database schema."
             )
-            return
+    except LearningPublisherError:
+        raise
     except APIResponseError as exc:
         raise LearningPublisherError(
-            f"Failed to update Expression Database schema: {api_error_message(exc)}"
+            "Failed to update Expression Database schema."
         ) from exc
     except Exception as exc:
         raise LearningPublisherError(
-            f"Failed to update Expression Database schema: {exc}"
+            "Failed to update Expression Database schema."
         ) from exc
 
     logger.info(
         "Added missing Commonness property to Expression Database %s",
         expression_database_id,
+    )
+
+    repaired_properties = notion_database_properties(
+        notion,
+        expression_database_id,
+    )
+    validate_expression_database_schema(
+        repaired_properties,
+        podcast_database_id,
+        require_commonness=True,
     )
 
 
@@ -414,6 +502,138 @@ def update_complete_podcast_page_properties(
         ) from exc
 
 
+def expression_identity_filter(
+    item: LearningItem,
+    podcast_page_id: str,
+) -> dict[str, Any]:
+    """Build the stable Notion identity for one Podcast expression."""
+    return {
+        "and": [
+            {
+                "property": "Expression",
+                "title": {"equals": item.text},
+            },
+            {
+                "property": "Category",
+                "select": {"equals": item.category},
+            },
+            {
+                "property": "Source Podcast",
+                "relation": {"contains": podcast_page_id},
+            },
+        ]
+    }
+
+
+def normalized_expression_identity(item: LearningItem) -> tuple[str, str]:
+    """Return the stable per-Podcast identity used for artifact deduplication."""
+    normalized_text = " ".join(item.text.split()).casefold()
+    normalized_category = " ".join(item.category.split()).casefold()
+    return normalized_text, normalized_category
+
+
+def deduplicate_expected_expression_items(
+    items: Sequence[LearningItem],
+) -> list[LearningItem]:
+    """Keep the first item for each normalized identity within one Podcast."""
+    unique_items: list[LearningItem] = []
+    seen: set[tuple[str, str]] = set()
+    for item in items:
+        identity = normalized_expression_identity(item)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique_items.append(item)
+    return unique_items
+
+
+def find_existing_expression_page_ids(
+    notion: Client,
+    expression_database_id: str,
+    podcast_page_id: str,
+    item: LearningItem,
+) -> list[str]:
+    """Return all exact Expression page matches for one stable identity."""
+    try:
+        if not hasattr(notion, "data_sources") or not hasattr(
+            notion.data_sources,
+            "query",
+        ):
+            raise LearningPublisherError(
+                "Notion client cannot query existing Expression records."
+            )
+        response = notion.data_sources.query(
+            data_source_id=expression_database_id,
+            filter=expression_identity_filter(item, podcast_page_id),
+            page_size=2,
+        )
+    except LearningPublisherError:
+        raise
+    except Exception as exc:
+        raise LearningPublisherError(
+            "Failed to inspect existing Expression records."
+        ) from exc
+
+    results = response.get("results", [])
+    if not isinstance(results, list):
+        raise LearningPublisherError(
+            "Notion returned an invalid Expression query result."
+        )
+    page_ids: list[str] = []
+    for result in results:
+        page_id = (
+            str(result.get("id", "")).strip()
+            if isinstance(result, dict)
+            else ""
+        )
+        if not page_id:
+            raise LearningPublisherError(
+                "Existing Expression record did not include a page ID."
+            )
+        page_ids.append(page_id)
+    return page_ids
+
+
+def reconcile_expression_pages(
+    notion: Client,
+    expression_database_id: str,
+    podcast_page_id: str,
+    items: Sequence[LearningItem],
+) -> list[str]:
+    """Reuse exact Expression matches and create only missing pages."""
+    expected: list[tuple[LearningItem, list[str]]] = []
+    for item in deduplicate_expected_expression_items(items):
+        expected.append(
+            (
+                item,
+                find_existing_expression_page_ids(
+                    notion=notion,
+                    expression_database_id=expression_database_id,
+                    podcast_page_id=podcast_page_id,
+                    item=item,
+                ),
+            )
+        )
+
+    if any(len(page_ids) > 1 for _, page_ids in expected):
+        raise LearningPublisherError(
+            "Duplicate Expression records found for one expected learning item."
+        )
+
+    page_ids: list[str] = []
+    for item, existing_page_ids in expected:
+        page_ids.append(
+            (existing_page_ids[0] if existing_page_ids else None)
+            or create_expression_page(
+                notion=notion,
+                expression_database_id=expression_database_id,
+                podcast_page_id=podcast_page_id,
+                item=item,
+            )
+        )
+    return page_ids
+
+
 def publish_complete_learning_materials(
     payload: CompletePodcastLearningPayload,
     notion: Optional[Client] = None,
@@ -426,6 +646,15 @@ def publish_complete_learning_materials(
         notion = notion or create_notion_client(config.token)
         podcast_database_id = podcast_database_id or config.podcast_database_id
         expression_database_id = expression_database_id or config.expression_database_id
+
+    ensure_expression_database_schema(
+        notion,
+        expression_database_id,
+        podcast_database_id,
+    )
+    expected_items = deduplicate_expected_expression_items(
+        payload.analysis.all_learning_items()
+    )
 
     existing_page = find_existing_complete_podcast_page(
         notion=notion,
@@ -445,36 +674,26 @@ def publish_complete_learning_materials(
             payload=payload,
         )
         logger.info("Updated existing Podcast Library page: %s", podcast_page_id)
-        return LearningPublishResult(
-            podcast_page_id=podcast_page_id,
-            expression_page_ids=[],
-            podcast_page_url=(
-                str(podcast_page_url) if podcast_page_url is not None else None
-            ),
-        )
-
-    podcast_page_id, podcast_page_url = create_complete_podcast_learning_page(
-        notion=notion,
-        podcast_database_id=podcast_database_id,
-        payload=payload,
-    )
-
-    ensure_expression_database_schema(notion, expression_database_id)
-
-    expression_page_ids = [
-        create_expression_page(
+    else:
+        podcast_page_id, podcast_page_url = create_complete_podcast_learning_page(
             notion=notion,
-            expression_database_id=expression_database_id,
-            podcast_page_id=podcast_page_id,
-            item=item,
+            podcast_database_id=podcast_database_id,
+            payload=payload,
         )
-        for item in payload.analysis.all_learning_items()
-    ]
+
+    expression_page_ids = reconcile_expression_pages(
+        notion=notion,
+        expression_database_id=expression_database_id,
+        podcast_page_id=podcast_page_id,
+        items=expected_items,
+    )
 
     return LearningPublishResult(
         podcast_page_id=podcast_page_id,
         expression_page_ids=expression_page_ids,
-        podcast_page_url=podcast_page_url,
+        podcast_page_url=(
+            str(podcast_page_url) if podcast_page_url is not None else None
+        ),
     )
 
 
@@ -482,12 +701,27 @@ def publish_learning_materials(
     payload: LearningPublishPayload,
     notion: Optional[Client] = None,
     expression_database_id: Optional[str] = None,
+    podcast_database_id: Optional[str] = None,
 ) -> LearningPublishResult:
     """Publish AI learning analysis to an existing Podcast Library page."""
-    if notion is None or expression_database_id is None:
+    if (
+        notion is None
+        or expression_database_id is None
+        or podcast_database_id is None
+    ):
         config = load_notion_config()
         notion = notion or create_notion_client(config.token)
         expression_database_id = expression_database_id or config.expression_database_id
+        podcast_database_id = podcast_database_id or config.podcast_database_id
+
+    ensure_expression_database_schema(
+        notion,
+        expression_database_id,
+        podcast_database_id,
+    )
+    expected_items = deduplicate_expected_expression_items(
+        payload.analysis.all_learning_items()
+    )
 
     update_podcast_learning_page(
         notion=notion,
@@ -496,17 +730,12 @@ def publish_learning_materials(
         transcript=payload.transcript,
     )
 
-    ensure_expression_database_schema(notion, expression_database_id)
-
-    expression_page_ids = [
-        create_expression_page(
-            notion=notion,
-            expression_database_id=expression_database_id,
-            podcast_page_id=payload.podcast_page_id,
-            item=item,
-        )
-        for item in payload.analysis.all_learning_items()
-    ]
+    expression_page_ids = reconcile_expression_pages(
+        notion=notion,
+        expression_database_id=expression_database_id,
+        podcast_page_id=payload.podcast_page_id,
+        items=expected_items,
+    )
 
     return LearningPublishResult(
         podcast_page_id=payload.podcast_page_id,
