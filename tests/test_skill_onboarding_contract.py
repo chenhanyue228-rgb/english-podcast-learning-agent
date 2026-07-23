@@ -68,7 +68,11 @@ def test_notion_official_entry_is_documented() -> None:
 
 
 def test_token_must_not_be_sent_to_chat() -> None:
-    assert "不得发送到 Codex 对话" in CONTRACT_TEXT
+    assert "不要发送到聊天" in CONTRACT_TEXT
+
+
+def test_page_url_must_not_be_sent_to_chat() -> None:
+    assert "访问密钥和页面链接都不发送到聊天" in USER_GUIDE
 
 
 def test_safe_setup_tool_is_documented() -> None:
@@ -77,7 +81,7 @@ def test_safe_setup_tool_is_documented() -> None:
 
 
 def test_full_parent_page_url_is_supported() -> None:
-    assert "父页面完整链接" in CONTRACT_TEXT
+    assert "完整页面链接" in CONTRACT_TEXT
 
 
 def test_manual_page_id_extraction_is_not_required() -> None:
@@ -95,7 +99,7 @@ def test_four_databases_are_documented() -> None:
 
 
 def test_codex_automates_database_creation_and_validation() -> None:
-    assert "自动创建和验证四个数据库" in CONTRACT_TEXT
+    assert "自动创建和检查" in CONTRACT_TEXT
 
 
 def test_success_flow_prompts_for_podcast() -> None:

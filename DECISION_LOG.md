@@ -262,3 +262,53 @@ copied by the user.
 ### Reason
 
 Users should express intent while Codex handles orchestration details.
+
+## DEC-012: Use Step-by-Step Confirmation for Notion First-Time Setup
+
+- Date: 2026-07-23
+- Status: Accepted for Owner Acceptance remediation
+
+### Decision
+
+Normal users receive exactly one visible Notion action at a time. Codex waits
+for the required completion reply before displaying the next action.
+
+The canonical existing-connection sequence is:
+
+```text
+已打开 Notion
+↓
+页面已创建
+↓
+连接已添加
+↓
+链接已复制
+```
+
+Users without a connection first complete:
+
+```text
+开发者页面已打开
+↓
+连接已创建
+↓
+密钥已保存
+```
+
+Internal test and acceptance terminology must not override the canonical
+user-visible copy in `skill/SKILL.md`.
+
+### Reason
+
+Phase 4.1C Owner Acceptance showed that a combined authorization instruction
+required normal users to interpret internal concepts and decide whether a
+technical setup state was complete. This is a P1 onboarding blocker.
+
+### Consequences
+
+- Codex owns conversation state and only advances after each reply gate.
+- Local setup cannot start before `链接已复制`.
+- Users do not send the token or page link in chat.
+- Python, not the user, determines whether access and database validation
+  succeed.
+- Owner Acceptance remains blocked until the fix is merged and revalidated.

@@ -26,6 +26,21 @@ entries must be appended or clarified, not removed.
 
 ### Phase 4.1C Owner Acceptance
 
+- Started Owner Acceptance from a clean clone of merge commit
+  `60de7aab6fa4904a5b5576e351d28cc70ff672df`.
+- Verified Skill installation and same-conversation continuation without a new
+  conversation or Codex restart.
+- Recorded a P1 blocker before real Notion setup: the first Notion instruction
+  combined multiple actions and used internal acceptance terminology that a
+  normal user could not independently follow.
+- Changed the Notion first-time conversation to one action and one confirmation
+  at a time.
+- Added complete `已有` and `没有` connection paths with explicit reply gates.
+- Removed internal test terminology from normal-user guidance.
+- Added regression coverage for conversation order, forbidden copy, reply
+  gates, and the local-setup launch boundary.
+- Kept Owner Acceptance blocked and external-user sessions at 0 until this fix
+  is reviewed, merged, and reinstalled.
 - Made first-time Notion database creation resumable with per-database
   progress persistence and safe retry.
 - Bound resumed setup to the original Notion parent page so missing databases

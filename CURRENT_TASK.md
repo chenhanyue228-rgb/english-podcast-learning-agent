@@ -8,29 +8,30 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Production `main`: `e87d6e41c6b8d2a98a4ef1db43ed685a937ba4d2`
-- PR #4: merged
-- Tests: 351 passed
+- Production `main`: `60de7aab6fa4904a5b5576e351d28cc70ff672df`
+- PR #5: merged
+- Tests: 407 passed
 - Architecture: Stable
 
 ## Current Sprint
 
-Phase 4.1C — Owner Acceptance Preparation
+Phase 4.1C — Owner Acceptance
 
-Status: `READY_FOR_ONBOARDING_PR`
+Status: `OWNER_ACCEPTANCE_BLOCKED`
 
 External-user sessions: 0
 
 ## Goal
 
-Complete and verify a first-time setup flow in which a normal user does not
-need to locate the project directory, type `cd`, or run primary commands
-manually.
+Fix the P1 Notion first-time guidance blocker discovered during Owner
+Acceptance, then restart the acceptance flow from the post-install handoff.
 
 ```text
-Installation handoff in the current conversation
+One understandable Notion action
 ↓
-Guided Notion authorization
+User confirmation
+↓
+Next understandable Notion action
 ↓
 Safe local setup
 ↓
@@ -39,18 +40,18 @@ Codex-operated podcast-to-Notion flow
 
 ## Current Tasks
 
-1. Keep the current conversation as the primary post-install continuation.
-2. Make a new conversation and restart fallback-only actions.
-3. Add the Chinese user guide and complete path comparison.
-4. Add secure local token and parent-page URL input.
-5. Add the macOS one-click setup entry.
-6. Let Codex locate the project and prepare the runtime.
-7. Automatically create or validate all four Notion databases.
-8. Let Codex actively prompt for the first podcast after setup.
-9. Lock the onboarding contract with regression tests.
-10. Make interrupted database creation safely resumable.
-11. Keep every resumed database setup bound to its original parent page.
-12. Prepare the branch for onboarding review without starting Owner Acceptance.
+1. Make `skill/SKILL.md` the canonical user-visible Notion conversation.
+2. Require the `已有` path to wait for `已打开 Notion`, `页面已创建`,
+   `连接已添加`, and `链接已复制` in order.
+3. Require the `没有` path to wait for `开发者页面已打开`, `连接已创建`,
+   and `密钥已保存` before the page flow.
+4. Prevent local setup from starting before `链接已复制`.
+5. Remove internal acceptance terminology from normal-user instructions.
+6. Add recovery copy for a missing Notion connection menu.
+7. Add sequence, reply-gate, forbidden-copy, and launch-timing tests.
+8. Review and merge the focused fix.
+9. Reinstall the Skill from the latest `main`.
+10. Restart Owner Acceptance without starting external-user testing.
 
 ## Out of Scope
 
@@ -83,18 +84,22 @@ Codex-operated podcast-to-Notion flow
 - No real credentials are committed.
 - No external-user readiness claim is made.
 
-Owner Acceptance and external-user validation have not started.
+Owner Acceptance started and is blocked before real Notion setup. External-user
+validation has not started.
 
 ## Current State
 
-- PR #4 is merged.
-- The Phase 4.1C documentation branch exists.
-- The user interaction contract is being completed.
+- PR #5 is merged.
+- Skill installation passed in the owner's real Codex environment.
+- The installation conversation discovered the Skill on the next turn without
+  a new conversation or restart.
+- The first Notion instruction exposed a P1 usability blocker.
+- No real Notion setup or database creation was attempted.
 - The safe first-time setup tool and its interruption recovery are implemented.
 - Safe per-database setup recovery and dependency verification are implemented.
 - Parent-page consistency protection is implemented for setup recovery.
 - The Notion plugin is documented as optional and outside the production write path.
-- Owner Acceptance has not started.
+- Owner Acceptance is `OWNER_ACCEPTANCE_BLOCKED`.
 - External-user sessions: 0.
 
 ## Completed Phase 4.1 Milestones

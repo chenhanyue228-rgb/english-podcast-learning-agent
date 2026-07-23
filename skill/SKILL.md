@@ -145,7 +145,205 @@ The suggested destination is `~/EnglishAudioLearningAgent`.
   access.
 - Do not require the user to find the project folder or type `cd`.
 
+### User-Visible Notion Conversation Contract
+
+The following Chinese copy is the canonical first-time setup conversation.
+Codex must show exactly one action at a time and wait for the specified reply
+before showing the next action. Codex must not combine these steps into a
+single authorization request.
+
+#### Existing Notion Connection
+
+When the user says `已有`, Codex must display:
+
+```text
+接下来，我会带你在 Notion 中创建一个新页面，用来存放英语学习资料。
+
+这个操作不会修改你已有的页面，也不会把页面公开到互联网。
+
+现在请打开自己的 Notion 工作空间。
+
+打开后，请回复：
+
+已打开 Notion
+```
+
+Codex must wait for `已打开 Notion`.
+
+After the user replies `已打开 Notion`, Codex must display:
+
+```text
+请在 Notion 左侧栏点击“新建页面”。
+
+页面名称填写：
+
+英语音频学习助手
+
+请选择空白页面，不要手动添加数据库或其他内容。
+
+创建完成后，请回复：
+
+页面已创建
+```
+
+Codex must wait for `页面已创建`.
+
+After the user replies `页面已创建`, Codex must display:
+
+```text
+现在请允许英语音频学习助手访问这个页面。
+
+操作步骤：
+
+1. 打开刚创建的“英语音频学习助手”页面。
+2. 点击页面右上角的“•••”。
+3. 找到“连接”或“Connections”。
+4. 点击“添加连接”。
+5. 选择你已有的英语音频学习助手连接。
+
+这个操作只允许英语音频学习助手在这个页面下创建和更新学习资料。
+
+完成后，请回复：
+
+连接已添加
+```
+
+Codex must wait for `连接已添加`.
+
+If the user cannot find the connection control, Codex must display:
+
+```text
+请先确认你正在查看刚创建的 Notion 页面。
+
+然后：
+
+1. 点击页面右上角的“•••”。
+2. 向下查找“连接”“Connections”或“添加连接”。
+3. 选择你的英语音频学习助手连接。
+
+如果仍然找不到，请告诉我页面右上角现在有哪些按钮，或发送一张不包含密钥的截图。
+```
+
+After the user replies `连接已添加`, Codex must display:
+
+```text
+现在请复制这个 Notion 页面的链接。
+
+操作步骤：
+
+1. 点击页面右上角的“共享”。
+2. 点击“复制链接”。
+
+请先保留这个链接，不要发送到聊天。
+
+稍后我会打开一个本地安全窗口，让你在那里粘贴：
+
+- Notion 访问密钥
+- 刚复制的页面链接
+
+复制完成后，请回复：
+
+链接已复制
+```
+
+Codex must wait for `链接已复制`. Only after this reply may Codex prepare the
+local runtime and launch the safe setup tool.
+
+#### No Existing Notion Connection
+
+When the user says `没有`, Codex must display:
+
+```text
+英语音频学习助手需要一个 Notion 私人连接，才能只访问你指定的页面并保存学习资料。
+
+这个连接不会自动访问你整个 Notion 工作空间。
+
+现在我会带你创建它。
+
+请打开：
+
+https://www.notion.so/developers
+
+打开后，请回复：
+
+开发者页面已打开
+```
+
+Codex must wait for `开发者页面已打开`.
+
+After the user replies `开发者页面已打开`, Codex must display:
+
+```text
+请创建一个新的 Notion 内部连接。
+
+建议名称：
+
+英语音频学习助手
+
+请选择你用于保存学习资料的 Notion 工作空间。
+
+确认连接拥有读取、插入和更新内容的权限。
+
+创建完成后，请回复：
+
+连接已创建
+```
+
+Codex must wait for `连接已创建`.
+
+After the user replies `连接已创建`, Codex must display:
+
+```text
+请复制刚创建连接的访问密钥。
+
+访问密钥相当于私人密码：
+
+- 不要发送到聊天
+- 不要截图分享
+- 不要写入公开文档
+- 不要提交到 GitHub
+
+请先安全保留它，稍后只粘贴到本地安全窗口。
+
+保存好后，请回复：
+
+密钥已保存
+```
+
+Codex must wait for `密钥已保存`, then continue with the existing-connection
+page flow in this order:
+
+```text
+已打开 Notion
+↓
+页面已创建
+↓
+连接已添加
+↓
+链接已复制
+```
+
+Every later reply gate remains mandatory.
+
 ### First-Time Setup Responsibilities
+
+Before the user replies `链接已复制`, Codex must not launch
+`scripts/first_time_setup.py`, `start_setup.command`, environment preparation,
+or any local setup command.
+
+After the user replies `链接已复制`, Codex must:
+
+1. Locate or safely acquire the complete project.
+2. Prepare or reuse the project-local `.venv`.
+3. Automatically launch `scripts/first_time_setup.py` with safe interactive
+   input.
+4. Ask the user to enter the hidden Notion access token and the complete page
+   URL only in the local safe window.
+5. Never ask the user to send the token, page URL, page ID, or database IDs in
+   chat.
+6. Let Python validate the token and page access, create or validate all four
+   databases, wire relations, and report the result. The user is not
+   responsible for deciding whether technical validation succeeded.
 
 The Codex Notion plugin is not required. Database creation, validation, and
 learning-content writes use local Python with the user's own Notion internal
@@ -157,26 +355,6 @@ only:
 - it must not introduce a second production write path
 - never let the plugin and local setup create separate database sets
 
-For the setup trigger, Codex must:
-
-1. Locate or safely acquire the complete project.
-2. Prepare or reuse the project-local `.venv`.
-3. Direct the user to the official Notion resources:
-   - https://www.notion.so/developers
-   - https://developers.notion.com/guides/get-started/internal-connections
-   - https://www.notion.com/help/create-your-first-page
-   - https://www.notion.com/help/share-your-work
-4. Guide the user to create an internal connection and an empty parent page.
-5. Guide the user to add the connection to the parent page.
-6. Remind the user that the access token must not be sent to the Codex chat.
-7. Automatically launch `scripts/first_time_setup.py` with safe interactive
-   input.
-8. Ask the user to enter only the hidden token and the complete parent-page
-   URL in the local interface.
-9. Never require manual page-ID extraction.
-10. Let Python create or validate all four databases.
-11. Report the four database results.
-
 If safe interactive input is unavailable, try to open `start_setup.command`.
 If that also fails, open the project directory in Finder and ask the user only
 to double-click `start_setup.command`. Terminal instructions are the final
@@ -184,6 +362,14 @@ fallback.
 
 After success, actively prompt the user for an Apple Podcasts episode URL,
 podcast RSS feed, or local audio file.
+
+### Owner Acceptance Prompt Boundary
+
+Owner-acceptance prompts may define test goals, evidence, pass/fail criteria,
+and issue severity. They must not rewrite or override the user-visible copy in
+this conversation contract. Internal phrases such as test page, disposable
+page, parent page, or acceptance environment belong only in developer reports
+and must not be shown as user instructions.
 
 ### Daily Podcast Trigger
 
