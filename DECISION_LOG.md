@@ -139,3 +139,52 @@ understand, and obtain value from the product without developer assistance.
 
 Phase 4 ends only after external-user evidence supports the next product
 direction.
+
+## DEC-006: Use Codex Skills UI as the Primary Installation Path
+
+- Date: 2026-07-23
+- Status: Provisional (pending owner validation)
+
+### Decision
+
+Use the Codex Skills UI as the primary user-facing installation path. The user
+opens Skills, chooses Create, uploads the local `skill/` directory, saves the
+Skill, and restarts Codex or opens a new task before verifying
+`$english-audio-learning-agent`.
+
+The symbolic-link method under `~/.codex/skills/` remains a Developer-only
+fallback and is not the default onboarding contract.
+
+### Reason
+
+The primary installation path must use the supported Codex product surface and
+must not claim that an internal helper or filesystem copy proves end-to-end
+product installation.
+
+### Acceptance Condition
+
+This decision becomes Accepted only after the owner completes installation and
+discovery in the real Codex Skills UI. External-user validation is separate
+and has not started.
+
+## DEC-007: Preserve Weekly Review Database Naming
+
+- Date: 2026-07-23
+- Status: Accepted
+
+### Decision
+
+Keep `Weekly Review` as the Notion database container name. Store the
+`Weekly Reflection` compounding learning note as its product content.
+
+### Reason
+
+This naming preserves the existing production database, relations, environment
+compatibility, and idempotent publishing behavior without a schema migration.
+
+### Consequences
+
+- No live Notion database rename or migration is required.
+- `NOTION_WEEKLY_REFLECTION_DATABASE_ID` remains the canonical environment
+  variable.
+- `NOTION_WEEKLY_REVIEW_DATABASE_ID` remains a legacy compatibility alias.

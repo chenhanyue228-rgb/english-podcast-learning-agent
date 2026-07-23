@@ -8,40 +8,44 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Tests: 345 passed
+- Production `main`: `e87d6e41c6b8d2a98a4ef1db43ed685a937ba4d2`
+- PR #4: merged
+- Tests: 351 passed
 - Architecture: Stable
 
 ## Current Sprint
 
-Phase 4.1 — Clean-Clone Onboarding Validation
+Phase 4.1C — Owner Acceptance
+
+Status: `READY_FOR_OWNER_ACCEPTANCE`
+
+External-user sessions: 0
 
 ## Goal
 
-Determine whether a new user can independently complete:
+Verify the merged onboarding flow in the owner's real Codex and Notion
+environment:
 
 ```text
-Repository access
+Codex Skills UI installation
 ↓
-Environment setup
+Skill discovery
 ↓
-Notion setup
+Four-database Notion setup
 ↓
-First audio input
-↓
-Codex artifact generation
-↓
-Notion learning-page publishing
+Complete learning flow
 ```
 
 ## Current Tasks
 
-1. Test installation from a clean clone.
-2. Record every undocumented dependency or manual step.
-3. Validate Notion workspace setup.
-4. Validate the first Podcast or Local Audio journey.
-5. Measure time to the first successful Notion learning page.
-6. Create a first-user issue log.
-7. Prioritize only evidence-backed UX fixes.
+1. Install the Skill through the Codex Skills UI.
+2. Restart Codex or open a new task.
+3. Verify `$english-audio-learning-agent` discovery.
+4. Create a disposable Notion parent page and share it with the integration.
+5. Run `python -m src.notion.setup_workspace --parent-page-id "<id>"`.
+6. Run `python -m src.notion.check_workspace`.
+7. Complete one full supported audio-to-artifact-to-Notion learning flow.
+8. Record results, failures, timing, and evidence.
 
 ## Out of Scope
 
@@ -57,13 +61,27 @@ Notion learning-page publishing
 
 ## Completion Criteria
 
-- A clean clone can bootstrap successfully.
-- First-use instructions match actual behavior.
+- The Skill is installed through the documented Codex Skills UI path.
+- `$english-audio-learning-agent` is discovered after restart or a new task.
+- All four Notion databases are created and pass `check_workspace`.
+- One complete supported learning flow publishes successfully to Notion.
 - No real credentials are committed.
-- At least three external users are tested.
-- At least two users complete the core flow without developer intervention.
-- No unresolved P0 or P1 usability blocker remains.
-- Findings are recorded before the next feature sprint.
+- Owner Acceptance results are recorded.
+- No external-user readiness claim is made.
+
+External-user validation remains a later activity and has not started.
+
+## Completed Phase 4.1 Milestones
+
+- Phase 4.1 clean-clone technical audit
+- Phase 4.1B onboarding fixes for PV-001 through PV-005
+- Codex Skills UI installation contract
+- four-database Notion onboarding flow
+- isolated `.venv` setup
+- complete Codex artifact handoff output
+- Apple Podcasts episode URL scope clarification
+- PR #4 merge into production `main`
+- merged-main regression verification: 351 passed, 3 expected warnings
 
 ## Completed Phase 3 Milestones
 

@@ -5,12 +5,32 @@ entries must be appended or clarified, not removed.
 
 ## Unreleased — Phase 4 Product Validation
 
-- Clean-clone onboarding validation.
-- First-user journey measurement.
-- External-user feedback collection.
-- Evidence-based UX improvement planning.
+### Phase 4.1B Onboarding Fixes
 
-These activities are planned validation work, not completed product changes.
+- Merged PR #4 with evidence-backed fixes for PV-001 through PV-005.
+- Added valid Codex Skill manifest frontmatter and discovery regression
+  coverage.
+- Defined the Codex Skills UI as the primary user installation path while
+  retaining symbolic-link setup as Developer-only.
+- Standardized onboarding around an isolated project `.venv`.
+- Unified Notion onboarding around one setup command that creates Podcast
+  Library, Expression Database, Weekly Review, and Vocabulary Database.
+- Preserved Weekly Review as the database container for Weekly Reflection
+  content.
+- Improved Podcast Analysis artifact handoff output with request path, expected
+  output path, canonical `$english-audio-learning-agent` instruction, and exact
+  rerun command.
+- Clarified supported Apple Podcasts episode URL input.
+- Verified merged `main`: 351 tests passed with 0 failures and 3 expected
+  compatibility-provider deprecation warnings.
+
+### Phase 4.1C Owner Acceptance
+
+- Entered Owner Acceptance with status `READY_FOR_OWNER_ACCEPTANCE`.
+- External-user testing has not started; external-user session count remains 0.
+
+Owner Acceptance remains pending and must not be treated as external-user
+validation.
 
 ## [v1.1.0] - 2026-07-22
 

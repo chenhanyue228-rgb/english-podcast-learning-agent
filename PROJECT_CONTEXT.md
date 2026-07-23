@@ -19,20 +19,27 @@ The system helps users build long-term personal English learning memory.
 
 **Phase 4 — Product Validation**
 
-The current stable release is **v1.1.0**, built from merge commit
-`80cbab01ea266e487a0359ddbec562959070d8a0`.
+**Execution stage:** Phase 4.1C — Owner Acceptance
+
+**Status:** `READY_FOR_OWNER_ACCEPTANCE`
+
+The current stable release remains **v1.1.0**, built from release commit
+`80cbab01ea266e487a0359ddbec562959070d8a0`. The current production `main`
+includes PR #4 through merge commit
+`e87d6e41c6b8d2a98a4ef1db43ed685a937ba4d2`.
 
 Release status:
 
 - v1.1.0 is released and tagged locally and remotely
 - the production architecture and workflow boundaries are stable
 - production workflows and CLI behavior are verified
-- 345 tests pass with 3 expected compatibility-provider deprecation warnings
-- Product Validation is now the priority
+- PR #4 merged the Phase 4.1B onboarding fixes into `main`
+- 351 tests pass with 3 expected compatibility-provider deprecation warnings
+- external-user sessions: 0
+- Owner Acceptance is the current priority
 
-Phase 4 validates whether a new user can independently transform an English
-audio source into useful, reusable Notion learning assets. The immediate
-priority is clean-clone onboarding and first-user journey validation.
+Phase 4.1C validates the merged onboarding contract in the owner's real Codex
+and Notion environment. External-user testing has not started.
 
 ## Runtime Model
 
@@ -131,10 +138,12 @@ Weekly Reflection is a compounding learning note rather than a recap.
 
 ## Current Product Risks
 
-- Setup may still require too much technical knowledge.
-- First-time Notion configuration has not been tested by external users.
-- The Codex artifact handoff may be unclear to a new user.
-- The first-use path has not been measured.
+- The Codex Skills UI installation path is defined but has not completed Owner
+  Acceptance.
+- The four-database Notion setup has not completed Owner Acceptance.
+- The merged artifact handoff has not yet been exercised in the owner's full
+  learning journey.
+- External-user session count remains 0.
 - Learning-asset usefulness has not been validated with external users.
 
 ## Historical Milestones
@@ -147,10 +156,10 @@ full regression suite, and completed the reviewed v1.1.0 release.
 
 ## Immediate Milestone
 
-Complete Phase 4.1 clean-clone onboarding validation: observe new users setting
-up the environment and Notion, processing a first supported audio source,
-completing the Codex artifact handoff, and publishing a first learning page.
-Record evidence before scheduling product or architecture changes.
+Complete Phase 4.1C Owner Acceptance: install the Skill through the Codex
+Skills UI, verify discovery, initialize and validate the four-database Notion
+workspace, then complete one supported audio-to-Notion learning flow. Record
+the result without claiming external-user validation.
 
 Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md` and
 `skill/SKILL.md` before changing runtime behavior.
