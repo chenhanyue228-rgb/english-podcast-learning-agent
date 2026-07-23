@@ -98,13 +98,15 @@ entries must be appended or clarified, not removed.
   create, update, or delete page records.
 - Removed Data Source IDs and other configuration values from developer CLI
   output and API failure summaries.
-- Verified the PR #7 candidate with 453 passing tests and 3 expected
+- Reviewed the PR #7 remediation implementation with result
+  `READY_TO_MERGE`.
+- Candidate verification completed with 453 passing tests and 3 expected
   compatibility-provider deprecation warnings.
-- Kept Owner Acceptance blocked and external-user sessions at 0 pending review
-  and merge of this remediation.
+- Kept Owner Acceptance blocked and external-user sessions at 0 pending real
+  recovery with the existing four Data Source IDs.
 
-Owner Acceptance resumes only after this remediation is reviewed, merged, and
-installed from the latest `main`.
+Owner Acceptance remains pending until this remediation is available from the
+latest `main` and the existing four Data Sources pass real recovery.
 
 ## [v1.1.0] - 2026-07-22
 

@@ -8,17 +8,21 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Production `main`: `87b96d9f68ad65d3356943b1f8196eeea8f9f3ee`
+- Pre-PR #7 production baseline:
+  `87b96d9f68ad65d3356943b1f8196eeea8f9f3ee`
 - PR #6: merged
 - Production baseline tests: 407 passed, 3 expected warnings
 - Architecture: Stable
 
-## PR #7 Candidate
+## PR #7 Merge Candidate
 
-- PR: #7, open and not merged
+- PR #7 remediation implementation reviewed
 - Branch: `fix/phase-4.1c-notion-api-and-setup-ux`
-- Candidate tests: 453 passed, 3 expected warnings
-- Review status: `CHANGES_REQUIRED` fixes completed; awaiting re-review
+- Candidate verification: 453 passed, 3 expected warnings
+- Review result: `READY_TO_MERGE`
+- Existing four Data Source IDs must be reused
+- Real Owner Acceptance remains pending
+- External-user sessions: 0
 
 ## Current Sprint
 

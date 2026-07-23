@@ -24,8 +24,8 @@ The system helps users build long-term personal English learning memory.
 **Status:** `OWNER_ACCEPTANCE_BLOCKED`
 
 The current stable release remains **v1.1.0**, built from release commit
-`80cbab01ea266e487a0359ddbec562959070d8a0`. The current production `main`
-includes PR #6 through merge commit
+`80cbab01ea266e487a0359ddbec562959070d8a0`. The pre-PR #7 production
+baseline includes PR #6 through merge commit
 `87b96d9f68ad65d3356943b1f8196eeea8f9f3ee`.
 
 Release status:
@@ -36,13 +36,15 @@ Release status:
 - PR #4 merged the Phase 4.1B onboarding fixes into `main`
 - PR #5 merged the guided first-time-use flow into `main`
 - PR #6 merged the one-action/one-confirmation Notion guidance into `main`
-- production `main` passes 407 tests with 3 expected compatibility-provider
-  deprecation warnings
-- PR #7 is open and unmerged on
+- the pre-PR #7 production baseline passes 407 tests with 3 expected
+  compatibility-provider deprecation warnings
+- PR #7 remediation implementation reviewed on
   `fix/phase-4.1c-notion-api-and-setup-ux`
-- the PR #7 candidate passes 453 tests with 3 expected compatibility-provider
-  deprecation warnings
-- PR #7 status: `CHANGES_REQUIRED` fixes completed; awaiting re-review
+- candidate verification: 453 tests passed with 3 expected
+  compatibility-provider deprecation warnings
+- review result: `READY_TO_MERGE`
+- the existing four Data Source IDs must be reused
+- real Owner Acceptance remains pending
 - external-user sessions: 0
 - Owner Acceptance started
 - Skill installation passed
