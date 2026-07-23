@@ -25,8 +25,8 @@ The system helps users build long-term personal English learning memory.
 
 The current stable release remains **v1.1.0**, built from release commit
 `80cbab01ea266e487a0359ddbec562959070d8a0`. The current production `main`
-includes PR #4 through merge commit
-`60de7aab6fa4904a5b5576e351d28cc70ff672df`.
+includes PR #6 through merge commit
+`87b96d9f68ad65d3356943b1f8196eeea8f9f3ee`.
 
 Release status:
 
@@ -35,19 +35,24 @@ Release status:
 - production workflows and CLI behavior are verified
 - PR #4 merged the Phase 4.1B onboarding fixes into `main`
 - PR #5 merged the guided first-time-use flow into `main`
-- 407 tests pass with 3 expected compatibility-provider deprecation warnings
+- PR #6 merged the one-action/one-confirmation Notion guidance into `main`
+- 440 tests pass with 3 expected compatibility-provider deprecation warnings
 - external-user sessions: 0
 - Owner Acceptance started
 - Skill installation passed
 - continuing in the installation conversation passed without a restart
-- Notion first-time guidance is blocked by a P1 usability issue
+- the one-action/one-confirmation conversation mechanism passed
+- Owner Acceptance is blocked by current Notion data source schema
+  compatibility and local secure-input feedback issues
 
 Phase 4.1C is running in the owner's real Codex environment. The first
-acceptance attempt confirmed Skill installation and immediate continuation in
-the same conversation. It then stopped before any real Notion setup because
-the Notion instructions combined several actions and used internal terms that
-a normal user could not independently follow. External-user testing has not
-started.
+acceptance attempt confirmed Skill installation, immediate continuation in the
+same conversation, and the reply-gated guidance mechanism. Real setup then
+revealed that the current Notion UI uses “连接” in the developer dashboard and
+“集成” on a normal page, while the local setup used an obsolete database
+creation payload. Four database containers were created but their data source
+fields and relations were incomplete. Their saved identifiers must be reused;
+they must not be deleted or recreated. External-user testing has not started.
 
 The formal user flow continues in the current conversation after installation.
 A new conversation is not mandatory, and restarting Codex is only the second
@@ -157,10 +162,14 @@ Weekly Reflection is a compounding learning note rather than a recap.
 
 ## Current Product Risks
 
-- Notion first-time guidance is a P1 Owner Acceptance blocker because it did
-  not present one understandable user action at a time.
-- The formal Skill contract and Chinese guides must lock the exact
-  confirmation sequence before Owner Acceptance restarts.
+- Notion first-time setup is a P1 Owner Acceptance blocker because the current
+  SDK data source creation contract differs from the legacy top-level
+  `properties` request.
+- Existing empty database containers require an idempotent in-place schema
+  reconciliation path that preserves their identifiers and unknown fields.
+- Relation properties must use `data_source_id` with `single_property`.
+- The local safe-input window must confirm both hidden inputs without exposing
+  the token, page URL, page ID, or database IDs.
 - The merged artifact handoff has not yet been exercised in the owner's full
   learning journey.
 - External-user session count remains 0.
@@ -176,10 +185,11 @@ full regression suite, and completed the reviewed v1.1.0 release.
 
 ## Immediate Milestone
 
-Fix and review the step-by-step Notion guidance, merge it, reinstall the Skill
-from the latest `main`, and restart Phase 4.1C Owner Acceptance from the
-post-install continuation point. Do not start external-user testing.
-External-user sessions remain 0.
+Fix and review the current Notion data source creation/reconciliation contract,
+align the real “连接”/“集成” UI path, and improve the two-step hidden local
+input. After the fix is merged, resume setup against the same saved four
+database identifiers and the same Notion page. Do not start external-user
+testing. External-user sessions remain 0.
 
 Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md` and
 `skill/SKILL.md` before changing runtime behavior.

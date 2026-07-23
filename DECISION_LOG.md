@@ -266,7 +266,7 @@ Users should express intent while Codex handles orchestration details.
 ## DEC-012: Use Step-by-Step Confirmation for Notion First-Time Setup
 
 - Date: 2026-07-23
-- Status: Accepted for Owner Acceptance remediation
+- Status: Superseded by DEC-015 after real Notion UI validation
 
 ### Decision
 
@@ -312,3 +312,98 @@ technical setup state was complete. This is a P1 onboarding blocker.
 - Python, not the user, determines whether access and database validation
   succeed.
 - Owner Acceptance remains blocked until the fix is merged and revalidated.
+
+## DEC-013: Separate Notion Database Containers from Data Source Schemas
+
+- Date: 2026-07-23
+- Status: Accepted for Owner Acceptance remediation
+
+### Decision
+
+Treat a Notion Database as the page-level container and its Data Source as the
+owner of properties and records. Create initial fields through
+`initial_data_source.properties`, then retrieve and update fields through the
+data source API.
+
+### Reason
+
+Owner Acceptance used `notion-client 3.1.0`, whose database-create endpoint
+does not send legacy top-level `properties`. Mixing the old and current models
+created empty database containers.
+
+## DEC-014: Use One-Way Notion Relations
+
+- Date: 2026-07-23
+- Status: Accepted
+
+### Decision
+
+Expression Database `Source Podcast`, Vocabulary Database `Source`, and Weekly
+Review `Podcasts` target the Podcast Library data source with:
+
+```text
+data_source_id + single_property
+```
+
+Do not send `database_id` or `dual_property`.
+
+### Reason
+
+The product needs one-way source traceability. A two-way relation would add
+schema and product behavior that has not been approved.
+
+## DEC-015: Use One Unified Notion Connection Path
+
+- Date: 2026-07-23
+- Status: Accepted for Owner Acceptance remediation
+
+### Decision
+
+Do not ask users to classify themselves as having or not having a connection.
+Guide everyone through the developer dashboard connection list, where they
+open an existing connection or create one in the same step.
+
+Developer-dashboard UI uses “连接”. Normal Notion page authorization uses
+“集成”.
+
+### Reason
+
+The real Notion UI exposes the same practical path for both users, and the
+preclassification question added cognitive work without improving safety.
+
+## DEC-016: Hide Both Local Setup Inputs
+
+- Date: 2026-07-23
+- Status: Accepted
+
+### Decision
+
+Collect both the Notion access token and the complete learning-page URL through
+hidden local input. Display a numbered step before each input and a
+non-sensitive receipt confirmation immediately after Enter.
+
+### Reason
+
+The access token is a secret, and the page URL contains a private identifier.
+Neither value should appear in chat, terminal echo, screenshots, or detailed
+error output.
+
+## DEC-017: Fix the Workspace Database Order
+
+- Date: 2026-07-23
+- Status: Accepted
+
+### Decision
+
+Use one creation, validation, and reporting order:
+
+1. Podcast Library
+2. Expression Database
+3. Vocabulary Database
+4. Weekly Review
+
+### Reason
+
+The order follows the dependency graph: Podcast Library is the relation target,
+Expression and Vocabulary are learning assets, and Weekly Review is the
+downstream reflection container.

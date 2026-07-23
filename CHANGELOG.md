@@ -72,8 +72,31 @@ entries must be appended or clarified, not removed.
 - Prepared Owner Acceptance with status `READY_FOR_ONBOARDING_PR`.
 - External-user testing has not started; external-user session count remains 0.
 
-Owner Acceptance begins only after this onboarding update is reviewed, merged,
-and installed from the latest `main`.
+### Phase 4.1C Notion API and Setup Remediation
+
+- Recorded the real Owner Acceptance finding that Notion's current UI uses
+  “连接” in the developer dashboard and “集成” on a normal page.
+- Replaced the `已有`/`没有` preclassification with one guided connection
+  path.
+- Migrated database creation to
+  `initial_data_source.properties` for the current Notion data source API.
+- Pinned `notion-client` to the locally verified `3.1.0` release.
+- Added idempotent in-place schema reconciliation for saved data source IDs.
+- Preserved unknown fields and existing records, and added safe stops for
+  property type conflicts.
+- Fixed all three workspace relations to use `data_source_id` with
+  `single_property`.
+- Changed both token and page-link collection to hidden local input with
+  immediate non-sensitive receipt confirmation.
+- Fixed the formal database order to Podcast Library, Expression Database,
+  Vocabulary Database, and Weekly Review.
+- Verified the remediation with 440 passing tests and 3 expected
+  compatibility-provider deprecation warnings.
+- Kept Owner Acceptance blocked and external-user sessions at 0 pending review
+  and merge of this remediation.
+
+Owner Acceptance resumes only after this remediation is reviewed, merged, and
+installed from the latest `main`.
 
 ## [v1.1.0] - 2026-07-22
 

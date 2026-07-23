@@ -1,6 +1,8 @@
 #!/bin/zsh
 
 set -u
+export LANG="en_US.UTF-8"
+export LC_CTYPE="en_US.UTF-8"
 
 PROJECT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$PROJECT_DIR" || {
@@ -13,7 +15,8 @@ cd "$PROJECT_DIR" || {
 fail_and_wait() {
   print ""
   print "第一次设置未完成：$1"
-  print "请把上面的错误信息告诉 Codex，但不要发送 Notion 访问密钥。"
+  print "请修正后重新双击 start_setup.command。"
+  print "如需帮助，只提供上方非敏感错误摘要，不要发送访问密钥或页面链接。"
   print "按回车键关闭窗口。"
   read -r
   exit 1

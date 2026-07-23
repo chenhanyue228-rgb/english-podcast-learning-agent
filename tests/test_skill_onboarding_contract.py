@@ -110,6 +110,6 @@ def test_terminal_commands_are_fallback_only() -> None:
     assert "手动终端命令只属于最终备用方案" in CONTRACT_TEXT
 
 
-def test_user_guide_has_all_26_path_stages() -> None:
-    for stage_number in range(1, 27):
+def test_user_guide_has_all_30_path_stages() -> None:
+    for stage_number in range(1, 31):
         assert f"| {stage_number}." in USER_GUIDE

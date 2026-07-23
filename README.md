@@ -99,10 +99,11 @@ https://github.com/chenhanyue228-rgb/english-podcast-learning-agent
 - 不需要手动运行数据库初始化或验证命令
 - 不需要手动提取 Notion 页面编号
 
-Notion 设置会一次只显示一个操作，用户完成并确认后才进入下一步。用户需要
-亲自完成的只有打开 Notion、创建“英语音频学习助手”页面、把连接添加到该页面、
-复制页面链接，以及在本地安全界面输入访问密钥和完整页面链接。访问密钥和
-页面链接都不得发送到 Codex 对话。
+Notion 设置使用一条统一路径，一次只显示一个操作，用户完成并确认后才进入
+下一步。开发者后台中的入口名称是“连接”，普通 Notion 页面中的授权入口名称是
+“集成”。用户依次打开或创建连接、确认内容权限、保存访问令牌、创建
+“英语音频学习助手”页面、把集成添加到页面并复制页面链接。访问密钥和页面链接
+只输入本地安全窗口，不得发送到 Codex 对话。
 
 ### Notion 连接边界
 
@@ -119,8 +120,8 @@ Notion 插件只是可选的搜索、读取和辅助查看工具。
 
 - Podcast Library（播客资料库）
 - Expression Database（表达资料库）
-- Weekly Review（每周复盘资料库，存放 Weekly Reflection 每周复盘内容）
 - Vocabulary Database（词汇资料库）
+- Weekly Review（每周复盘资料库，存放 Weekly Reflection 每周复盘内容）
 
 ## 日常使用
 

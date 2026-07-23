@@ -152,9 +152,110 @@ Codex must show exactly one action at a time and wait for the specified reply
 before showing the next action. Codex must not combine these steps into a
 single authorization request.
 
-#### Existing Notion Connection
+#### Step 1: Open the Developer Dashboard
 
-When the user says `已有`, Codex must display:
+Codex must display:
+
+```text
+英语音频学习助手需要一个只访问你指定页面的 Notion 私人连接。
+
+现在请打开 Notion 开发者后台：
+
+https://www.notion.so/developers
+
+打开后，请回复：
+
+开发者页面已打开
+```
+
+Codex must wait for `开发者页面已打开`.
+
+#### Step 2: Open the Connection List
+
+After the user replies `开发者页面已打开`, Codex must display:
+
+```text
+请点击开发者后台左侧栏的“连接”。
+
+这里会显示你已经创建的 Notion 连接。
+
+打开后，请回复：
+
+连接列表已打开
+```
+
+Codex must wait for `连接列表已打开`.
+
+#### Step 3: Open or Create a Connection
+
+After the user replies `连接列表已打开`, Codex must display:
+
+```text
+请查看列表中是否已经有用于英语音频学习助手的连接。
+
+如果已经有，请直接打开它。
+
+如果没有，请创建一个新的连接，名称建议填写：
+
+英语音频学习助手
+
+请选择你用于保存学习资料的工作空间。
+
+打开连接配置页面后，请回复：
+
+连接页面已打开
+```
+
+An existing connection may have a different name, such as
+`English podcast learning`; Codex must not require renaming it.
+Codex must wait for `连接页面已打开`.
+
+#### Step 4: Confirm Content Permissions
+
+After the user replies `连接页面已打开`, Codex must display:
+
+```text
+请在当前连接的“配置”页面中，确认以下内容权限已经开启：
+
+- 读取内容
+- 更新内容
+- 插入内容
+
+这些权限只用于读取和保存英语学习资料。
+
+确认完成后，请回复：
+
+权限已确认
+```
+
+Codex must wait for `权限已确认`.
+
+#### Step 5: Save the Access Token
+
+After the user replies `权限已确认`, Codex must display:
+
+```text
+请在同一个连接配置页面找到“访问令牌”。
+
+点击复制按钮，安全保存完整令牌。
+
+访问令牌相当于私人密码：
+
+- 不要发送到聊天
+- 不要截图分享
+- 不要写入公开文档
+- 不要提交到 GitHub
+
+保存好后，请回复：
+
+密钥已保存
+```
+
+Codex must wait for `密钥已保存`.
+
+#### Step 6: Open Notion and Create the Learning Page
+
+After the user replies `密钥已保存`, Codex must display:
 
 ```text
 接下来，我会带你在 Notion 中创建一个新页面，用来存放英语学习资料。
@@ -188,6 +289,8 @@ After the user replies `已打开 Notion`, Codex must display:
 
 Codex must wait for `页面已创建`.
 
+#### Step 7: Add the Integration to the Page
+
 After the user replies `页面已创建`, Codex must display:
 
 ```text
@@ -197,20 +300,20 @@ After the user replies `页面已创建`, Codex must display:
 
 1. 打开刚创建的“英语音频学习助手”页面。
 2. 点击页面右上角的“•••”。
-3. 找到“连接”或“Connections”。
-4. 点击“添加连接”。
-5. 选择你已有的英语音频学习助手连接。
+3. 找到“集成”。
+4. 点击“集成”。
+5. 选择你刚才打开或创建的英语音频学习助手连接。
 
-这个操作只允许英语音频学习助手在这个页面下创建和更新学习资料。
+如果你的连接名称不同，请选择你为这个项目使用的连接。
 
 完成后，请回复：
 
-连接已添加
+集成已添加
 ```
 
-Codex must wait for `连接已添加`.
+Codex must wait for `集成已添加`.
 
-If the user cannot find the connection control, Codex must display:
+If the user cannot find the integration control, Codex must display:
 
 ```text
 请先确认你正在查看刚创建的 Notion 页面。
@@ -218,13 +321,15 @@ If the user cannot find the connection control, Codex must display:
 然后：
 
 1. 点击页面右上角的“•••”。
-2. 向下查找“连接”“Connections”或“添加连接”。
+2. 向下查找“集成”。
 3. 选择你的英语音频学习助手连接。
 
 如果仍然找不到，请告诉我页面右上角现在有哪些按钮，或发送一张不包含密钥的截图。
 ```
 
-After the user replies `连接已添加`, Codex must display:
+#### Step 8: Copy the Page Link
+
+After the user replies `集成已添加`, Codex must display:
 
 ```text
 现在请复制这个 Notion 页面的链接。
@@ -248,82 +353,6 @@ After the user replies `连接已添加`, Codex must display:
 
 Codex must wait for `链接已复制`. Only after this reply may Codex prepare the
 local runtime and launch the safe setup tool.
-
-#### No Existing Notion Connection
-
-When the user says `没有`, Codex must display:
-
-```text
-英语音频学习助手需要一个 Notion 私人连接，才能只访问你指定的页面并保存学习资料。
-
-这个连接不会自动访问你整个 Notion 工作空间。
-
-现在我会带你创建它。
-
-请打开：
-
-https://www.notion.so/developers
-
-打开后，请回复：
-
-开发者页面已打开
-```
-
-Codex must wait for `开发者页面已打开`.
-
-After the user replies `开发者页面已打开`, Codex must display:
-
-```text
-请创建一个新的 Notion 内部连接。
-
-建议名称：
-
-英语音频学习助手
-
-请选择你用于保存学习资料的 Notion 工作空间。
-
-确认连接拥有读取、插入和更新内容的权限。
-
-创建完成后，请回复：
-
-连接已创建
-```
-
-Codex must wait for `连接已创建`.
-
-After the user replies `连接已创建`, Codex must display:
-
-```text
-请复制刚创建连接的访问密钥。
-
-访问密钥相当于私人密码：
-
-- 不要发送到聊天
-- 不要截图分享
-- 不要写入公开文档
-- 不要提交到 GitHub
-
-请先安全保留它，稍后只粘贴到本地安全窗口。
-
-保存好后，请回复：
-
-密钥已保存
-```
-
-Codex must wait for `密钥已保存`, then continue with the existing-connection
-page flow in this order:
-
-```text
-已打开 Notion
-↓
-页面已创建
-↓
-连接已添加
-↓
-链接已复制
-```
-
-Every later reply gate remains mandatory.
 
 ### First-Time Setup Responsibilities
 
@@ -436,8 +465,8 @@ Codex locates the complete project, prepares the local environment, guides the
 Notion authorization, and starts the safe setup tool. The user enters the
 token and complete parent-page URL only in the local interface.
 
-Python creates or validates Podcast Library, Expression Database, Weekly
-Review, and Vocabulary Database. Weekly Review stores the Weekly Reflection
+Python creates or validates Podcast Library, Expression Database, Vocabulary
+Database, and Weekly Review. Weekly Review stores the Weekly Reflection
 learning note.
 
 ### Step 3: Provide Podcast Input
