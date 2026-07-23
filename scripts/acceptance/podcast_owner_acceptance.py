@@ -42,6 +42,7 @@ from src.notion.schema import (
 SETUP_STATE_ENV = "EPLA_NOTION_SETUP_STATE"
 SETUP_STATE_COMPLETE = "complete"
 DEPENDS_ON_PR_9 = True
+INITIAL_PR_9_HEAD = "7a0d240cfb3c8ccf935ebc96bf7b671994e332ef"
 
 
 class AcceptanceConfigurationError(RuntimeError):
@@ -988,6 +989,8 @@ class AcceptanceReport:
 
     status: str
     depends_on_pr_9: bool
+    initial_pr_9_head: str
+    final_pr_9_integration_verified: bool
     pre_publish_snapshot: str
     first_publish_verification: str
     second_publish_verification: str
@@ -1009,6 +1012,14 @@ class AcceptanceReport:
                 else "[REDACTED]"
             ),
             "depends_on_pr_9": bool(self.depends_on_pr_9),
+            "initial_pr_9_head": (
+                self.initial_pr_9_head
+                if self.initial_pr_9_head == INITIAL_PR_9_HEAD
+                else "[REDACTED]"
+            ),
+            "final_pr_9_integration_verified": bool(
+                self.final_pr_9_integration_verified
+            ),
             "pre_publish_snapshot": (
                 self.pre_publish_snapshot
                 if self.pre_publish_snapshot in _PUBLIC_CHECK_VALUES
@@ -1120,6 +1131,8 @@ class OwnerAcceptanceRunner:
         report = AcceptanceReport(
             status="passed",
             depends_on_pr_9=DEPENDS_ON_PR_9,
+            initial_pr_9_head=INITIAL_PR_9_HEAD,
+            final_pr_9_integration_verified=False,
             pre_publish_snapshot="passed",
             first_publish_verification="passed",
             second_publish_verification="passed",
@@ -1256,6 +1269,8 @@ def render_failure_report(code: str) -> str:
         {
             "status": "failed",
             "depends_on_pr_9": DEPENDS_ON_PR_9,
+            "initial_pr_9_head": INITIAL_PR_9_HEAD,
+            "final_pr_9_integration_verified": False,
             "failure": safe_code,
             "secrets_redacted": True,
         },

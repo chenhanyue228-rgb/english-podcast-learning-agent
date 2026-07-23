@@ -5,12 +5,20 @@ It depends on the behavior under review in PR #9:
 
 ```text
 depends_on_pr_9=true
+initial_pr_9_head=7a0d240cfb3c8ccf935ebc96bf7b671994e332ef
+final_pr_9_integration_verified=false
 ```
 
 It does not replace the production workflow or reproduce PR #9's recovery and
 idempotency implementation. The harness imports and invokes the existing
 `publish_complete_learning_materials` entry point twice with exactly the same
 payload.
+
+The initial PR #9 HEAD above has been reviewed as `CHANGES_REQUIRED`. It is a
+historical construction baseline only. The harness does not claim integration
+with the eventual PR #9 HEAD. After the maintainer publishes the final PR #9
+commit, this branch requires a rebase or an integration-verification run
+against that exact final HEAD before owner acceptance can be executed.
 
 ## Safety model
 

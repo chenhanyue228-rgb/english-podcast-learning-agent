@@ -114,6 +114,11 @@ def test_first_publish_snapshot_comparison_passes() -> None:
 
     assert result.report.status == "passed"
     assert result.report.depends_on_pr_9 is True
+    assert (
+        result.report.initial_pr_9_head
+        == "7a0d240cfb3c8ccf935ebc96bf7b671994e332ef"
+    )
+    assert result.report.final_pr_9_integration_verified is False
     assert result.evidence.podcast_added_on_first_publish == 1
     assert result.evidence.expressions_added_on_first_publish == 2
     assert len(workspace.target_podcast_pages()) == 1
@@ -300,6 +305,8 @@ def test_all_public_reports_are_redacted() -> None:
     tainted_report = AcceptanceReport(
         status=workspace.config.token,
         depends_on_pr_9=True,
+        initial_pr_9_head=workspace.config.expression_data_source_id,
+        final_pr_9_integration_verified=False,
         pre_publish_snapshot="https://notion.so/private-page",
         first_publish_verification="passed",
         second_publish_verification="passed",
@@ -317,6 +324,12 @@ def test_all_public_reports_are_redacted() -> None:
     assert '"secrets_redacted": true' in rendered
     assert '"secrets_redacted": true' in tainted
     assert '"secrets_redacted": true' in failure
+    assert (
+        '"initial_pr_9_head": '
+        '"7a0d240cfb3c8ccf935ebc96bf7b671994e332ef"'
+        in rendered
+    )
+    assert '"final_pr_9_integration_verified": false' in rendered
 
 
 def test_temporary_snapshots_are_deleted_in_finally(tmp_path) -> None:
