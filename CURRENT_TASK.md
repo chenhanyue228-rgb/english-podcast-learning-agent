@@ -8,21 +8,10 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Pre-PR #7 production baseline:
-  `87b96d9f68ad65d3356943b1f8196eeea8f9f3ee`
-- PR #6: merged
-- Production baseline tests: 407 passed, 3 expected warnings
+- Production `main`: `68cf0db509600862c002c66659478522ff290e35`
+- PR #7: merged with Create a merge commit
+- Production verification: 453 passed, 3 expected warnings
 - Architecture: Stable
-
-## PR #7 Merge Candidate
-
-- PR #7 remediation implementation reviewed
-- Branch: `fix/phase-4.1c-notion-api-and-setup-ux`
-- Candidate verification: 453 passed, 3 expected warnings
-- Review result: `READY_TO_MERGE`
-- Existing four Data Source IDs must be reused
-- Real Owner Acceptance remains pending
-- External-user sessions: 0
 
 ## Current Sprint
 
@@ -34,41 +23,31 @@ External-user sessions: 0
 
 ## Goal
 
-Fix the P1 Notion data source field and relation compatibility blocker
-discovered during Owner Acceptance, then resume setup against the already
-created databases without creating duplicates.
+Merge the reviewed recovery evidence and prepare the protected real
+podcast-to-Notion Owner Acceptance journey.
 
 ```text
-Saved data source IDs
+Real Notion recovery evidence accepted
 ↓
-In-place schema reconciliation
+Merge PR #8
 ↓
-Single-property relations
+Select one supported podcast input
 ↓
-Full validation
+Run protected podcast-to-Notion journey
 ↓
-Resume Owner Acceptance
+Review real Notion output and idempotency
 ```
 
 ## Current Tasks
 
-1. Pin the Notion SDK version verified for the current data source API.
-2. Create database containers with `initial_data_source.properties`.
-3. Persist and reuse returned `data_source_id` values.
-4. Reconcile all four existing data source schemas in place.
-5. Rename the sole title property without creating a second title.
-6. Preserve unknown user properties and stop on type conflicts.
-7. Configure Expression, Vocabulary, and Weekly Review relations with
-   `single_property`.
-8. Fix the database creation, validation, and reporting order.
-9. Replace the `已有`/`没有` split with one guided connection path.
-10. Distinguish developer-dashboard “连接” from page-level “集成”.
-11. Hide both token and page-link input and confirm each is received.
-12. Stop safely when an existing relation uses `dual_property` or points to a
-    different data source.
-13. Validate all three relation targets and one-way modes before setup can be
-    marked complete.
-14. Re-review and merge the fix before resuming real setup.
+1. Merge the reviewed recovery evidence.
+2. Keep the existing four Data Source IDs and parent page unchanged.
+3. Run one protected podcast-to-Notion Owner Acceptance journey.
+4. Verify Podcast Library and Expression Database output.
+5. Verify retry/idempotency behavior without duplicate records.
+6. Keep Vocabulary and Weekly Review outside the podcast write unless the
+   accepted workflow explicitly requires them.
+7. Keep external-user testing paused.
 
 ## Out of Scope
 
@@ -108,8 +87,9 @@ Resume Owner Acceptance
 Owner Acceptance started and reached real first-time setup. Skill installation,
 Skill discovery, and the reply-gated guidance mechanism passed. Real setup
 created four database containers and saved all four Data Source IDs. Field and
-Relation recovery has not yet passed real acceptance, and the podcast-to-Notion
-journey has not started. External-user validation has not started.
+Relation recovery passed with the original Data Sources and no new database.
+The podcast-to-Notion journey has not started. External-user validation has
+not started.
 
 ## Current State
 
@@ -119,10 +99,16 @@ journey has not started. External-user validation has not started.
   a new conversation or restart.
 - The reply-gated Notion conversation mechanism passed Owner Acceptance.
 - Real setup created four database containers and saved their identifiers.
-- The current API rejected legacy relation payloads and left data source
-  fields incomplete.
-- The existing databases must be repaired in place; they must not be deleted
-  or recreated.
+- PR #7 is merged into production `main`.
+- Real Notion in-place recovery passed with the existing four Data Sources.
+- New databases created: 0.
+- Required fields and all three single-property relations passed validation.
+- Unknown fields and existing records were preserved.
+- Setup state is `complete`.
+- Real recovery evidence was reviewed and accepted by the AI Tech Lead.
+- PR #8 remains pending merge.
+- The next uncompleted Owner Acceptance gate is the podcast-to-Notion journey.
+- The existing databases must not be deleted or recreated.
 - The safe first-time setup tool and its interruption recovery are implemented.
 - Safe per-database setup recovery and dependency verification are implemented.
 - Parent-page consistency protection is implemented for setup recovery.
