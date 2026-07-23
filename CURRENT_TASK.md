@@ -8,40 +8,49 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Tests: 345 passed
+- Production `main`: `e87d6e41c6b8d2a98a4ef1db43ed685a937ba4d2`
+- PR #4: merged
+- Tests: 351 passed
 - Architecture: Stable
 
 ## Current Sprint
 
-Phase 4.1 — Clean-Clone Onboarding Validation
+Phase 4.1C — Owner Acceptance Preparation
+
+Status: `READY_FOR_ONBOARDING_PR`
+
+External-user sessions: 0
 
 ## Goal
 
-Determine whether a new user can independently complete:
+Complete and verify a first-time setup flow in which a normal user does not
+need to locate the project directory, type `cd`, or run primary commands
+manually.
 
 ```text
-Repository access
+Installation handoff in the current conversation
 ↓
-Environment setup
+Guided Notion authorization
 ↓
-Notion setup
+Safe local setup
 ↓
-First audio input
-↓
-Codex artifact generation
-↓
-Notion learning-page publishing
+Codex-operated podcast-to-Notion flow
 ```
 
 ## Current Tasks
 
-1. Test installation from a clean clone.
-2. Record every undocumented dependency or manual step.
-3. Validate Notion workspace setup.
-4. Validate the first Podcast or Local Audio journey.
-5. Measure time to the first successful Notion learning page.
-6. Create a first-user issue log.
-7. Prioritize only evidence-backed UX fixes.
+1. Keep the current conversation as the primary post-install continuation.
+2. Make a new conversation and restart fallback-only actions.
+3. Add the Chinese user guide and complete path comparison.
+4. Add secure local token and parent-page URL input.
+5. Add the macOS one-click setup entry.
+6. Let Codex locate the project and prepare the runtime.
+7. Automatically create or validate all four Notion databases.
+8. Let Codex actively prompt for the first podcast after setup.
+9. Lock the onboarding contract with regression tests.
+10. Make interrupted database creation safely resumable.
+11. Keep every resumed database setup bound to its original parent page.
+12. Prepare the branch for onboarding review without starting Owner Acceptance.
 
 ## Out of Scope
 
@@ -57,13 +66,48 @@ Notion learning-page publishing
 
 ## Completion Criteria
 
-- A clean clone can bootstrap successfully.
-- First-use instructions match actual behavior.
+- The current conversation can continue directly after installation.
+- A new conversation is not mandatory.
+- The user does not need to memorize an instruction.
+- The user does not locate the project directory or type `cd`.
+- The token and complete parent-page URL are entered in a local safe interface.
+- Codex prepares the runtime and starts the setup flow.
+- Codex and Python create and validate the four databases.
+- Interrupted setup resumes from saved database IDs without creating duplicates.
+- Existing database IDs are checked before reuse.
+- Resumed setup safely stops before any operation if the parent page differs.
+- Relations and schema validation pass before setup is marked complete.
+- Codex actively prompts for a podcast after setup.
+- Codex operates the podcast-to-Notion workflow.
+- No unresolved P0 or P1 onboarding blocker remains in the implementation.
 - No real credentials are committed.
-- At least three external users are tested.
-- At least two users complete the core flow without developer intervention.
-- No unresolved P0 or P1 usability blocker remains.
-- Findings are recorded before the next feature sprint.
+- No external-user readiness claim is made.
+
+Owner Acceptance and external-user validation have not started.
+
+## Current State
+
+- PR #4 is merged.
+- The Phase 4.1C documentation branch exists.
+- The user interaction contract is being completed.
+- The safe first-time setup tool and its interruption recovery are implemented.
+- Safe per-database setup recovery and dependency verification are implemented.
+- Parent-page consistency protection is implemented for setup recovery.
+- The Notion plugin is documented as optional and outside the production write path.
+- Owner Acceptance has not started.
+- External-user sessions: 0.
+
+## Completed Phase 4.1 Milestones
+
+- Phase 4.1 clean-clone technical audit
+- Phase 4.1B onboarding fixes for PV-001 through PV-005
+- Codex Skills UI installation contract
+- four-database Notion onboarding flow
+- isolated `.venv` setup
+- complete Codex artifact handoff output
+- Apple Podcasts episode URL scope clarification
+- PR #4 merge into production `main`
+- merged-main regression verification: 351 passed, 3 expected warnings
 
 ## Completed Phase 3 Milestones
 

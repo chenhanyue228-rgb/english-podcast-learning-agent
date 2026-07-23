@@ -5,12 +5,60 @@ entries must be appended or clarified, not removed.
 
 ## Unreleased — Phase 4 Product Validation
 
-- Clean-clone onboarding validation.
-- First-user journey measurement.
-- External-user feedback collection.
-- Evidence-based UX improvement planning.
+### Phase 4.1B Onboarding Fixes
 
-These activities are planned validation work, not completed product changes.
+- Merged PR #4 with evidence-backed fixes for PV-001 through PV-005.
+- Added valid Codex Skill manifest frontmatter and discovery regression
+  coverage.
+- Defined the Codex Skills UI as the primary user installation path while
+  retaining symbolic-link setup as Developer-only.
+- Standardized onboarding around an isolated project `.venv`.
+- Unified Notion onboarding around one setup command that creates Podcast
+  Library, Expression Database, Weekly Review, and Vocabulary Database.
+- Preserved Weekly Review as the database container for Weekly Reflection
+  content.
+- Improved Podcast Analysis artifact handoff output with request path, expected
+  output path, canonical `$english-audio-learning-agent` instruction, and exact
+  rerun command.
+- Clarified supported Apple Podcasts episode URL input.
+- Verified merged `main`: 351 tests passed with 0 failures and 3 expected
+  compatibility-provider deprecation warnings.
+
+### Phase 4.1C Owner Acceptance
+
+- Made first-time Notion database creation resumable with per-database
+  progress persistence and safe retry.
+- Bound resumed setup to the original Notion parent page so missing databases
+  cannot be created under a different page.
+- Verified the parent-page consistency closure with 407 passing tests and 3
+  expected compatibility-provider deprecation warnings.
+- Added existing-database access checks and mandatory relation rewiring before
+  setup completion.
+- Made the macOS setup entry verify the complete project dependency set.
+- Clarified that the Codex Notion plugin is optional and is not a second
+  authentication, setup, or write path.
+- Added a complete Chinese user guide for installation, Notion authorization,
+  first-time setup, daily use, and recovery.
+- Made the current conversation the primary continuation after installation.
+- Limited new-conversation and restart guidance to Skill-refresh fallbacks.
+- Added the full user-path and runtime-path comparison table.
+- Added automatic project location and safe acquisition rules for Codex.
+- Added one macOS first-time setup entry.
+- Added hidden Notion token input and complete parent-page URL support.
+- Removed the normal-user requirement to locate a project directory, type
+  `cd`, edit `.env`, create `.venv`, run primary commands, or extract a page
+  ID manually.
+- Added automatic four-database creation/validation and partial-configuration
+  duplicate protection.
+- Added the post-setup prompt for the user's first podcast.
+- Added first-time setup and Skill onboarding contract regression tests.
+- Verified the resumable setup closure with 401 passing tests and 3 expected
+  compatibility-provider deprecation warnings.
+- Prepared Owner Acceptance with status `READY_FOR_ONBOARDING_PR`.
+- External-user testing has not started; external-user session count remains 0.
+
+Owner Acceptance begins only after this onboarding update is reviewed, merged,
+and installed from the latest `main`.
 
 ## [v1.1.0] - 2026-07-22
 

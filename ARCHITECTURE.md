@@ -31,10 +31,23 @@ expressions, vocabulary memory, and personal learning reflections.
 
 ## 3. Runtime Responsibilities
 
+### User
+
+The user owns only non-delegable actions:
+
+- Notion account and workspace authorization
+- entering the Notion token in the local hidden-input interface
+- providing the complete Notion parent-page URL
+- selecting audio sources and vocabulary highlights
+- approving necessary local execution and network access
+
 ### Codex
 
 Codex is the reasoning layer. It is responsible for:
 
+- installation handoff and user guidance
+- locating or safely acquiring the complete local project
+- preparing and operating the project-local runtime
 - language understanding
 - podcast learning analysis
 - expression extraction
@@ -42,6 +55,7 @@ Codex is the reasoning layer. It is responsible for:
 - reflection analysis
 - Weekly Review generation
 - generating schema-conformant JSON artifacts
+- advancing workflows and reporting results
 
 ### Python
 
@@ -56,6 +70,10 @@ Python is the orchestration and validation layer. It is responsible for:
 - Notion synchronization and idempotent updates
 
 Python does not perform production AI reasoning.
+
+Local Python execution is required, but manual terminal operation by the user
+is not. Codex starts the deterministic tools; Python validates formats and
+writes to Notion.
 
 ### Notion
 
@@ -104,8 +122,13 @@ Notion write occurs.
 
 Responsibility boundary:
 
+- User: account authorization, safe secret entry, content selection, and
+  permission approval
 - Codex: reasoning, analysis, and content generation
-- Python: orchestration, validation, and deterministic processing
+- Codex also handles installation handoff, local workflow operation, recovery,
+  and result reporting
+- Python: orchestration, validation, deterministic processing, and Notion
+  writing
 - Notion: storage, memory, and knowledge management
 
 ## 5. Core Workflows

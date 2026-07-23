@@ -19,20 +19,39 @@ The system helps users build long-term personal English learning memory.
 
 **Phase 4 — Product Validation**
 
-The current stable release is **v1.1.0**, built from merge commit
-`80cbab01ea266e487a0359ddbec562959070d8a0`.
+**Execution stage:** Phase 4.1C — Owner Acceptance Preparation
+
+**Status:** `READY_FOR_ONBOARDING_PR`
+
+The current stable release remains **v1.1.0**, built from release commit
+`80cbab01ea266e487a0359ddbec562959070d8a0`. The current production `main`
+includes PR #4 through merge commit
+`e87d6e41c6b8d2a98a4ef1db43ed685a937ba4d2`.
 
 Release status:
 
 - v1.1.0 is released and tagged locally and remotely
 - the production architecture and workflow boundaries are stable
 - production workflows and CLI behavior are verified
-- 345 tests pass with 3 expected compatibility-provider deprecation warnings
-- Product Validation is now the priority
+- PR #4 merged the Phase 4.1B onboarding fixes into `main`
+- 351 tests pass with 3 expected compatibility-provider deprecation warnings
+- external-user sessions: 0
+- the guided first-time-use flow is being prepared for Owner Acceptance
 
-Phase 4 validates whether a new user can independently transform an English
-audio source into useful, reusable Notion learning assets. The immediate
-priority is clean-clone onboarding and first-user journey validation.
+Phase 4.1C prepares the guided onboarding flow before it is merged and tested
+in the owner's real Codex and Notion environment. Owner Acceptance has not
+started. External-user testing has not started.
+
+The formal user flow continues in the current conversation after installation.
+A new conversation is not mandatory, and restarting Codex is only the second
+Skill-refresh fallback. The user does not need to memorize commands, locate the
+project directory, type `cd`, create `.venv`, or run the primary workflow.
+
+Codex locates or safely acquires the complete project, prepares the local
+runtime, starts the safe first-time setup tool, and advances the workflow. The
+user remains responsible for non-delegable account authorization, hidden token
+entry, the parent-page URL, learning-content selection, and required
+permissions.
 
 ## Runtime Model
 
@@ -131,10 +150,13 @@ Weekly Reflection is a compounding learning note rather than a recap.
 
 ## Current Product Risks
 
-- Setup may still require too much technical knowledge.
-- First-time Notion configuration has not been tested by external users.
-- The Codex artifact handoff may be unclear to a new user.
-- The first-use path has not been measured.
+- The Codex Skills UI installation path is defined but has not completed Owner
+  Acceptance.
+- The new safe first-time setup tool must be reviewed and merged before Owner
+  Acceptance begins.
+- The merged artifact handoff has not yet been exercised in the owner's full
+  learning journey.
+- External-user session count remains 0.
 - Learning-asset usefulness has not been validated with external users.
 
 ## Historical Milestones
@@ -147,10 +169,10 @@ full regression suite, and completed the reviewed v1.1.0 release.
 
 ## Immediate Milestone
 
-Complete Phase 4.1 clean-clone onboarding validation: observe new users setting
-up the environment and Notion, processing a first supported audio source,
-completing the Codex artifact handoff, and publishing a first learning page.
-Record evidence before scheduling product or architecture changes.
+Review and merge the guided first-time-use flow. Then begin Phase 4.1C Owner
+Acceptance from the latest `main`: install the Skill, continue in the current
+conversation, complete safe Notion setup, and run one supported
+audio-to-Notion learning flow. External-user sessions remain 0.
 
 Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md` and
 `skill/SKILL.md` before changing runtime behavior.

@@ -139,3 +139,126 @@ understand, and obtain value from the product without developer assistance.
 
 Phase 4 ends only after external-user evidence supports the next product
 direction.
+
+## DEC-006: Use Codex Skills UI as the Primary Installation Path
+
+- Date: 2026-07-23
+- Status: Provisional (pending owner validation)
+
+### Decision
+
+Use the Codex Skills UI as the primary user-facing installation path. The user
+opens Skills, chooses Create, uploads the local `skill/` directory, saves the
+Skill, and restarts Codex or opens a new task before verifying
+`$english-audio-learning-agent`.
+
+The symbolic-link method under `~/.codex/skills/` remains a Developer-only
+fallback and is not the default onboarding contract.
+
+### Reason
+
+The primary installation path must use the supported Codex product surface and
+must not claim that an internal helper or filesystem copy proves end-to-end
+product installation.
+
+### Acceptance Condition
+
+This decision becomes Accepted only after the owner completes installation and
+discovery in the real Codex Skills UI. External-user validation is separate
+and has not started.
+
+## DEC-007: Preserve Weekly Review Database Naming
+
+- Date: 2026-07-23
+- Status: Accepted
+
+### Decision
+
+Keep `Weekly Review` as the Notion database container name. Store the
+`Weekly Reflection` compounding learning note as its product content.
+
+### Reason
+
+This naming preserves the existing production database, relations, environment
+compatibility, and idempotent publishing behavior without a schema migration.
+
+### Consequences
+
+- No live Notion database rename or migration is required.
+- `NOTION_WEEKLY_REFLECTION_DATABASE_ID` remains the canonical environment
+  variable.
+- `NOTION_WEEKLY_REVIEW_DATABASE_ID` remains a legacy compatibility alias.
+
+## DEC-008: Continue First-Time Setup in the Installation Conversation
+
+- Date: 2026-07-23
+- Status: 项目所有者验收阶段采用
+
+### Decision
+
+After installation, the installing Codex asks in the current conversation
+whether the user wants to continue first-time setup. A new conversation is
+only the first Skill-refresh fallback. Restarting Codex is the second fallback.
+
+### Reason
+
+Installation and setup should feel like one product journey. Requiring a new
+conversation adds an unnecessary handoff and makes the user remember a command.
+
+## DEC-009: Normal Users Do Not Locate the Project Directory
+
+- Date: 2026-07-23
+- Status: 项目所有者验收阶段采用
+
+### Decision
+
+Codex locates or safely acquires the complete project and operates the local
+runtime. Normal users are not responsible for the project path, `cd`, `.venv`,
+or primary terminal commands.
+
+### Reason
+
+These are execution details owned by Codex and Python, not learning tasks owned
+by the user.
+
+## DEC-010: Use One Safe First-Time Setup Entry
+
+- Date: 2026-07-23
+- Status: 采用
+
+### Decision
+
+Use one Codex-launched local setup flow for the Notion token and complete
+parent-page URL. The token must not be accepted through chat, command
+arguments, or plaintext shell commands.
+
+### Reason
+
+A single hidden-input path reduces configuration errors and keeps the secret
+out of conversation history, process arguments, and logs.
+
+## DEC-011: Short Instructions Trigger Complete User Flows
+
+- Date: 2026-07-23
+- Status: 项目所有者验收阶段采用
+
+### Decision
+
+First-time setup may be triggered with:
+
+```text
+请使用英语音频学习助手，带我完成第一次设置。
+```
+
+Podcast processing may be triggered with:
+
+```text
+请使用英语音频学习助手处理这个播客。
+```
+
+The detailed background sequence belongs to the Skill contract and is not
+copied by the user.
+
+### Reason
+
+Users should express intent while Codex handles orchestration details.
