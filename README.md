@@ -38,9 +38,10 @@ Current state:
 - required fields and three single-property relations passed validation
 - unknown fields and existing records were preserved
 - setup state is `complete`
-- Owner Acceptance remains blocked pending evidence review and the remaining
-  podcast-to-Notion journey
+- real recovery evidence has been reviewed and accepted
+- Owner Acceptance remains blocked pending the podcast-to-Notion journey
 - external-user sessions remain 0
+- the product is not ready for external users
 
 For the production runtime contract, read:
 

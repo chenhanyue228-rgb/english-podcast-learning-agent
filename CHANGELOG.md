@@ -108,11 +108,14 @@ entries must be appended or clarified, not removed.
   unknown fields, and all four Data Source identities.
 - Verified all required fields and three single-property relations.
 - Advanced the setup state from `in_progress` to `complete`.
-- Kept Owner Acceptance blocked and external-user sessions at 0 pending
-  evidence review and the remaining podcast-to-Notion journey.
+- Real recovery evidence was reviewed and accepted by the AI Tech Lead.
+- Recovery result: PASS.
+- PR #8 records the accepted recovery evidence.
+- Kept Owner Acceptance blocked pending the podcast-to-Notion journey.
+- External-user sessions remain 0.
 
-Owner Acceptance remains pending until the recovery evidence is reviewed and
-the remaining podcast-to-Notion journey is completed.
+Owner Acceptance remains pending until the podcast-to-Notion journey is
+completed.
 
 ## [v1.1.0] - 2026-07-22
 

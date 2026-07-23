@@ -23,27 +23,31 @@ External-user sessions: 0
 
 ## Goal
 
-Record and review the protected real Notion in-place recovery evidence before
-resuming the remaining Owner Acceptance journey.
+Merge the reviewed recovery evidence and prepare the protected real
+podcast-to-Notion Owner Acceptance journey.
 
 ```text
-Existing data source IDs
+Real Notion recovery evidence accepted
 ↓
-Protected in-place recovery
+Merge PR #8
 ↓
-Full schema and relation validation
+Select one supported podcast input
 ↓
-AI Tech Lead evidence review
+Run protected podcast-to-Notion journey
 ↓
-Resume Owner Acceptance
+Review real Notion output and idempotency
 ```
 
 ## Current Tasks
 
-1. Review the real Notion recovery evidence.
+1. Merge the reviewed recovery evidence.
 2. Keep the existing four Data Source IDs and parent page unchanged.
-3. Resume the podcast-to-Notion Owner Acceptance journey only after review.
-4. Keep external-user testing paused.
+3. Run one protected podcast-to-Notion Owner Acceptance journey.
+4. Verify Podcast Library and Expression Database output.
+5. Verify retry/idempotency behavior without duplicate records.
+6. Keep Vocabulary and Weekly Review outside the podcast write unless the
+   accepted workflow explicitly requires them.
+7. Keep external-user testing paused.
 
 ## Out of Scope
 
@@ -101,6 +105,9 @@ not started.
 - Required fields and all three single-property relations passed validation.
 - Unknown fields and existing records were preserved.
 - Setup state is `complete`.
+- Real recovery evidence was reviewed and accepted by the AI Tech Lead.
+- PR #8 remains pending merge.
+- The next uncompleted Owner Acceptance gate is the podcast-to-Notion journey.
 - The existing databases must not be deleted or recreated.
 - The safe first-time setup tool and its interruption recovery are implemented.
 - Safe per-database setup recovery and dependency verification are implemented.

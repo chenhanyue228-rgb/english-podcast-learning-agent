@@ -44,14 +44,14 @@ Release status:
 - required fields and three single-property relations: PASS
 - unknown fields and existing records preserved: PASS
 - setup state: `complete`
-- real Owner Acceptance remains pending evidence review and the remaining
-  podcast-to-Notion journey
+- recovery evidence reviewed and accepted
+- real Owner Acceptance remains pending the podcast-to-Notion journey
 - external-user sessions: 0
 - Owner Acceptance started
 - Skill installation passed
 - continuing in the installation conversation passed without a restart
 - the one-action/one-confirmation conversation mechanism passed
-- Owner Acceptance is blocked pending evidence review before the remaining
+- Owner Acceptance is blocked pending the remaining podcast-to-Notion
   end-to-end journey
 
 Phase 4.1C is running in the owner's real Codex environment. The first
@@ -172,22 +172,25 @@ Weekly Reflection is a compounding learning note rather than a recap.
 
 ## Current Product Risks
 
-- Notion first-time setup is a P1 Owner Acceptance blocker because the current
-  SDK data source creation contract differs from the legacy top-level
-  `properties` request.
-- Existing empty database containers require an idempotent in-place schema
-  reconciliation path that preserves their identifiers and unknown fields.
-- Relation properties must use `data_source_id` with `single_property`.
-- The local safe-input window must confirm both hidden inputs without exposing
-  the token, page URL, page ID, or database IDs.
-- Existing dual-property relations must stop recovery safely; they must not be
-  converted to one-way relations without an explicit migration decision.
-- Final workspace validation must check relation targets and relation modes,
-  not only the `relation` property type.
-- The merged artifact handoff has not yet been exercised in the owner's full
-  learning journey.
-- External-user session count remains 0.
-- Learning-asset usefulness has not been validated with external users.
+Resolved during Phase 4.1C:
+
+- legacy Database / Data Source API mismatch
+- empty database schema reconciliation requirement
+- relation `single_property` compatibility
+- hidden input feedback issue
+- final relation target and mode validation
+- safe stop for existing `dual_property` relations
+
+Current risks:
+
+1. The recovered production workspace has not yet completed a real
+   podcast-to-Notion journey.
+2. Real Podcast Library and Expression Database output has not yet been
+   reviewed after recovery.
+3. End-to-end retry and idempotency have not yet been verified in the
+   recovered owner workspace.
+4. External-user sessions remain 0.
+5. Learning-asset usefulness has not been validated with external users.
 
 ## Historical Milestones
 
@@ -199,11 +202,12 @@ full regression suite, and completed the reviewed v1.1.0 release.
 
 ## Immediate Milestone
 
-Fix and review the current Notion data source creation/reconciliation contract,
-align the real “连接”/“集成” UI path, and improve the two-step hidden local
-input. After the fix is merged, resume setup against the same saved four
-database identifiers and the same Notion page. Do not start external-user
-testing. External-user sessions remain 0.
+- Merge PR #8.
+- Run one protected real podcast-to-Notion Owner Acceptance journey against
+  the existing workspace.
+- Review output quality, database placement, relation behavior, and
+  idempotency.
+- Do not start external-user testing.
 
 Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md` and
 `skill/SKILL.md` before changing runtime behavior.
