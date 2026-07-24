@@ -610,6 +610,8 @@ def update_env_file(values: dict[str, str], path: Path = ENV_PATH) -> None:
 
 
 def setup_workspace(parent_page_id: str, notion: Optional[Client] = None) -> dict[str, str]:
+    from src.notion.parent_page_guide import ensure_parent_page_guide_for_setup
+
     notion_client = notion or create_notion_client()
     normalized_parent_page_id = normalize_notion_id(parent_page_id)
     update_env_file(
@@ -617,6 +619,10 @@ def setup_workspace(parent_page_id: str, notion: Optional[Client] = None) -> dic
             NOTION_PARENT_PAGE_ID_ENV: normalized_parent_page_id,
             NOTION_TARGET_PARENT_PAGE_ID_ENV: normalized_parent_page_id,
         }
+    )
+    ensure_parent_page_guide_for_setup(
+        notion_client,
+        normalized_parent_page_id,
     )
     database_ids = create_base_databases(notion_client, normalized_parent_page_id)
     reconcile_workspace_schema(notion_client, database_ids)

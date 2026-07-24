@@ -34,6 +34,11 @@ def mock_schema_reconciler(monkeypatch) -> None:
         "reconcile_workspace_schema",
         lambda _notion, _ids: None,
     )
+    monkeypatch.setattr(
+        first_time_setup,
+        "ensure_parent_page_guide_for_setup",
+        lambda _notion, _parent: False,
+    )
 
 
 def create_missing_database_ids(
@@ -424,6 +429,126 @@ def test_empty_database_configuration_creates_databases(
 
     assert result.created_databases is True
     assert calls == ["create", "wire"]
+
+
+def test_new_workspace_creates_parent_guide_before_databases(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        first_time_setup,
+        "ensure_parent_page_guide_for_setup",
+        lambda _notion, _parent: calls.append("guide") or True,
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        lambda _notion, _parent, **kwargs: calls.append("create")
+        or create_missing_database_ids(_notion, _parent, **kwargs),
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: calls.append("wire"),
+    )
+
+    first_time_setup.run_first_time_setup(
+        project_root=root,
+        token=FAKE_TOKEN,
+        parent_page=PARENT_URL,
+        notion=object(),
+        validator=valid_results,
+    )
+
+    assert calls == ["guide", "create", "wire"]
+
+
+def test_complete_workspace_does_not_implicitly_publish_parent_guide(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    (root / ".env").write_text(
+        f"NOTION_PARENT_PAGE_ID={PARENT_ID}\n"
+        f"{first_time_setup.SETUP_STATE_ENV}="
+        f"{first_time_setup.SETUP_STATE_COMPLETE}\n"
+        + "\n".join(f"{key}={value}" for key, value in DATABASE_IDS.items())
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "ensure_parent_page_guide_for_setup",
+        lambda *_args: pytest.fail(
+            "completed workspaces require the protected guide CLI"
+        ),
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        create_missing_database_ids,
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "wire_database_relations",
+        lambda _notion, _ids: None,
+    )
+
+    result = first_time_setup.run_first_time_setup(
+        project_root=root,
+        token=FAKE_TOKEN,
+        parent_page=PARENT_URL,
+        notion=object(),
+        validator=valid_results,
+        database_access_validator=lambda _notion, _ids: None,
+    )
+
+    assert result.created_databases is False
+
+
+def test_parent_guide_failure_stops_before_database_creation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    root = make_project_root(tmp_path)
+    monkeypatch.setattr(
+        first_time_setup,
+        "ensure_parent_page_guide_for_setup",
+        lambda *_args: (_ for _ in ()).throw(
+            first_time_setup.ParentPageGuideError(
+                "parent_guide_write_failed",
+                write_attempted=True,
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "create_base_databases",
+        lambda *_args, **_kwargs: pytest.fail(
+            "database creation must not continue"
+        ),
+    )
+
+    with pytest.raises(
+        first_time_setup.FirstTimeSetupError,
+        match="父页面使用指南创建未完成",
+    ):
+        first_time_setup.run_first_time_setup(
+            project_root=root,
+            token=FAKE_TOKEN,
+            parent_page=PARENT_URL,
+            notion=object(),
+            validator=valid_results,
+        )
+
+    assert (
+        first_time_setup.read_env_values(root / ".env")[
+            first_time_setup.SETUP_STATE_ENV
+        ]
+        == first_time_setup.SETUP_STATE_IN_PROGRESS
+    )
 
 
 def test_partial_database_configuration_stops_before_create(
