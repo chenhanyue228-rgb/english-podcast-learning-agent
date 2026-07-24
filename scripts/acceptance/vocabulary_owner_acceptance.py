@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import re
 from collections import Counter
 from contextlib import redirect_stdout
@@ -31,6 +32,11 @@ from scripts.acceptance.podcast_owner_acceptance import (
     load_acceptance_config,
 )
 from src.agent.highlight_state import HIGHLIGHT_SYNC_STATE_PATH
+from src.enrichment.codex_provider import (
+    VOCABULARY_ENRICHMENT_SCHEMA,
+    VOCABULARY_INSTRUCTIONS,
+    CodexVocabularyEnrichmentProvider,
+)
 from src.notion.schema import (
     EXPRESSION_DATABASE,
     PODCAST_LIBRARY,
@@ -44,10 +50,17 @@ from src.notion.target_binding import (
     ensure_notion_page_belongs_to_role,
     validate_notion_target_binding,
 )
+from src.notion.vocabulary_publisher import vocabulary_page_properties
 from src.skill_runtime.artifacts import CodexArtifactPendingError
+from src.skill_runtime.artifacts import load_codex_artifact
 from src.workflow.highlight_vocabulary_publish_pipeline import (
+    _publish_payload_from_item,
     publish_highlight_vocabulary,
 )
+from src.workflow.vocabulary_candidate_filter import (
+    filter_vocabulary_candidates,
+)
+from src.workflow.vocabulary_enrichment import enrich_vocabulary_candidates
 from src.workflow.vocabulary_learning_pipeline import (
     build_vocabulary_learning_preview,
 )
@@ -64,6 +77,95 @@ def _state_digest(path: Path) -> str:
     if not path.exists():
         return "missing"
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _tree_digest(path: Path) -> str:
+    if not path.exists():
+        return "missing"
+    digest = hashlib.sha256()
+    for item in sorted(
+        (candidate for candidate in path.rglob("*") if candidate.is_file()),
+        key=lambda candidate: candidate.as_posix(),
+    ):
+        digest.update(item.relative_to(path).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(item.read_bytes()).digest())
+    return digest.hexdigest()
+
+
+def _load_existing_codex_enrichment(
+    word: str,
+    context: str,
+) -> dict[str, Any]:
+    provider = CodexVocabularyEnrichmentProvider()
+    request_path, output_path = provider._paths(word)
+    if not request_path.exists():
+        raise CodexArtifactPendingError(
+            "Codex vocabulary enrichment request is missing."
+        )
+    try:
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise CodexArtifactPendingError(
+            "Codex vocabulary enrichment request is invalid."
+        ) from None
+    expected_request = {
+        "stage": "vocabulary_enrichment",
+        "instructions": VOCABULARY_INSTRUCTIONS,
+        "input": {"word": word, "context": context},
+        "schema": VOCABULARY_ENRICHMENT_SCHEMA,
+    }
+    if not isinstance(request, Mapping) or any(
+        request.get(key) != value for key, value in expected_request.items()
+    ):
+        raise CodexArtifactPendingError(
+            "Codex vocabulary enrichment request is stale."
+        )
+    return load_codex_artifact(
+        request_path=request_path,
+        output_path=output_path,
+        stage=f"vocabulary enrichment ({word})",
+    )
+
+
+class _ReadOnlyVocabularyEnrichmentProvider:
+    def enrich(self, word: str, context: str) -> dict[str, Any]:
+        return _load_existing_codex_enrichment(word, context)
+
+
+def _build_read_only_vocabulary_preview(
+    *,
+    page_id: str,
+    raw_highlights: tuple[Mapping[str, Any], ...],
+) -> Mapping[str, Any]:
+    candidates = [
+        {
+            "word": str(item.get("text", "")).strip(),
+            "context": str(item.get("context", "")).strip(),
+            "source_page_id": page_id,
+        }
+        for item in raw_highlights
+    ]
+    filtered = filter_vocabulary_candidates(candidates)
+    enriched = enrich_vocabulary_candidates(
+        filtered.approved,
+        provider=_ReadOnlyVocabularyEnrichmentProvider(),
+    )
+    return {
+        "page_id": page_id,
+        "total_highlights": len(raw_highlights),
+        "rejected_candidates": [
+            {
+                "word": item.get("word", ""),
+                "reason": item.get("reason", ""),
+            }
+            for item in filtered.rejected
+        ],
+        "pending_vocabulary": [],
+        "approved_vocabulary": [
+            {**item, "review_status": "New"} for item in enriched
+        ],
+    }
 
 
 @dataclass(frozen=True, repr=False)
@@ -479,7 +581,9 @@ class _PreparedRun:
     approved: tuple[Mapping[str, Any], ...] = field(repr=False)
     rejected: tuple[Mapping[str, Any], ...] = field(repr=False)
     planned_actions: Mapping[str, str] = field(repr=False)
+    expected_properties: Mapping[str, Mapping[str, Any]] = field(repr=False)
     state_before: str = field(repr=False)
+    local_data_before: str = field(repr=False)
     binding: Any = field(repr=False)
 
 
@@ -539,17 +643,27 @@ class VocabularyOwnerAcceptanceRunner:
         *,
         highlight_reader: HighlightReader = read_pink_highlights,
         preview_builder: PreviewBuilder = build_vocabulary_learning_preview,
+        read_only_preview_builder: Optional[PreviewBuilder] = None,
         publisher: Publisher = publish_highlight_vocabulary,
         state_path: Path = HIGHLIGHT_SYNC_STATE_PATH,
+        artifact_root: Path = Path("data"),
     ) -> None:
         self.raw_notion = notion
         self.config = config
         self.highlight_reader = highlight_reader
         self.preview_builder = preview_builder
+        self.read_only_preview_builder = read_only_preview_builder
         self.publisher = publisher
         self.state_path = state_path
+        self.artifact_root = artifact_root
 
-    def _prepare(self, page_id: str) -> _PreparedRun:
+    def _prepare(self, page_id: str, *, read_only: bool) -> _PreparedRun:
+        if os.environ.get("ENRICHMENT_PROVIDER", "codex").strip().casefold() != (
+            "codex"
+        ):
+            raise AcceptanceFailure(
+                "non_codex_enrichment_provider_blocked"
+            )
         policy = VocabularyAcceptancePolicy(
             config=self.config,
             source_page_id=page_id,
@@ -570,6 +684,9 @@ class VocabularyOwnerAcceptanceRunner:
             raise AcceptanceFailure(exc.code) from None
 
         state_before = _state_digest(self.state_path)
+        local_data_before = (
+            _tree_digest(self.artifact_root) if read_only else ""
+        )
         before = snapshotter.capture()
         raw_highlights = tuple(
             item
@@ -581,7 +698,25 @@ class VocabularyOwnerAcceptanceRunner:
         )
         try:
             with redirect_stdout(io.StringIO()):
-                preview = self.preview_builder(page_id=page_id, notion=notion)
+                if read_only and self.read_only_preview_builder is None:
+                    preview = _build_read_only_vocabulary_preview(
+                        page_id=page_id,
+                        raw_highlights=raw_highlights,
+                    )
+                else:
+                    preview_builder = (
+                        self.read_only_preview_builder
+                        if read_only
+                        else self.preview_builder
+                    )
+                    if preview_builder is None:
+                        raise AcceptanceFailure(
+                            "vocabulary_preview_invalid"
+                        )
+                    preview = preview_builder(
+                        page_id=page_id,
+                        notion=notion,
+                    )
         except CodexArtifactPendingError:
             raise AcceptanceFailure("vocabulary_artifact_pending") from None
         if not isinstance(preview, Mapping):
@@ -665,6 +800,14 @@ class VocabularyOwnerAcceptanceRunner:
         policy.set_expected_words(
             str(item.get("word", "")).strip() for item in approved
         )
+        expected_properties = {
+            _word_key(item.get("word")): _normalized_properties(
+                vocabulary_page_properties(
+                    _publish_payload_from_item(item)
+                )
+            )
+            for item in approved
+        }
         targets = _target_records(before, policy.expected_word_keys)
         approved_words = {
             _word_key(item.get("word")): str(item.get("word", "")).strip()
@@ -704,6 +847,8 @@ class VocabularyOwnerAcceptanceRunner:
 
         if _state_digest(self.state_path) != state_before:
             raise AcceptanceFailure("highlight_state_changed")
+        if read_only and _tree_digest(self.artifact_root) != local_data_before:
+            raise AcceptanceFailure("dry_run_changed_local_data")
 
         return _PreparedRun(
             policy=policy,
@@ -715,7 +860,9 @@ class VocabularyOwnerAcceptanceRunner:
             approved=approved,
             rejected=rejected,
             planned_actions=planned_actions,
+            expected_properties=expected_properties,
             state_before=state_before,
+            local_data_before=local_data_before,
             binding=binding,
         )
 
@@ -774,7 +921,7 @@ class VocabularyOwnerAcceptanceRunner:
         return VocabularyAcceptanceRunResult(report=report, evidence=evidence)
 
     def dry_run(self, page_id: str) -> VocabularyAcceptanceRunResult:
-        prepared = self._prepare(page_id)
+        prepared = self._prepare(page_id, read_only=True)
         after = prepared.snapshotter.capture()
         if any(
             not _record_sets_equal(prepared.before, after, role)
@@ -783,10 +930,14 @@ class VocabularyOwnerAcceptanceRunner:
             raise AcceptanceFailure("dry_run_changed_workspace")
         if _state_digest(self.state_path) != prepared.state_before:
             raise AcceptanceFailure("highlight_state_changed")
+        if _tree_digest(self.artifact_root) != prepared.local_data_before:
+            raise AcceptanceFailure("dry_run_changed_local_data")
         return self._report(prepared, mode="dry-run")
 
     def run(self, page_id: str) -> VocabularyAcceptanceRunResult:
-        prepared = self._prepare(page_id)
+        prepared = self._prepare(page_id, read_only=False)
+        if not prepared.approved:
+            raise AcceptanceFailure("no_approved_vocabulary")
         first_result = self.publisher(
             page_id,
             notion=prepared.notion,
@@ -855,6 +1006,16 @@ class VocabularyOwnerAcceptanceRunner:
         targets = _target_records(first, prepared.policy.expected_word_keys)
         if any(len(records) != 1 for records in targets.values()):
             raise AcceptanceFailure("vocabulary_identity_not_unique")
+        for word_key, records in targets.items():
+            expected = prepared.expected_properties[word_key]
+            actual = records[0].properties
+            if any(
+                actual.get(property_name) != expected_value
+                for property_name, expected_value in expected.items()
+            ):
+                raise AcceptanceFailure(
+                    "published_vocabulary_content_mismatch"
+                )
 
         target_ids = {
             records[0].page_id for records in targets.values() if records
@@ -912,6 +1073,7 @@ _PUBLIC_FAILURE_CODES = frozenset(
         "database_creation_blocked",
         "delete_or_archive_blocked",
         "dry_run_changed_workspace",
+        "dry_run_changed_local_data",
         "duplicate_vocabulary_create_blocked",
         "enrichment_artifact_incomplete",
         "exact_retry_changed_workspace",
@@ -928,11 +1090,14 @@ _PUBLIC_FAILURE_CODES = frozenset(
         "invalid_data_source_query_response",
         "live_confirmation_missing",
         "manual_vocabulary_fields_present",
+        "no_approved_vocabulary",
+        "non_codex_enrichment_provider_blocked",
         "non_vocabulary_record_changed",
         "non_vocabulary_write_blocked",
         "page_create_response_rejected",
         "publisher_create_count_mismatch",
         "publisher_update_count_mismatch",
+        "published_vocabulary_content_mismatch",
         "rejected_candidate_invalid",
         "schema_mutation_blocked",
         "setup_state_not_complete",

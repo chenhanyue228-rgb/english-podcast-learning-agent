@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from scripts.acceptance import run_vocabulary_owner_acceptance
+from scripts.acceptance import vocabulary_owner_acceptance
 from scripts.acceptance.vocabulary_owner_acceptance import (
     AcceptanceFailure,
     GuardViolation,
@@ -22,9 +24,16 @@ from src.notion.vocabulary_publisher import (
     vocabulary_page_properties,
 )
 from src.skill_runtime.artifacts import CodexArtifactPendingError
+from src.skill_runtime.artifacts import prepare_codex_request
+from src.enrichment.codex_provider import (
+    VOCABULARY_ENRICHMENT_SCHEMA,
+    VOCABULARY_INSTRUCTIONS,
+    CodexVocabularyEnrichmentProvider,
+)
 from src.workflow import highlight_vocabulary_publish_pipeline
 from tests.acceptance.fakes import (
     FakeNotion,
+    relation_property,
     rich_text_property,
     title_property,
 )
@@ -119,7 +128,9 @@ def _runner(
         workspace.config,
         highlight_reader=highlight_reader,
         preview_builder=preview_builder,
+        read_only_preview_builder=preview_builder,
         state_path=state_path,
+        artifact_root=state_path.parent / "artifact-data",
     )
 
 
@@ -162,6 +173,87 @@ def test_dry_run_is_read_only_and_reports_plan(
     assert state_path.read_text(encoding="utf-8") == '{"stable": true}'
 
 
+def test_default_dry_run_loads_existing_artifacts_without_local_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = FakeNotion()
+    page_id = _source_page(workspace)
+    preview = _preview(page_id)
+    artifact_root = tmp_path / "data"
+    provider = CodexVocabularyEnrichmentProvider(
+        request_dir=artifact_root / "vocabulary_enrichment_requests",
+        output_dir=artifact_root / "vocabulary_enrichment",
+    )
+    for item in preview["approved_vocabulary"]:
+        request_path, output_path = provider._paths(item["word"])
+        prepare_codex_request(
+            stage="vocabulary_enrichment",
+            instructions=VOCABULARY_INSTRUCTIONS,
+            input_payload={
+                "word": item["word"],
+                "context": item["original_context"],
+            },
+            schema=VOCABULARY_ENRICHMENT_SCHEMA,
+            request_path=request_path,
+            output_path=output_path,
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(item, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(
+        vocabulary_owner_acceptance,
+        "CodexVocabularyEnrichmentProvider",
+        lambda: provider,
+    )
+    marker = tmp_path / "production-preview-called"
+
+    def writey_production_preview(**_kwargs):
+        marker.write_text("unexpected", encoding="utf-8")
+        return preview
+
+    raw_highlights = [
+        {
+            "text": item["word"],
+            "context": item.get("original_context", ""),
+        }
+        for item in [
+            *preview["approved_vocabulary"],
+            {
+                "word": preview["rejected_candidates"][0]["word"],
+                "original_context": "X is too short.",
+            },
+        ]
+    ]
+    before = {
+        path.relative_to(artifact_root).as_posix(): path.read_bytes()
+        for path in artifact_root.rglob("*")
+        if path.is_file()
+    }
+
+    result = VocabularyOwnerAcceptanceRunner(
+        workspace,
+        workspace.config,
+        highlight_reader=lambda **_kwargs: raw_highlights,
+        preview_builder=writey_production_preview,
+        state_path=artifact_root / "highlight_sync_state.json",
+        artifact_root=artifact_root,
+    ).dry_run(page_id)
+
+    after = {
+        path.relative_to(artifact_root).as_posix(): path.read_bytes()
+        for path in artifact_root.rglob("*")
+        if path.is_file()
+    }
+    assert result.report.mode == "dry-run"
+    assert result.report.counts["approved"] == 2
+    assert marker.exists() is False
+    assert after == before
+
+
 def test_live_run_creates_then_exact_retry_updates_without_duplicates(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -187,6 +279,83 @@ def test_live_run_creates_then_exact_retry_updates_without_duplicates(
     assert len(workspace.pages.create_calls) == 2
     assert len(workspace.pages.update_calls) == 2
     assert state_path.read_text(encoding="utf-8") == '{"stable": true}'
+
+
+def test_live_run_verifies_published_fields_against_enrichment_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = FakeNotion()
+    page_id = _source_page(workspace)
+    runner = _runner(
+        workspace,
+        page_id,
+        tmp_path / "state.json",
+        monkeypatch,
+    )
+
+    def incomplete_publisher(
+        page_id: str,
+        *,
+        notion,
+        vocabulary_database_id: str,
+    ):
+        for item in _preview(page_id)["approved_vocabulary"]:
+            notion.pages.create(
+                parent={"data_source_id": vocabulary_database_id},
+                properties={
+                    "Name": title_property(item["word"]),
+                    "Source": relation_property(page_id),
+                },
+            )
+        return SimpleNamespace(created=2, updated=0)
+
+    runner.publisher = incomplete_publisher
+
+    with pytest.raises(
+        AcceptanceFailure,
+        match="published_vocabulary_content_mismatch",
+    ):
+        runner.run(page_id)
+
+
+def test_live_run_requires_at_least_one_approved_candidate(
+    tmp_path: Path,
+) -> None:
+    workspace = FakeNotion()
+    page_id = _source_page(workspace)
+    preview = {
+        "page_id": page_id,
+        "total_highlights": 1,
+        "rejected_candidates": [
+            {"word": "X", "reason": "too short"},
+        ],
+        "pending_vocabulary": [],
+        "approved_vocabulary": [],
+    }
+    publisher_calls = 0
+
+    def publisher(*_args, **_kwargs):
+        nonlocal publisher_calls
+        publisher_calls += 1
+
+    runner = VocabularyOwnerAcceptanceRunner(
+        workspace,
+        workspace.config,
+        highlight_reader=lambda **_kwargs: [
+            {"text": "X", "context": "X is too short."}
+        ],
+        preview_builder=lambda **_kwargs: preview,
+        publisher=publisher,
+        state_path=tmp_path / "state.json",
+    )
+
+    with pytest.raises(AcceptanceFailure, match="no_approved_vocabulary"):
+        runner.run(page_id)
+
+    assert publisher_calls == 0
+    assert workspace.pages.create_calls == []
+    assert workspace.pages.update_calls == []
 
 
 def test_existing_target_is_updated_without_creating_duplicate(
@@ -357,7 +526,9 @@ def test_exact_highlight_target_must_match_pipeline_word(
         workspace.config,
         highlight_reader=highlight_reader,
         preview_builder=lambda **_kwargs: preview,
+        read_only_preview_builder=lambda **_kwargs: preview,
         state_path=tmp_path / "state.json",
+        artifact_root=tmp_path / "artifact-data",
     )
 
     with pytest.raises(AcceptanceFailure, match="highlight_target_changed"):
@@ -394,7 +565,9 @@ def test_approved_context_must_match_highlight_context(
         workspace.config,
         highlight_reader=highlight_reader,
         preview_builder=lambda **_kwargs: preview,
+        read_only_preview_builder=lambda **_kwargs: preview,
         state_path=tmp_path / "state.json",
+        artifact_root=tmp_path / "artifact-data",
     )
 
     with pytest.raises(AcceptanceFailure, match="highlight_context_changed"):
@@ -447,8 +620,10 @@ def test_pending_codex_artifact_is_a_stable_safe_stop(
     runner = VocabularyOwnerAcceptanceRunner(
         workspace,
         workspace.config,
+        read_only_preview_builder=preview_builder,
         preview_builder=preview_builder,
         state_path=tmp_path / "state.json",
+        artifact_root=tmp_path / "artifact-data",
     )
 
     with pytest.raises(
