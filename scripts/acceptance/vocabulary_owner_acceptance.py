@@ -679,6 +679,8 @@ class VocabularyOwnerAcceptanceRunner:
         )
         if not title or not source_type:
             raise AcceptanceFailure("vocabulary_source_identity_missing")
+        if source_type.casefold() != "local audio" and source_url is None:
+            raise AcceptanceFailure("vocabulary_source_url_required")
         self.source_identity = VocabularySourceIdentity(
             title=title,
             source_type=source_type,

@@ -35,7 +35,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--page-id", required=True)
     parser.add_argument("--expected-title", required=True)
     parser.add_argument("--expected-source-type", default="Podcast")
-    parser.add_argument("--expected-source-url")
+    parser.add_argument(
+        "--expected-source-url",
+        help=(
+            "Required for Podcast sources; omit only for Local Audio, whose "
+            "identity is Title + Source Type."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--confirmation")
     return parser

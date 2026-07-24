@@ -744,6 +744,41 @@ def test_in_group_wrong_podcast_identity_stops_before_write(
     assert workspace.pages.update_calls == []
 
 
+def test_podcast_identity_requires_expected_url_before_any_notion_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = FakeNotion()
+    wrong_page_id = workspace.add_page(
+        workspace.config.podcast_data_source_id,
+        {
+            "Title": title_property("BE 598"),
+            "URL": url_property(
+                "https://podcasts.apple.com/example?id=different"
+            ),
+            "Source Type": select_property("Podcast"),
+        },
+        page_id="same-title-different-url",
+    )
+
+    with pytest.raises(
+        AcceptanceFailure,
+        match="vocabulary_source_url_required",
+    ):
+        VocabularyOwnerAcceptanceRunner(
+            workspace,
+            workspace.config,
+            expected_title="BE 598",
+            expected_source_type="Podcast",
+            state_path=tmp_path / "state.json",
+        ).dry_run(wrong_page_id)
+
+    assert workspace.data_sources.retrieve_calls == []
+    assert workspace.data_sources.query_calls == []
+    assert workspace.pages.create_calls == []
+    assert workspace.pages.update_calls == []
+
+
 def test_public_reports_are_redacted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
