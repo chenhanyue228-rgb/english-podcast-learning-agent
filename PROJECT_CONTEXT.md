@@ -14,30 +14,35 @@ files into reusable English learning assets:
 
 ## Current Phase
 
-**Phase:** Phase 4 — Product Validation
+**Phase:** Phase 4.1C — Owner Acceptance
 
-**Execution stage:** Phase 4.1C — Vocabulary Acceptance and Owner Visual Review
-Closure
+**Execution stage:** Protected targeted Vocabulary dry-run
 
-**Status:** `OWNER_VISUAL_REVIEW_CHANGES_REQUIRED`
+**Status:** `VOCABULARY_ACCEPTANCE_DRY_RUN_READY`
 
 The stable release remains **v1.1.0**, built from release commit
 `80cbab01ea266e487a0359ddbec562959070d8a0`. Production `main` is
-`b315f1fd4b08bf7ed0f9446b6cf31aec2f77d8ce`.
+`987c7aa95f68b07b2a258b65166584f468425047`.
 
 Current release and acceptance evidence:
 
 - PR #9 merged the partial Podcast/Expression publish recovery.
 - PR #10 merged the protected Podcast Owner Acceptance Harness.
 - PR #11 merged fail-closed Notion target-group binding.
-- Latest complete regression: 550 passed with 3 existing compatibility-provider
-  deprecation warnings.
+- PR #14 implemented, independently reviewed, and merged the protected
+  Vocabulary Acceptance Harness after all identified P0/P1 false-pass paths
+  were closed.
+- Vocabulary Harness targeted tests: 19 passed.
+- Latest complete regression: 569 passed with 3 existing
+  compatibility-provider deprecation warnings.
+- `compileall`: PASS.
+- `git diff --check`: PASS.
 - The five local target settings now point to the intended database group.
 - The Notion token did not change during the target switch.
 - Read-only Target Binding Diagnosis: PASS.
 - Automated Podcast Owner Acceptance: PASS.
 - Vocabulary Acceptance: NOT RUN.
-- Owner visual review: CHANGES_REQUIRED.
+- Owner visual review: NOT COMPLETE.
 - External-user sessions: 0.
 - External-user readiness: `NOT READY_FOR_EXTERNAL_USERS`.
 
@@ -140,9 +145,15 @@ Vocabulary sync script is broken.
 
 Accurate current Vocabulary status:
 
+- the protected Vocabulary Acceptance Harness is implemented, independently
+  reviewed, and merged;
+- Harness readiness does not mean the Vocabulary workflow has passed
+  acceptance;
 - the intended-group targeted dry-run has not run;
 - the intended-group targeted publish has not run;
 - the exact retry has not run;
+- Vocabulary record data quality has not been inspected;
+- Owner visual review has not completed;
 - therefore Vocabulary Acceptance is `NOT RUN`;
 - full-scan highlight checkpoints and processed-highlight state are currently
   global rather than scoped by target group.
@@ -199,16 +210,20 @@ semantic text highlights, the Highlight Legend, or the Highlighted Transcript.
 In execution order:
 
 1. targeted Vocabulary dry-run;
-2. targeted Vocabulary publish;
-3. exact Vocabulary retry with zero new records;
-4. target-group-scoped highlight state;
-5. conversational `同步生词`;
-6. semantic Select option colors for future database creation;
-7. documented manual color adjustment for the live database;
-8. Podcast page table of contents;
-9. Weekly page table of contents;
-10. parent-page usage guide after these workflows stabilize;
-11. complete Owner visual review.
+2. inspect highlights, candidate decisions, enrichment, and planned writes;
+3. obtain exact human confirmation;
+4. targeted Vocabulary publish;
+5. inspect Vocabulary record data quality;
+6. exact Vocabulary retry with zero new records;
+7. make the Vocabulary acceptance decision;
+8. target-group-scoped highlight state;
+9. conversational `同步生词`;
+10. semantic Select option colors for future database creation;
+11. documented manual color adjustment for the live database;
+12. Podcast page table of contents;
+13. Weekly page table of contents;
+14. parent-page usage guide after these workflows stabilize;
+15. complete Owner visual review.
 
 Podcast and Weekly TOCs are presentation enhancements. New pages should place
 the TOC at the beginning, exact retry must not duplicate it, existing body
@@ -238,9 +253,11 @@ proposal.
 
 ## Immediate Milestone
 
-Complete targeted Vocabulary Acceptance before classifying a core-script
-defect, then close the visual-review findings. External-user testing remains
-paused.
+Run the protected targeted Vocabulary dry-run against BE 598 from a clean
+latest-main acceptance worktree. Continue through inspection, exact human
+confirmation, publish, data-quality review, exact retry, and the acceptance
+decision before classifying a core-script defect. External-user testing
+remains paused.
 
 Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md`,
 `skill/SKILL.md`, and `DECISION_LOG.md` before changing runtime behavior.

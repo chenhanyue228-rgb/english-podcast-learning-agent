@@ -7,7 +7,8 @@ is implemented after the v1.1 runtime migration, not a future target design.
 
 - Stable baseline: v1.1.0
 - Stable baseline commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Product phase: Phase 4 — Product Validation
+- Production main: `987c7aa95f68b07b2a258b65166584f468425047`
+- Product phase: Phase 4.1C — Owner Acceptance
 - Production AI runtime: Codex Artifact Runtime
 - Python role: deterministic orchestration and validation
 - Persistence layer: Notion
@@ -209,10 +210,31 @@ The immediate Vocabulary acceptance path is:
 ```text
 Targeted dry-run
 ↓
+Inspect highlights, candidates, enrichment, and planned writes
+↓
+Exact human confirmation
+↓
 Targeted publish
 ↓
+Data-quality inspection
+↓
 Exact retry with zero new records
+↓
+Acceptance decision
 ```
+
+The protected Vocabulary Acceptance Harness merged in PR #14. It is an
+acceptance boundary around the existing Vocabulary workflow, not a new
+Vocabulary architecture, trigger, enrichment path, publisher, schema, or state
+model. It verifies target binding, exact source identity, exact pink-highlight
+intent, artifact-derived payloads, write isolation, idempotent retry, and
+fail-closed behavior. Its independent review closed all identified P0/P1
+false-pass paths.
+
+Harness readiness does not mean real Vocabulary Acceptance has passed. Harness
+development and review made no real Notion calls or writes. The targeted
+dry-run, publish, data-quality inspection, exact retry, and Owner visual review
+remain unexecuted.
 
 The current full-scan checkpoint and processed-highlight state are global.
 They must be namespaced by target group before full-scan synchronization is
@@ -331,9 +353,10 @@ Experimental code must not be presented as the default production workflow.
 
 ## 10. Product Validation Boundary
 
-The current priority is Phase 4.1C targeted Vocabulary Acceptance and closure
-of the remaining Owner visual-review findings. The architecture remains
-unchanged.
+The current priority is the protected targeted Vocabulary dry-run against BE
+598 from a clean latest-main acceptance worktree, followed by inspection,
+exact human confirmation, publish, data-quality review, exact retry, and the
+acceptance decision. The architecture remains unchanged.
 
 Allowed during Phase 4:
 

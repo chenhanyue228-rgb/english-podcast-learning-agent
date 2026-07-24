@@ -8,22 +8,27 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - Release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Production `main`: `b315f1fd4b08bf7ed0f9446b6cf31aec2f77d8ce`
+- Production `main`: `987c7aa95f68b07b2a258b65166584f468425047`
 - PR #9: merged
 - PR #10: merged
 - PR #11: merged
-- Latest regression: 550 passed, 3 existing deprecation warnings
+- PR #14 Vocabulary Acceptance Harness: merged
+- Harness targeted tests: 19 passed
+- Latest regression: 569 passed, 3 existing deprecation warnings
+- `compileall`: PASS
+- `git diff --check`: PASS
 - Architecture: Stable
 
 ## Current Sprint
 
-**Phase 4.1C — Vocabulary Acceptance and Owner Visual Review Closure**
+**Phase 4.1C — Owner Acceptance**
 
 Current status:
 
 - Automated Podcast Owner Acceptance: PASS
+- Vocabulary Acceptance Harness: MERGED
 - Vocabulary Acceptance: NOT RUN
-- Owner visual review: CHANGES_REQUIRED
+- Owner visual review: NOT COMPLETE
 - External-user sessions: 0
 - External-user readiness: `NOT READY_FOR_EXTERNAL_USERS`
 
@@ -40,29 +45,43 @@ Current status:
 - Exact retry created 0 Podcast and 0 Expressions.
 - Vocabulary and Weekly databases remained unchanged.
 - Historical database group remained unchanged.
+- PR #14 protected Vocabulary Acceptance Harness merged after independent
+  review closed all identified P0/P1 false-pass paths.
+- Harness validation passed: 19 targeted tests, 569 full regression tests,
+  `compileall`, and `git diff --check`.
+- Harness development made 0 real Notion calls and 0 real Notion writes.
 
 ## Current Tasks
 
-1. Run a targeted Vocabulary dry-run on the accepted BE 598 Podcast page.
-2. Verify detected pink highlights and approved/rejected candidates.
-3. Run targeted Vocabulary publish.
-4. Run an exact retry and require zero new records.
-5. Verify original word preservation, context, source relation, and status.
-6. Determine whether a real Vocabulary core-script defect exists.
-7. Namespace highlight state by target group.
-8. Add the Skill `同步生词` interaction.
-9. Fix semantic Select option colors for future database creation.
-10. Document the manual live-database color adjustment.
-11. Add the Podcast page table of contents.
-12. Add the Weekly page table of contents.
-13. Implement the final parent-page usage guide after the above behavior is
+1. From a clean latest-main acceptance worktree, run the protected targeted
+   Vocabulary dry-run on the accepted BE 598 Podcast page.
+2. Inspect exact pink highlights, approved/rejected candidates, enrichment,
+   and planned writes.
+3. Obtain exact human confirmation before any real write.
+4. Run targeted Vocabulary publish.
+5. Inspect original word preservation, context, source relation, status, and
+   other Vocabulary data quality.
+6. Run an exact retry and require zero new records.
+7. Make the Vocabulary acceptance decision.
+8. Determine whether a real Vocabulary core-script defect exists.
+9. Namespace highlight state by target group.
+10. Add the Skill `同步生词` interaction.
+11. Fix semantic Select option colors for future database creation.
+12. Document the manual live-database color adjustment.
+13. Add the Podcast page table of contents.
+14. Add the Weekly page table of contents.
+15. Implement the final parent-page usage guide after the above behavior is
     stable.
-14. Complete Owner visual review.
+16. Complete Owner visual review.
 
 ## Vocabulary Acceptance Rule
 
 Podcast publishing and Vocabulary synchronization are separate workflows.
 The Podcast acceptance intentionally did not write Vocabulary records.
+
+The merged Harness is a protected acceptance boundary around the existing
+Vocabulary workflow. Its tests and independent review prove the Harness can
+fail closed; they do not prove that real Vocabulary Acceptance has passed.
 
 An empty Vocabulary Database is not evidence of a broken sync script. Defect
 classification requires:
@@ -70,11 +89,17 @@ classification requires:
 ```text
 Targeted dry-run
 ↓
+Candidate and enrichment inspection
+↓
+Exact human confirmation
+↓
 Targeted publish
+↓
+Data-quality inspection
 ↓
 Exact retry
 ↓
-Record and relation verification
+Acceptance decision
 ```
 
 The current full-scan highlight checkpoint and processed-highlight state are

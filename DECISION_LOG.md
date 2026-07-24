@@ -528,3 +528,31 @@ The accepted product already has clear ownership boundaries: Codex produces
 reasoning artifacts, Python validates and orchestrates, Podcast publishing
 owns analyzed Expressions, and explicit pink-highlight sync owns Vocabulary.
 The cancelled proposal added complexity without an accepted user need.
+
+## DEC-024: Treat the Vocabulary Harness as an Acceptance Boundary
+
+- Date: 2026-07-24
+- Status: Accepted for Phase 4.1C
+
+### Decision
+
+Merge the protected Vocabulary Acceptance Harness only after independent
+review closes all identified P0/P1 false-pass paths. The merged Harness wraps
+the existing Vocabulary workflow; it does not introduce a new trigger,
+enrichment path, publisher, schema, or state model.
+
+Harness test and review success does not mean the real Vocabulary workflow has
+passed acceptance. Vocabulary Acceptance remains `NOT RUN` until the targeted
+dry-run, candidate and enrichment inspection, confirmed publish, data-quality
+inspection, and exact retry have completed.
+
+The real targeted dry-run remains gated by synchronization of the canonical
+project documents with the merged production baseline. Any real Vocabulary
+write still requires the exact human confirmation defined by the Harness.
+
+### Reason
+
+The Harness can prove that unsafe or ambiguous runs stop, but only the
+protected real workflow can establish product acceptance and record quality.
+Separating Harness readiness from workflow acceptance prevents a test result
+from being reported as production evidence.

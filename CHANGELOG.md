@@ -10,6 +10,15 @@ entries must be appended or clarified, not removed.
 - Merged PR #9 for partial Podcast/Expression publish recovery.
 - Merged PR #10 for the protected Podcast Owner Acceptance Harness.
 - Merged PR #11 for fail-closed Notion target-group binding.
+- Merged PR #14 for the protected Vocabulary Acceptance Harness.
+- Completed independent Harness review with all identified P0/P1 false-pass
+  paths closed, including source identity, empty live runs, artifact mutation,
+  and persisted-payload drift.
+- Passed 19 targeted Harness tests and the complete regression with 569 tests;
+  the 3 existing compatibility-provider deprecation warnings remain.
+- Passed `compileall` and `git diff --check`.
+- Made 0 real Notion calls and 0 real Notion writes during Harness
+  implementation and review.
 - Switched the five local target settings to the intended database group
   without changing the Notion token.
 - Passed the read-only Target Binding Diagnosis.
@@ -18,11 +27,11 @@ entries must be appended or clarified, not removed.
   created 0 Podcast and 0 Expressions.
 - Preserved the historical database group and left Vocabulary Database and
   Weekly Review unchanged during Podcast acceptance.
-- Completed the latest full regression with 550 passing tests and 3 existing
-  compatibility-provider deprecation warnings.
-- Recorded that Vocabulary was outside the Podcast acceptance scope. Targeted
-  Vocabulary dry-run, publish, exact retry, and record verification remain
-  pending; Vocabulary sync is not classified as passed or failed.
+- Recorded that Vocabulary was outside the Podcast acceptance scope and that
+  Harness readiness is not Vocabulary workflow acceptance. The targeted
+  Vocabulary dry-run, candidate and enrichment inspection, confirmed publish,
+  data-quality inspection, exact retry, and Owner visual review remain
+  pending. Vocabulary Acceptance is `NOT RUN`.
 - Recorded that the full-scan highlight checkpoint and processed-highlight
   state are not currently scoped by target group.
 - Recorded the Owner visual-review finding that Expression Database Select
