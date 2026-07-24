@@ -7,8 +7,15 @@ is implemented after the v1.1 runtime migration, not a future target design.
 
 - Stable baseline: v1.1.0
 - Stable baseline commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Production main: `987c7aa95f68b07b2a258b65166584f468425047`
-- Product phase: Phase 4.1C — Owner Acceptance
+- Phase 4.1C closure base:
+  `de9f088a47b58ad54de9ef281ddf427c994dbf0a`
+- Product phase: Phase 4.2 — External User Validation
+- Owner Acceptance: `OWNER_ACCEPTANCE_PASS`
+- Internal release:
+  `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`
+- External-user sessions: 0
+- External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`
+- Architecture Review: not required
 - Production AI runtime: Codex Artifact Runtime
 - Python role: deterministic orchestration and validation
 - Persistence layer: Notion
@@ -19,10 +26,10 @@ Direct OpenAI providers may remain importable as deprecated compatibility
 paths. They are not the default production reasoning runtime and
 `OPENAI_API_KEY` is not required for the Codex Skill workflow.
 
-Phase 4 does not introduce an architecture change. The v1.1.0 architecture is
-frozen during initial Product Validation. User feedback may produce future
-proposals, but a proposal is not accepted until it passes Product and
-Architecture review.
+Phase 4.1C completed without an architecture change. The v1.1.0 architecture
+remains frozen during Phase 4.2 External User Validation. User evidence may
+produce future proposals, but a proposal is not accepted until it passes the
+required Product and Architecture review.
 
 ## 2. System Purpose
 
@@ -231,10 +238,9 @@ intent, artifact-derived payloads, write isolation, idempotent retry, and
 fail-closed behavior. Its independent review closed all identified P0/P1
 false-pass paths.
 
-Harness readiness does not mean real Vocabulary Acceptance has passed. Harness
-development and review made no real Notion calls or writes. The targeted
-dry-run, publish, data-quality inspection, exact retry, and Owner visual review
-remain unexecuted.
+Targeted Vocabulary Acceptance passed. The first publish created 2 Vocabulary
+records and the exact retry created 0. Non-target databases and the historical
+database group remained unchanged.
 
 The current full-scan checkpoint and processed-highlight state are global.
 They must be namespaced by target group before full-scan synchronization is
@@ -268,6 +274,10 @@ Weekly Reflection is a compounding learning note. It turns weekly learning into
 mindset shifts, cross-content patterns, language growth, and professional
 actions. It is not a podcast recap or a raw data aggregation page.
 
+Protected Weekly Reflection Acceptance passed. The first publish created 1
+Weekly page and the exact retry created 0. Non-target databases and the
+historical database group remained unchanged.
+
 ## 6. Artifact Contracts
 
 Important artifact locations include:
@@ -300,6 +310,11 @@ missing or invalid artifacts before publishing.
 - Receives only Codex-analyzed learning expressions.
 - Preserves meaning, context, examples, category, and source relation.
 - Must not receive user vocabulary items.
+- Future database creation assigns semantic colors to the existing Category,
+  Commonness, and Review Status option names.
+- Existing databases are not automatically rewritten. Existing option colors
+  may be changed manually in the Notion UI only; options must not be deleted,
+  recreated, or renamed.
 
 ### Vocabulary Database
 
@@ -328,18 +343,18 @@ The following behavior is stable and should remain protected:
 - Weekly Reflection output contract and quality gate
 - Notion schema and idempotent publishing
 
-### Presentation Enhancements
+### Deferred Non-Blocking Backlog
 
-Podcast and Weekly page tables of contents are approved as low-risk
-presentation enhancements:
+The following polish is separate from the Phase 4.2 core validation journey:
 
-- place the TOC at the beginning of each newly created page;
-- exact retry must not duplicate the TOC;
-- existing page body contracts remain intact;
-- historical automatic backfill is not approved.
+- Podcast page table of contents;
+- Weekly page table of contents;
+- parent-page usage guide;
+- improved Skill `同步生词` interaction;
+- full-scan highlight state namespacing;
+- manual color adjustment for the existing Expression Database.
 
-The complete parent-page usage guide is deferred until Vocabulary acceptance,
-TOC behavior, and related user instructions are stable.
+These items do not block the accepted core internal release.
 
 ## 9. Experimental and Legacy Paths
 
@@ -353,10 +368,29 @@ Experimental code must not be presented as the default production workflow.
 
 ## 10. Product Validation Boundary
 
-The current priority is the protected targeted Vocabulary dry-run against BE
-598 from a clean latest-main acceptance worktree, followed by inspection,
-exact human confirmation, publish, data-quality review, exact retry, and the
-acceptance decision. The architecture remains unchanged.
+Phase 4.1C Owner Acceptance is complete:
+
+- Setup / Notion workspace recovery: PASS
+- Target Binding: PASS
+- Automated Podcast Owner Acceptance: PASS
+- Podcast first publish and exact retry: PASS
+- Targeted Vocabulary Acceptance: PASS
+- Vocabulary first publish: created 2
+- Vocabulary exact retry: created 0
+- Weekly Reflection Acceptance: PASS
+- Weekly first publish: created 1
+- Weekly exact retry: created 0
+- non-target database changes: 0
+- historical database group changes: 0
+
+The internal release decision is
+`OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`. This does not
+mean `READY_FOR_EXTERNAL_USERS`.
+
+Phase 4.2 must complete 3 real external-user sessions, with at least 2 users
+finishing the core flow without developer intervention. It records
+time-to-first-value, confusion, failures, and recovery outcomes before any
+large-scale refactoring is considered. The architecture remains unchanged.
 
 Allowed during Phase 4:
 

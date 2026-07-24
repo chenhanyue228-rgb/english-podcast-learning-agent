@@ -14,15 +14,15 @@ files into reusable English learning assets:
 
 ## Current Phase
 
-**Phase:** Phase 4.1C — Owner Acceptance
+**Phase:** Phase 4.2 — External User Validation
 
-**Execution stage:** Protected targeted Vocabulary dry-run
+**Execution stage:** External-user session preparation
 
-**Status:** `VOCABULARY_ACCEPTANCE_DRY_RUN_READY`
+**Status:** `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`
 
 The stable release remains **v1.1.0**, built from release commit
-`80cbab01ea266e487a0359ddbec562959070d8a0`. Production `main` is
-`987c7aa95f68b07b2a258b65166584f468425047`.
+`80cbab01ea266e487a0359ddbec562959070d8a0`. The Phase 4.1C closure starts
+from production `main` `de9f088a47b58ad54de9ef281ddf427c994dbf0a`.
 
 Current release and acceptance evidence:
 
@@ -32,19 +32,33 @@ Current release and acceptance evidence:
 - PR #14 implemented, independently reviewed, and merged the protected
   Vocabulary Acceptance Harness after all identified P0/P1 false-pass paths
   were closed.
-- Vocabulary Harness targeted tests: 19 passed.
-- Latest complete regression: 569 passed with 3 existing
-  compatibility-provider deprecation warnings.
-- `compileall`: PASS.
-- `git diff --check`: PASS.
+- PR #16 added semantic Select colors for future Expression Database creation
+  without changing option names or rewriting existing databases.
 - The five local target settings now point to the intended database group.
 - The Notion token did not change during the target switch.
+- Setup / Notion workspace recovery: PASS.
 - Read-only Target Binding Diagnosis: PASS.
 - Automated Podcast Owner Acceptance: PASS.
-- Vocabulary Acceptance: NOT RUN.
-- Owner visual review: NOT COMPLETE.
+- Podcast first publish: PASS.
+- Podcast exact retry: PASS.
+- Targeted Vocabulary Acceptance: PASS.
+- Vocabulary first publish: created 2.
+- Vocabulary exact retry: created 0.
+- Weekly Reflection Acceptance: PASS.
+- Weekly first publish: created 1.
+- Weekly exact retry: created 0.
+- Non-target database changes: 0.
+- Historical database group changes: 0.
+- Owner Acceptance: `OWNER_ACCEPTANCE_PASS`.
+- Internal release decision:
+  `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`.
 - External-user sessions: 0.
 - External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`.
+- Architecture: Stable.
+- Architecture Review: not required.
+
+The internal release decision confirms the core flow for internal use. It does
+not mean the product is `READY_FOR_EXTERNAL_USERS`.
 
 ## Runtime Model
 
@@ -145,18 +159,13 @@ Vocabulary sync script is broken.
 
 Accurate current Vocabulary status:
 
-- the protected Vocabulary Acceptance Harness is implemented, independently
-  reviewed, and merged;
-- Harness readiness does not mean the Vocabulary workflow has passed
-  acceptance;
-- the intended-group targeted dry-run has not run;
-- the intended-group targeted publish has not run;
-- the exact retry has not run;
-- Vocabulary record data quality has not been inspected;
-- Owner visual review has not completed;
-- therefore Vocabulary Acceptance is `NOT RUN`;
-- full-scan highlight checkpoints and processed-highlight state are currently
-  global rather than scoped by target group.
+- the protected targeted acceptance passed;
+- the first publish created 2 Vocabulary records;
+- the exact retry created 0 new records;
+- non-target and historical database groups remained unchanged;
+- full-scan highlight checkpoints and processed-highlight state are still
+  global rather than scoped by target group, but this is deferred and does not
+  block the accepted targeted workflow.
 
 ### Weekly Reflection
 
@@ -176,6 +185,10 @@ Weekly Review Database
 
 Weekly Reflection is a compounding learning note, not a podcast recap.
 
+Protected Weekly acceptance passed. The first publish created 1 Weekly page,
+the exact retry created 0, and Podcast, Expression, Vocabulary, and historical
+database groups remained unchanged.
+
 ## Notion Target Binding
 
 All production writers are bound to one configured parent and one internally
@@ -193,41 +206,42 @@ The coordinated local switch changed only:
 
 The token and historical group were preserved.
 
-## Current Visual Review Finding
+## Expression Select Colors
 
-The Expression Database Select Property options are gray for:
+PR #16 added semantic Select colors for future Expression Database creation
+for:
 
 - Category
 - Commonness
 - Review Status
 
-This is a semantic presentation defect for future database creation and a
-manual live-database adjustment. It does not affect Podcast body formatting,
-semantic text highlights, the Highlight Legend, or the Highlighted Transcript.
+Existing option names remain unchanged. Existing databases are not
+automatically rewritten and may still display gray options. Their colors may
+be changed manually in the Notion UI only; existing options must not be
+deleted, recreated, or renamed.
 
-## Pending Requirements
+## Phase 4.2 Validation Goals
 
-In execution order:
+Phase 4.2 validates the accepted internal release with real external users:
 
-1. targeted Vocabulary dry-run;
-2. inspect highlights, candidate decisions, enrichment, and planned writes;
-3. obtain exact human confirmation;
-4. targeted Vocabulary publish;
-5. inspect Vocabulary record data quality;
-6. exact Vocabulary retry with zero new records;
-7. make the Vocabulary acceptance decision;
-8. target-group-scoped highlight state;
-9. conversational `同步生词`;
-10. semantic Select option colors for future database creation;
-11. documented manual color adjustment for the live database;
-12. Podcast page table of contents;
-13. Weekly page table of contents;
-14. parent-page usage guide after these workflows stabilize;
-15. complete Owner visual review.
+- complete 3 real external-user sessions;
+- have at least 2 users complete the core flow without developer intervention;
+- record time-to-first-value;
+- record confusion, failed steps, and recovery outcomes;
+- avoid speculative large-scale refactoring before evidence is collected.
 
-Podcast and Weekly TOCs are presentation enhancements. New pages should place
-the TOC at the beginning, exact retry must not duplicate it, existing body
-contracts remain intact, and historical automatic backfill is not approved.
+## Deferred Non-Blocking Backlog
+
+The following polish is separate from the core external-validation journey:
+
+- Podcast page table of contents;
+- Weekly page table of contents;
+- parent-page usage guide;
+- improved Skill `同步生词` interaction;
+- full-scan highlight state namespacing;
+- manual color adjustment for the existing Expression Database.
+
+These items are not current core release blockers.
 
 ## Cancelled Proposal
 
@@ -253,11 +267,10 @@ proposal.
 
 ## Immediate Milestone
 
-Run the protected targeted Vocabulary dry-run against BE 598 from a clean
-latest-main acceptance worktree. Continue through inspection, exact human
-confirmation, publish, data-quality review, exact retry, and the acceptance
-decision before classifying a core-script defect. External-user testing
-remains paused.
+Begin Phase 4.2 with three evidence-driven external-user sessions. Keep the
+accepted core journey stable, measure time-to-first-value and recovery, and
+defer broad product changes until the session evidence identifies a repeated
+problem.
 
 Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md`,
 `skill/SKILL.md`, and `DECISION_LOG.md` before changing runtime behavior.
