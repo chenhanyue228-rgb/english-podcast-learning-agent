@@ -574,8 +574,26 @@ def test_weekly_identity_uses_production_relation_subset_semantics(
     ("mutation", "expected"),
     [
         (
+            lambda payload: payload["weekly_theme"].update({"category": []}),
+            "reflection_context_incomplete",
+        ),
+        (
+            lambda payload: payload.update({"cross_content_patterns": [{}]}),
+            "reflection_context_incomplete",
+        ),
+        (
+            lambda payload: payload.update({"professional_actions": [7]}),
+            "reflection_context_incomplete",
+        ),
+        (
+            lambda payload: payload["mindset_shifts"][0].update(
+                {"before": {}}
+            ),
+            "reflection_context_incomplete",
+        ),
+        (
             lambda payload: payload["mindset_shifts"][0]["evidence"][0].update(
-                {"source": ""}
+                {"source": []}
             ),
             "reflection_context_incomplete",
         ),
@@ -614,19 +632,33 @@ def test_incomplete_reflection_artifact_is_rejected(
 
 
 @pytest.mark.parametrize(
-    "collection",
-    ["ideas_worth_compounding", "expressions_worth_reusing"],
+    "mutation",
+    [
+        lambda payload: payload["core_idea"].update({"idea": {}}),
+        lambda payload: payload["ideas_worth_compounding"][0].update(
+            {"idea": []}
+        ),
+        lambda payload: payload["expressions_worth_reusing"][0].update(
+            {"expression": 7}
+        ),
+        lambda payload: payload["next_week_application"].update(
+            {"scenario": {}}
+        ),
+        lambda payload: payload.update(
+            {"language_thinking_connection": []}
+        ),
+    ],
 )
-def test_incomplete_weekly_review_item_is_rejected(
+def test_incomplete_weekly_review_text_is_rejected(
     tmp_path: Path,
-    collection: str,
+    mutation,
 ) -> None:
     base = _pipeline()
 
     def invalid_review(**kwargs: Any) -> Any:
         result = base(**kwargs)
         payload = deepcopy(result.weekly_review)
-        payload[collection][0] = {}
+        mutation(payload)
         result.weekly_review = payload
         Path(result.weekly_review_path).write_text(
             json.dumps(payload, ensure_ascii=False),

@@ -98,6 +98,10 @@ def _canonical_json(value: object) -> str:
     )
 
 
+def _is_nonempty_text(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _semantic_value(value: Any) -> Any:
     """Remove volatile Notion response metadata from a private snapshot."""
     if isinstance(value, Mapping):
@@ -818,16 +822,16 @@ def _validate_reflection_context(
     actions = payload.get("professional_actions")
     if (
         not isinstance(theme, Mapping)
-        or not str(theme.get("category", "")).strip()
-        or not str(theme.get("theme", "")).strip()
+        or not _is_nonempty_text(theme.get("category"))
+        or not _is_nonempty_text(theme.get("theme"))
         or not isinstance(shifts, list)
         or not shifts
         or not isinstance(patterns, list)
         or not patterns
-        or not all(str(item).strip() for item in patterns)
+        or not all(_is_nonempty_text(item) for item in patterns)
         or not isinstance(actions, list)
         or not actions
-        or not all(str(item).strip() for item in actions)
+        or not all(_is_nonempty_text(item) for item in actions)
     ):
         raise AcceptanceFailure("reflection_context_incomplete")
     for shift in shifts:
@@ -837,14 +841,14 @@ def _validate_reflection_context(
         )
         if (
             not isinstance(shift, Mapping)
-            or not str(shift.get("before", "")).strip()
-            or not str(shift.get("after", "")).strip()
+            or not _is_nonempty_text(shift.get("before"))
+            or not _is_nonempty_text(shift.get("after"))
             or not isinstance(evidence, list)
             or not evidence
             or any(
                 not isinstance(item, Mapping)
-                or not str(item.get("source", "")).strip()
-                or not str(item.get("supporting_concept", "")).strip()
+                or not _is_nonempty_text(item.get("source"))
+                or not _is_nonempty_text(item.get("supporting_concept"))
                 for item in evidence
             )
             or isinstance(confidence, bool)
@@ -885,7 +889,7 @@ def _validate_weekly_review_contract(
     if (
         not isinstance(core, Mapping)
         or not all(
-            str(core.get(key, "")).strip()
+            _is_nonempty_text(core.get(key))
             for key in ("idea", "why_it_matters", "refined_understanding")
         )
         or not isinstance(ideas, list)
@@ -893,7 +897,7 @@ def _validate_weekly_review_contract(
         or any(
             not isinstance(item, Mapping)
             or not all(
-                str(item.get(key, "")).strip()
+                _is_nonempty_text(item.get(key))
                 for key in (
                     "idea",
                     "why_it_matters",
@@ -908,7 +912,7 @@ def _validate_weekly_review_contract(
         or any(
             not isinstance(item, Mapping)
             or not all(
-                str(item.get(key, "")).strip()
+                _is_nonempty_text(item.get(key))
                 for key in (
                     "expression",
                     "contextual_meaning",
@@ -918,12 +922,12 @@ def _validate_weekly_review_contract(
             )
             for item in expressions
         )
-        or not str(
-            weekly_review.get("language_thinking_connection", "")
-        ).strip()
+        or not _is_nonempty_text(
+            weekly_review.get("language_thinking_connection")
+        )
         or not isinstance(application, Mapping)
         or not all(
-            str(application.get(key, "")).strip()
+            _is_nonempty_text(application.get(key))
             for key in (
                 "scenario",
                 "behavior",
