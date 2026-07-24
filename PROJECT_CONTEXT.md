@@ -44,7 +44,7 @@ Current release and acceptance evidence:
 - Vocabulary Acceptance: NOT RUN.
 - Owner visual review: NOT COMPLETE.
 - External-user sessions: 0.
-- External-user readiness: `NOT READY_FOR_EXTERNAL_USERS`.
+- External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`.
 
 ## Runtime Model
 

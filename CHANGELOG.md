@@ -45,7 +45,7 @@ entries must be appended or clarified, not removed.
   Expression synchronization before implementation. Neither remains in the
   active roadmap.
 - External-user sessions remain 0 and the product remains
-  `NOT READY_FOR_EXTERNAL_USERS`.
+  `NOT_READY_FOR_EXTERNAL_USERS`.
 
 ### Phase 4.1B Onboarding Fixes
 

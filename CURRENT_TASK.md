@@ -30,7 +30,10 @@ Current status:
 - Vocabulary Acceptance: NOT RUN
 - Owner visual review: NOT COMPLETE
 - External-user sessions: 0
-- External-user readiness: `NOT READY_FOR_EXTERNAL_USERS`
+- External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`
+
+`NOT_READY_FOR_EXTERNAL_USERS` is the canonical readiness token. Do not use a
+space-separated variant in active project status.
 
 ## Completed Gates
 
