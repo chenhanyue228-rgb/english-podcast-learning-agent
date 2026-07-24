@@ -33,6 +33,9 @@ def build_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("--page-id", required=True)
+    parser.add_argument("--expected-title", required=True)
+    parser.add_argument("--expected-source-type", default="Podcast")
+    parser.add_argument("--expected-source-url")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--confirmation")
     return parser
@@ -49,7 +52,13 @@ def main() -> int:
     try:
         config = load_acceptance_config()
         notion = create_notion_client(config.token)
-        runner = VocabularyOwnerAcceptanceRunner(notion, config)
+        runner = VocabularyOwnerAcceptanceRunner(
+            notion,
+            config,
+            expected_title=args.expected_title,
+            expected_source_type=args.expected_source_type,
+            expected_source_url=args.expected_source_url,
+        )
         result = (
             runner.dry_run(args.page_id)
             if args.dry_run
@@ -72,6 +81,7 @@ def main() -> int:
                 config.target_parent_page_id,
                 *config.data_source_ids.values(),
                 args.page_id,
+                args.expected_source_url or "",
             ),
         )
     )

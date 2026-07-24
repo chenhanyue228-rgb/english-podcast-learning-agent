@@ -35,8 +35,13 @@ from tests.acceptance.fakes import (
     FakeNotion,
     relation_property,
     rich_text_property,
+    select_property,
     title_property,
+    url_property,
 )
+
+
+SOURCE_URL = "https://podcasts.apple.com/example?id=be598"
 
 
 def _source_page(workspace: FakeNotion) -> str:
@@ -44,6 +49,8 @@ def _source_page(workspace: FakeNotion) -> str:
         workspace.config.podcast_data_source_id,
         {
             "Title": title_property("BE 598"),
+            "URL": url_property(SOURCE_URL),
+            "Source Type": select_property("Podcast"),
             "Short Summary": rich_text_property("Private source summary."),
         },
         page_id="be-598-podcast-page",
@@ -126,6 +133,8 @@ def _runner(
     return VocabularyOwnerAcceptanceRunner(
         workspace,
         workspace.config,
+        expected_title="BE 598",
+        expected_source_url=SOURCE_URL,
         highlight_reader=highlight_reader,
         preview_builder=preview_builder,
         read_only_preview_builder=preview_builder,
@@ -237,6 +246,8 @@ def test_default_dry_run_loads_existing_artifacts_without_local_writes(
     result = VocabularyOwnerAcceptanceRunner(
         workspace,
         workspace.config,
+        expected_title="BE 598",
+        expected_source_url=SOURCE_URL,
         highlight_reader=lambda **_kwargs: raw_highlights,
         preview_builder=writey_production_preview,
         state_path=artifact_root / "highlight_sync_state.json",
@@ -342,6 +353,8 @@ def test_live_run_requires_at_least_one_approved_candidate(
     runner = VocabularyOwnerAcceptanceRunner(
         workspace,
         workspace.config,
+        expected_title="BE 598",
+        expected_source_url=SOURCE_URL,
         highlight_reader=lambda **_kwargs: [
             {"text": "X", "context": "X is too short."}
         ],
@@ -470,6 +483,8 @@ def test_incomplete_enrichment_stops_before_write(
     runner = VocabularyOwnerAcceptanceRunner(
         workspace,
         workspace.config,
+        expected_title="BE 598",
+        expected_source_url=SOURCE_URL,
         highlight_reader=lambda **_kwargs: [
             {
                 "text": item["word"],
@@ -524,6 +539,8 @@ def test_exact_highlight_target_must_match_pipeline_word(
     runner = VocabularyOwnerAcceptanceRunner(
         workspace,
         workspace.config,
+        expected_title="BE 598",
+        expected_source_url=SOURCE_URL,
         highlight_reader=highlight_reader,
         preview_builder=lambda **_kwargs: preview,
         read_only_preview_builder=lambda **_kwargs: preview,
@@ -563,6 +580,8 @@ def test_approved_context_must_match_highlight_context(
     runner = VocabularyOwnerAcceptanceRunner(
         workspace,
         workspace.config,
+        expected_title="BE 598",
+        expected_source_url=SOURCE_URL,
         highlight_reader=highlight_reader,
         preview_builder=lambda **_kwargs: preview,
         read_only_preview_builder=lambda **_kwargs: preview,
@@ -620,6 +639,8 @@ def test_pending_codex_artifact_is_a_stable_safe_stop(
     runner = VocabularyOwnerAcceptanceRunner(
         workspace,
         workspace.config,
+        expected_title="BE 598",
+        expected_source_url=SOURCE_URL,
         read_only_preview_builder=preview_builder,
         preview_builder=preview_builder,
         state_path=tmp_path / "state.json",
@@ -690,6 +711,39 @@ def test_source_page_must_belong_to_podcast_library(
     assert workspace.pages.update_calls == []
 
 
+def test_in_group_wrong_podcast_identity_stops_before_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = FakeNotion()
+    wrong_page_id = workspace.add_page(
+        workspace.config.podcast_data_source_id,
+        {
+            "Title": title_property("Unrelated Podcast"),
+            "URL": url_property(
+                "https://podcasts.apple.com/example?id=unrelated"
+            ),
+            "Source Type": select_property("Podcast"),
+        },
+        page_id="unrelated-podcast-page",
+    )
+
+    with pytest.raises(
+        AcceptanceFailure,
+        match="vocabulary_source_identity_mismatch",
+    ):
+        _runner(
+            workspace,
+            wrong_page_id,
+            tmp_path / "state.json",
+            monkeypatch,
+        ).dry_run(wrong_page_id)
+
+    assert workspace.data_sources.query_calls == []
+    assert workspace.pages.create_calls == []
+    assert workspace.pages.update_calls == []
+
+
 def test_public_reports_are_redacted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -742,6 +796,8 @@ def test_live_cli_requires_exact_confirmation_before_client_creation(
             "run_vocabulary_owner_acceptance.py",
             "--page-id",
             "private-page-id",
+            "--expected-title",
+            "BE 598",
             "--confirmation",
             LIVE_CONFIRMATION + "-wrong",
         ],

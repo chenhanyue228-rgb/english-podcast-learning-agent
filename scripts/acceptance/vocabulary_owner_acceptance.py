@@ -208,6 +208,22 @@ class VocabularyWorkspaceSnapshot:
         return {role: len(self.pages(role)) for role in WORKSPACE_DATABASE_ORDER}
 
 
+@dataclass(frozen=True, repr=False)
+class VocabularySourceIdentity:
+    title: str = field(repr=False)
+    source_type: str = field(repr=False)
+    source_url: Optional[str] = field(default=None, repr=False)
+
+    def matches(self, properties: Mapping[str, Any]) -> bool:
+        if str(properties.get("Title") or "").strip() != self.title:
+            return False
+        if str(properties.get("Source Type") or "").strip() != self.source_type:
+            return False
+        if self.source_url is not None:
+            return properties.get("URL") == self.source_url
+        return True
+
+
 @dataclass(repr=False)
 class VocabularyAcceptancePolicy:
     config: AcceptanceConfig = field(repr=False)
@@ -641,6 +657,9 @@ class VocabularyOwnerAcceptanceRunner:
         notion: Any,
         config: AcceptanceConfig,
         *,
+        expected_title: str,
+        expected_source_type: str = "Podcast",
+        expected_source_url: Optional[str] = None,
         highlight_reader: HighlightReader = read_pink_highlights,
         preview_builder: PreviewBuilder = build_vocabulary_learning_preview,
         read_only_preview_builder: Optional[PreviewBuilder] = None,
@@ -650,6 +669,21 @@ class VocabularyOwnerAcceptanceRunner:
     ) -> None:
         self.raw_notion = notion
         self.config = config
+        title = expected_title.strip()
+        source_type = expected_source_type.strip()
+        source_url = (
+            expected_source_url.strip()
+            if isinstance(expected_source_url, str)
+            and expected_source_url.strip()
+            else None
+        )
+        if not title or not source_type:
+            raise AcceptanceFailure("vocabulary_source_identity_missing")
+        self.source_identity = VocabularySourceIdentity(
+            title=title,
+            source_type=source_type,
+            source_url=source_url,
+        )
         self.highlight_reader = highlight_reader
         self.preview_builder = preview_builder
         self.read_only_preview_builder = read_only_preview_builder
@@ -680,8 +714,15 @@ class VocabularyOwnerAcceptanceRunner:
                 page_id,
                 PODCAST_LIBRARY,
             )
+            source_page = notion.pages.retrieve(page_id=page_id)
         except NotionTargetBindingError as exc:
             raise AcceptanceFailure(exc.code) from None
+        if not isinstance(source_page, Mapping) or not self.source_identity.matches(
+            _normalized_properties(source_page.get("properties"))
+        ):
+            raise AcceptanceFailure(
+                "vocabulary_source_identity_mismatch"
+            )
 
         state_before = _state_digest(self.state_path)
         local_data_before = (
@@ -1120,6 +1161,8 @@ _PUBLIC_FAILURE_CODES = frozenset(
         "vocabulary_preview_invalid",
         "vocabulary_record_removed",
         "vocabulary_source_page_mismatch",
+        "vocabulary_source_identity_mismatch",
+        "vocabulary_source_identity_missing",
     }
 )
 
@@ -1167,6 +1210,7 @@ __all__ = [
     "VocabularyAcceptancePolicy",
     "VocabularyAcceptanceReport",
     "VocabularyAcceptanceRunResult",
+    "VocabularySourceIdentity",
     "VocabularyOwnerAcceptanceRunner",
     "load_acceptance_config",
     "render_failure_report",
