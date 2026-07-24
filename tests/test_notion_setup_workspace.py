@@ -272,6 +272,83 @@ def test_create_base_databases_uses_fixed_product_order(monkeypatch) -> None:
     ]
 
 
+def test_setup_workspace_creates_guide_before_databases(monkeypatch) -> None:
+    from src.notion import parent_page_guide
+
+    calls: list[str] = []
+    database_ids = dict(DATABASE_IDS)
+    monkeypatch.delenv(setup_workspace.SETUP_STATE_ENV, raising=False)
+    monkeypatch.setattr(
+        parent_page_guide,
+        "ensure_parent_page_guide_for_setup",
+        lambda _notion, _parent: calls.append("guide") or True,
+    )
+    monkeypatch.setattr(
+        setup_workspace,
+        "update_env_file",
+        lambda _values: calls.append("env"),
+    )
+    monkeypatch.setattr(
+        setup_workspace,
+        "create_base_databases",
+        lambda _notion, _parent: calls.append("databases")
+        or database_ids,
+    )
+    monkeypatch.setattr(
+        setup_workspace,
+        "reconcile_workspace_schema",
+        lambda _notion, _ids: calls.append("schema"),
+    )
+    monkeypatch.setattr(
+        setup_workspace,
+        "wire_database_relations",
+        lambda _notion, _ids: calls.append("relations"),
+    )
+
+    result = setup_workspace.setup_workspace(
+        "0" * 32,
+        notion=object(),
+    )
+
+    assert result == database_ids
+    assert calls == [
+        "env",
+        "guide",
+        "databases",
+        "schema",
+        "relations",
+        "env",
+    ]
+
+
+def test_completed_setup_requires_protected_parent_guide_cli(
+    monkeypatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setenv(
+        setup_workspace.SETUP_STATE_ENV,
+        setup_workspace.SETUP_STATE_COMPLETE,
+    )
+    monkeypatch.setattr(
+        setup_workspace,
+        "update_env_file",
+        lambda _values: calls.append("env"),
+    )
+    monkeypatch.setattr(
+        setup_workspace,
+        "create_base_databases",
+        lambda *_args, **_kwargs: calls.append("databases"),
+    )
+
+    with pytest.raises(
+        setup_workspace.WorkspaceSetupError,
+        match="protected Parent Page Guide",
+    ):
+        setup_workspace.setup_workspace("0" * 32, notion=object())
+
+    assert calls == []
+
+
 def test_create_base_databases_reuses_all_existing_ids_without_create() -> None:
     notion = FakeNotion()
 

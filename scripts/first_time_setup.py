@@ -41,6 +41,10 @@ from src.notion.setup_workspace import (  # noqa: E402
     reconcile_workspace_schema,
     wire_database_relations,
 )
+from src.notion.parent_page_guide import (  # noqa: E402
+    ParentPageGuideError,
+    ensure_parent_page_guide_for_setup,
+)
 
 
 PROJECT_MARKERS = (
@@ -374,6 +378,18 @@ def run_first_time_setup(
                 SETUP_STATE_ENV: SETUP_STATE_IN_PROGRESS,
             },
         )
+
+    if state != "complete":
+        try:
+            ensure_parent_page_guide_for_setup(
+                notion_client,
+                normalized_parent_id,
+            )
+        except ParentPageGuideError as exc:
+            raise FirstTimeSetupError(
+                "Notion 父页面使用指南创建未完成。数据库尚未继续创建；"
+                "请检查页面权限和网络后重新运行，系统不会重复创建指南。"
+            ) from exc
 
     try:
         database_ids = create_base_databases(
