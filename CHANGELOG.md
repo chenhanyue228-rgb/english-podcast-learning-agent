@@ -5,6 +5,39 @@ entries must be appended or clarified, not removed.
 
 ## Unreleased — Phase 4 Product Validation
 
+### Phase 4.1C Podcast Acceptance and Vocabulary Handoff
+
+- Merged PR #9 for partial Podcast/Expression publish recovery.
+- Merged PR #10 for the protected Podcast Owner Acceptance Harness.
+- Merged PR #11 for fail-closed Notion target-group binding.
+- Switched the five local target settings to the intended database group
+  without changing the Notion token.
+- Passed the read-only Target Binding Diagnosis.
+- Passed protected Automated Podcast Owner Acceptance in the intended group:
+  the first publish created 1 Podcast and 19 Expressions, and the exact retry
+  created 0 Podcast and 0 Expressions.
+- Preserved the historical database group and left Vocabulary Database and
+  Weekly Review unchanged during Podcast acceptance.
+- Completed the latest full regression with 550 passing tests and 3 existing
+  compatibility-provider deprecation warnings.
+- Recorded that Vocabulary was outside the Podcast acceptance scope. Targeted
+  Vocabulary dry-run, publish, exact retry, and record verification remain
+  pending; Vocabulary sync is not classified as passed or failed.
+- Recorded that the full-scan highlight checkpoint and processed-highlight
+  state are not currently scoped by target group.
+- Recorded the Owner visual-review finding that Expression Database Select
+  options lack semantic colors for Category, Commonness, and Review Status.
+- Confirmed that Podcast body bolding, semantic highlights, Highlight Legend,
+  and Highlighted Transcript are working and are not affected by the Select
+  color defect.
+- Added pending requirements for conversational `同步生词`, Podcast TOC,
+  Weekly TOC, and the deferred parent-page usage guide.
+- Cancelled the proposed Notion AI-assisted page workflow and Podcast-page
+  Expression synchronization before implementation. Neither remains in the
+  active roadmap.
+- External-user sessions remain 0 and the product remains
+  `NOT READY_FOR_EXTERNAL_USERS`.
+
 ### Phase 4.1B Onboarding Fixes
 
 - Merged PR #4 with evidence-backed fixes for PV-001 through PV-005.
