@@ -40,6 +40,21 @@ CATEGORY_COLORS = {
     "Sentence Pattern": "Orange",
 }
 
+EXPRESSION_CATEGORY_SELECT_COLORS = {
+    category: color.lower()
+    for category, color in CATEGORY_COLORS.items()
+}
+EXPRESSION_COMMONNESS_SELECT_COLORS = {
+    "High": "red",
+    "Medium": "yellow",
+    "Low": "gray",
+}
+EXPRESSION_REVIEW_STATUS_SELECT_COLORS = {
+    "New": "blue",
+    "Reviewing": "yellow",
+    "Mastered": "green",
+}
+
 HIGHLIGHT_LEGEND = [
     ("Green", "Native expressions"),
     ("Blue", "Business phrases"),
