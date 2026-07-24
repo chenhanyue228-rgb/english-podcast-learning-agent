@@ -312,6 +312,24 @@ def _append_guide(
         ) from None
 
 
+def _verify_after_append(
+    notion: Any,
+    parent_page_id: str,
+) -> None:
+    try:
+        verified_blocks = list_parent_page_blocks(notion, parent_page_id)
+    except ParentPageGuideError as exc:
+        raise ParentPageGuideError(
+            exc.code,
+            write_attempted=True,
+        ) from None
+    if count_guide_versions(verified_blocks) != 1:
+        raise ParentPageGuideError(
+            POST_WRITE_VALIDATION_FAILED,
+            write_attempted=True,
+        )
+
+
 def ensure_parent_page_guide_for_setup(
     notion: Any,
     parent_page_id: str,
@@ -336,9 +354,7 @@ def ensure_parent_page_guide_for_setup(
         raise ParentPageGuideError(PARENT_STATE_CHANGED)
 
     _append_guide(notion, parent_page_id, guide_blocks)
-    verified_blocks = list_parent_page_blocks(notion, parent_page_id)
-    if count_guide_versions(verified_blocks) != 1:
-        raise ParentPageGuideError(POST_WRITE_VALIDATION_FAILED)
+    _verify_after_append(notion, parent_page_id)
     return True
 
 
@@ -410,12 +426,10 @@ def run_parent_page_guide(
         config.target_parent_page_id,
         guide_blocks,
     )
-    verified_blocks = list_parent_page_blocks(
+    _verify_after_append(
         notion,
         config.target_parent_page_id,
     )
-    if count_guide_versions(verified_blocks) != 1:
-        raise ParentPageGuideError(POST_WRITE_VALIDATION_FAILED)
 
     return ParentPageGuideReport(
         status="published",

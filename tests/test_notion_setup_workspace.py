@@ -277,6 +277,7 @@ def test_setup_workspace_creates_guide_before_databases(monkeypatch) -> None:
 
     calls: list[str] = []
     database_ids = dict(DATABASE_IDS)
+    monkeypatch.delenv(setup_workspace.SETUP_STATE_ENV, raising=False)
     monkeypatch.setattr(
         parent_page_guide,
         "ensure_parent_page_guide_for_setup",
@@ -318,6 +319,34 @@ def test_setup_workspace_creates_guide_before_databases(monkeypatch) -> None:
         "relations",
         "env",
     ]
+
+
+def test_completed_setup_requires_protected_parent_guide_cli(
+    monkeypatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setenv(
+        setup_workspace.SETUP_STATE_ENV,
+        setup_workspace.SETUP_STATE_COMPLETE,
+    )
+    monkeypatch.setattr(
+        setup_workspace,
+        "update_env_file",
+        lambda _values: calls.append("env"),
+    )
+    monkeypatch.setattr(
+        setup_workspace,
+        "create_base_databases",
+        lambda *_args, **_kwargs: calls.append("databases"),
+    )
+
+    with pytest.raises(
+        setup_workspace.WorkspaceSetupError,
+        match="protected Parent Page Guide",
+    ):
+        setup_workspace.setup_workspace("0" * 32, notion=object())
+
+    assert calls == []
 
 
 def test_create_base_databases_reuses_all_existing_ids_without_create() -> None:

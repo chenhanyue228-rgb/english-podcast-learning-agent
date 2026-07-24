@@ -64,13 +64,14 @@ class FakeChildren:
         self.append_calls: list[dict] = []
         self.delete_calls: list[dict] = []
         self.fail_read = False
+        self.fail_read_on_call: int | None = None
         self.fail_append = False
         self.mutate_before_second_read = False
         self.omit_appended_blocks = False
 
     def list(self, **kwargs):
         self.list_calls.append(deepcopy(kwargs))
-        if self.fail_read:
+        if self.fail_read or self.fail_read_on_call == len(self.list_calls):
             raise RuntimeError("private read failure")
         if self.mutate_before_second_read and len(self.list_calls) == 2:
             self.blocks.append(_api_block("Owner added content", block_id="new"))
@@ -383,6 +384,36 @@ def test_post_write_validation_failure_stops() -> None:
         )
 
     assert error.value.code == parent_page_guide.POST_WRITE_VALIDATION_FAILED
+    assert error.value.write_attempted is True
+
+
+def test_post_write_read_failure_reports_unknown_write_outcome(
+    monkeypatch,
+    capsys,
+) -> None:
+    notion = FakeNotion()
+    notion.blocks.children.fail_read_on_call = 3
+    monkeypatch.setattr(parent_page_guide, "load_dotenv", lambda: None)
+    monkeypatch.setattr(
+        parent_page_guide,
+        "load_notion_config",
+        lambda: CONFIG,
+    )
+    monkeypatch.setattr(
+        parent_page_guide,
+        "create_notion_client",
+        lambda _token: notion,
+    )
+
+    assert parent_page_guide.main(
+        ["--confirmation", parent_page_guide.WRITE_CONFIRMATION]
+    ) == 1
+
+    captured = capsys.readouterr()
+    assert parent_page_guide.PARENT_READ_FAILED in captured.err
+    assert '"write_attempted": true' in captured.err
+    assert '"real_notion_writes": "unknown"' in captured.err
+    assert len(notion.blocks.children.append_calls) == 1
 
 
 def test_setup_entrypoint_creates_once_and_retries_idempotently() -> None:
