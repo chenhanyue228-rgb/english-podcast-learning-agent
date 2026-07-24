@@ -780,12 +780,14 @@ def _weekly_identity_matches(
     start_date: str,
     source_ids: tuple[str, ...],
 ) -> bool:
+    record_source_ids = {
+        str(item).strip()
+        for item in (record.properties.get("Podcasts") or ())
+        if str(item).strip()
+    }
     return (
         str(record.properties.get("Date") or "").strip() == start_date
-        and tuple(
-            sorted(record.properties.get("Podcasts") or ())
-        )
-        == source_ids
+        and set(source_ids).issubset(record_source_ids)
     )
 
 
@@ -821,18 +823,33 @@ def _validate_reflection_context(
         or not isinstance(shifts, list)
         or not shifts
         or not isinstance(patterns, list)
+        or not patterns
+        or not all(str(item).strip() for item in patterns)
         or not isinstance(actions, list)
         or not actions
+        or not all(str(item).strip() for item in actions)
     ):
         raise AcceptanceFailure("reflection_context_incomplete")
     for shift in shifts:
+        evidence = shift.get("evidence") if isinstance(shift, Mapping) else None
+        confidence = (
+            shift.get("confidence") if isinstance(shift, Mapping) else None
+        )
         if (
             not isinstance(shift, Mapping)
             or not str(shift.get("before", "")).strip()
             or not str(shift.get("after", "")).strip()
-            or not isinstance(shift.get("evidence"), list)
-            or not shift.get("evidence")
-            or not isinstance(shift.get("confidence"), (int, float))
+            or not isinstance(evidence, list)
+            or not evidence
+            or any(
+                not isinstance(item, Mapping)
+                or not str(item.get("source", "")).strip()
+                or not str(item.get("supporting_concept", "")).strip()
+                for item in evidence
+            )
+            or isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not 0 <= float(confidence) <= 1
         ):
             raise AcceptanceFailure("reflection_context_incomplete")
 
@@ -873,8 +890,34 @@ def _validate_weekly_review_contract(
         )
         or not isinstance(ideas, list)
         or not ideas
+        or any(
+            not isinstance(item, Mapping)
+            or not all(
+                str(item.get(key, "")).strip()
+                for key in (
+                    "idea",
+                    "why_it_matters",
+                    "application",
+                    "source_reference",
+                )
+            )
+            for item in ideas
+        )
         or not isinstance(expressions, list)
         or not expressions
+        or any(
+            not isinstance(item, Mapping)
+            or not all(
+                str(item.get(key, "")).strip()
+                for key in (
+                    "expression",
+                    "contextual_meaning",
+                    "reusable_example",
+                    "communication_function",
+                )
+            )
+            for item in expressions
+        )
         or not str(
             weekly_review.get("language_thinking_connection", "")
         ).strip()
@@ -1043,6 +1086,9 @@ class WeeklyReflectionOwnerAcceptanceRunner:
             ) from None
         snapshotter = WeeklyWorkspaceSnapshotter(notion, self.config)
         before = snapshotter.capture()
+        podcast_page_ids = set(before.by_id(PODCAST_LIBRARY))
+        if not source_page_ids.issubset(podcast_page_ids):
+            raise AcceptanceFailure("weekly_source_podcast_missing")
         local_before = _tree_snapshot(self.project_root)
         return _PreparedRun(
             policy=policy,
@@ -1526,6 +1572,7 @@ _PUBLIC_FAILURE_CODES = frozenset(
         "weekly_learning_context_missing",
         "weekly_pipeline_failed",
         "weekly_review_incomplete",
+        "weekly_source_podcast_missing",
     }
 )
 

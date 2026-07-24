@@ -448,6 +448,19 @@ def test_empty_weekly_learning_context_is_rejected(tmp_path: Path) -> None:
     assert exc.value.code == "weekly_learning_context_empty"
 
 
+def test_missing_source_podcast_is_rejected(tmp_path: Path) -> None:
+    notion = WeeklyFakeNotion()
+    notion.pages_by_id.pop("weekly-source-podcast")
+    runner, _ = _runner(tmp_path, notion)
+
+    with pytest.raises(AcceptanceFailure) as exc:
+        runner.dry_run()
+
+    assert exc.value.code == "weekly_source_podcast_missing"
+    assert not notion.pages.create_calls
+    assert not notion.pages.update_calls
+
+
 @pytest.mark.parametrize(
     ("failure", "expected"),
     [
@@ -492,13 +505,14 @@ def _seed_matching_weekly(
     *,
     page_id: str,
     with_body: bool,
+    source_page_ids: tuple[str, ...] = ("weekly-source-podcast",),
 ) -> None:
     notion.add_page(
         notion.config.weekly_data_source_id,
         {
             "Week": title_property("Private existing week"),
             "Date": date_property("2026-07-13"),
-            "Podcasts": relation_property("weekly-source-podcast"),
+            "Podcasts": relation_property(*source_page_ids),
         },
         page_id=page_id,
         children=(
@@ -535,6 +549,97 @@ def test_duplicate_weekly_identity_fails_closed(tmp_path: Path) -> None:
 
     assert exc.value.code == "weekly_identity_not_unique"
     assert not notion.pages.update_calls
+
+
+def test_weekly_identity_uses_production_relation_subset_semantics(
+    tmp_path: Path,
+) -> None:
+    notion = WeeklyFakeNotion()
+    _seed_matching_weekly(
+        notion,
+        page_id="matching-weekly-superset",
+        with_body=False,
+        source_page_ids=("weekly-source-podcast", "another-source"),
+    )
+    runner, _ = _runner(tmp_path, notion)
+
+    with pytest.raises(AcceptanceFailure) as exc:
+        runner.dry_run()
+
+    assert exc.value.code == "weekly_identity_already_exists"
+    assert not notion.pages.create_calls
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    [
+        (
+            lambda payload: payload["mindset_shifts"][0]["evidence"][0].update(
+                {"source": ""}
+            ),
+            "reflection_context_incomplete",
+        ),
+        (
+            lambda payload: payload["mindset_shifts"][0].update(
+                {"confidence": 1.5}
+            ),
+            "reflection_context_incomplete",
+        ),
+    ],
+)
+def test_incomplete_reflection_artifact_is_rejected(
+    tmp_path: Path,
+    mutation,
+    expected: str,
+) -> None:
+    base = _pipeline()
+
+    def invalid_reflection(**kwargs: Any) -> Any:
+        result = base(**kwargs)
+        payload = deepcopy(result.reflection_context)
+        mutation(payload)
+        result.reflection_context = payload
+        Path(result.reflection_context_path).write_text(
+            json.dumps(payload, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return result
+
+    runner, _ = _runner(tmp_path, pipeline_runner=invalid_reflection)
+
+    with pytest.raises(AcceptanceFailure) as exc:
+        runner.dry_run()
+
+    assert exc.value.code == expected
+
+
+@pytest.mark.parametrize(
+    "collection",
+    ["ideas_worth_compounding", "expressions_worth_reusing"],
+)
+def test_incomplete_weekly_review_item_is_rejected(
+    tmp_path: Path,
+    collection: str,
+) -> None:
+    base = _pipeline()
+
+    def invalid_review(**kwargs: Any) -> Any:
+        result = base(**kwargs)
+        payload = deepcopy(result.weekly_review)
+        payload[collection][0] = {}
+        result.weekly_review = payload
+        Path(result.weekly_review_path).write_text(
+            json.dumps(payload, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return result
+
+    runner, _ = _runner(tmp_path, pipeline_runner=invalid_review)
+
+    with pytest.raises(AcceptanceFailure) as exc:
+        runner.dry_run()
+
+    assert exc.value.code == "weekly_review_incomplete"
 
 
 def test_existing_manual_content_is_protected(tmp_path: Path) -> None:
