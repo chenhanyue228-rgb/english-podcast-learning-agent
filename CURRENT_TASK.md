@@ -7,181 +7,149 @@ Phase 4 — Product Validation
 ## Stable Baseline
 
 - Release: v1.1.0
-- v1.1.0 release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Production `main`: `9ba69dc3deb79c1ed3e64fe8d395c0d57a79943e`
-- PR #7: merged with Create a merge commit
-- PR #8: merged with Create a merge commit
-- Production verification: 453 passed, 3 expected warnings
+- Release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
+- Production `main`: `987c7aa95f68b07b2a258b65166584f468425047`
+- PR #9: merged
+- PR #10: merged
+- PR #11: merged
+- PR #14 Vocabulary Acceptance Harness: merged
+- Harness targeted tests: 19 passed
+- Latest regression: 569 passed, 3 existing deprecation warnings
+- `compileall`: PASS
+- `git diff --check`: PASS
 - Architecture: Stable
 
 ## Current Sprint
 
-Phase 4.1C — Owner Acceptance
+**Phase 4.1C — Owner Acceptance**
 
-Status: `OWNER_ACCEPTANCE_BLOCKED`
+Current status:
 
-External-user sessions: 0
+- Automated Podcast Owner Acceptance: PASS
+- Vocabulary Acceptance Harness: MERGED
+- Vocabulary Acceptance: NOT RUN
+- Owner visual review: NOT COMPLETE
+- External-user sessions: 0
+- External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`
 
-## Goal
+`NOT_READY_FOR_EXTERNAL_USERS` is the canonical readiness token. Do not use a
+space-separated variant in active project status.
 
-Bind every production Notion writer to one explicitly configured parent page
-before resuming the protected podcast-to-Notion Owner Acceptance journey.
+## Completed Gates
 
-```text
-PR #9 and Owner Acceptance Harness merged
-↓
-Enforce Data Source → Database → Parent binding
-↓
-Switch all five target settings together
-↓
-Pass read-only diagnosis
-↓
-Resume the protected podcast-to-Notion journey
-```
+- PR #9 partial Podcast/Expression publish recovery merged.
+- PR #10 protected Owner Acceptance Harness merged.
+- PR #11 Notion target binding merged.
+- Five local target settings switched to the intended group.
+- Notion token preserved.
+- Read-only Target Binding Diagnosis passed.
+- Protected Automated Podcast Owner Acceptance passed.
+- First publish created 1 Podcast and 19 Expressions.
+- Exact retry created 0 Podcast and 0 Expressions.
+- Vocabulary and Weekly databases remained unchanged.
+- Historical database group remained unchanged.
+- PR #14 protected Vocabulary Acceptance Harness merged after independent
+  review closed all identified P0/P1 false-pass paths.
+- Harness validation passed: 19 targeted tests, 569 full regression tests,
+  `compileall`, and `git diff --check`.
+- Harness development made 0 real Notion calls and 0 real Notion writes.
 
 ## Current Tasks
 
-1. Validate all four configured Data Sources, databases, and their common
-   direct parent before any production write.
-2. Require `NOTION_TARGET_PARENT_PAGE_ID` for all production writes.
-3. Reject mixed groups, parent mismatch, cross-group relations, and
-   `dual_property` relations with stable redacted errors.
-4. Keep the historical group and its records unchanged.
-5. Keep real Owner Acceptance blocked until the repair is reviewed, merged,
-   the five target settings are switched, and read-only diagnosis passes.
-6. Keep external-user testing paused.
+1. From a clean latest-main acceptance worktree, run the protected targeted
+   Vocabulary dry-run on the accepted BE 598 Podcast page.
+2. Inspect exact pink highlights, approved/rejected candidates, enrichment,
+   and planned writes.
+3. Obtain exact human confirmation before any real write.
+4. Run targeted Vocabulary publish.
+5. Inspect original word preservation, context, source relation, status, and
+   other Vocabulary data quality.
+6. Run an exact retry and require zero new records.
+7. Make the Vocabulary acceptance decision.
+8. Determine whether a real Vocabulary core-script defect exists.
+9. Namespace highlight state by target group.
+10. Add the Skill `同步生词` interaction.
+11. Fix semantic Select option colors for future database creation.
+12. Document the manual live-database color adjustment.
+13. Add the Podcast page table of contents.
+14. Add the Weekly page table of contents.
+15. Implement the final parent-page usage guide after the above behavior is
+    stable.
+16. Complete Owner visual review.
+
+## Vocabulary Acceptance Rule
+
+Podcast publishing and Vocabulary synchronization are separate workflows.
+The Podcast acceptance intentionally did not write Vocabulary records.
+
+The merged Harness is a protected acceptance boundary around the existing
+Vocabulary workflow. Its tests and independent review prove the Harness can
+fail closed; they do not prove that real Vocabulary Acceptance has passed.
+
+An empty Vocabulary Database is not evidence of a broken sync script. Defect
+classification requires:
+
+```text
+Targeted dry-run
+↓
+Candidate and enrichment inspection
+↓
+Exact human confirmation
+↓
+Targeted publish
+↓
+Data-quality inspection
+↓
+Exact retry
+↓
+Acceptance decision
+```
+
+The current full-scan highlight checkpoint and processed-highlight state are
+global. They must be namespaced by target group so historical-group state
+cannot suppress work in another group.
+
+## Owner Visual Review Finding
+
+Expression Database Select options currently lack semantic colors for:
+
+- Category
+- Commonness
+- Review Status
+
+Podcast body bolding, semantic highlights, Highlight Legend, and Highlighted
+Transcript are working and are outside this defect.
+
+## Presentation Enhancements
+
+- New Podcast pages should begin with a navigable table of contents.
+- New Weekly pages should begin with a navigable table of contents.
+- Exact retries must not duplicate either TOC.
+- Existing body contracts remain intact.
+- Historical automatic backfill is not approved.
+- The parent-page usage guide remains deferred until Vocabulary, TOC, and
+  related instructions are stable.
+
+## Cancelled Requirements
+
+The following are not active requirements and require no Architecture Review:
+
+- Notion AI-assisted page workflow;
+- Podcast-page Expression synchronization into Expression Database.
+
+They must not reappear in the active roadmap, blockers, or user guide.
 
 ## Out of Scope
 
-- new major features
 - architecture redesign
+- Notion schema redesign
+- background daemon or infinite polling
+- automatic Vocabulary discovery as the primary workflow
 - YouTube support
 - cloud hosting
-- user accounts
-- payment
-- Web UI
-- automatic Vocabulary discovery
-- Weekly Reflection redesign
-
-## Completion Criteria
-
-- The current conversation can continue directly after installation.
-- A new conversation is not mandatory.
-- The user does not need to memorize an instruction.
-- The user does not locate the project directory or type `cd`.
-- The token and complete page URL are entered in a local safe interface.
-- Codex prepares the runtime and starts the setup flow.
-- Codex and Python create only missing databases and reconcile existing data
-  source fields in place.
-- Interrupted setup resumes from saved database IDs without creating duplicates.
-- Existing database IDs are checked before reuse.
-- Resumed setup safely stops before any operation if the parent page differs.
-- Existing unknown fields and records are preserved.
-- Type conflicts stop safely without deleting properties.
-- Relations use `data_source_id` and `single_property`.
-- Relations and schema validation pass before setup is marked complete.
-- Codex actively prompts for a podcast after setup.
-- Codex operates the podcast-to-Notion workflow.
-- No unresolved P0 or P1 onboarding blocker remains in the implementation.
-- No real credentials are committed.
-- No external-user readiness claim is made.
-
-Owner Acceptance started and reached real first-time setup. Skill installation,
-Skill discovery, and the reply-gated guidance mechanism passed. Real setup
-created four database containers and saved all four Data Source IDs. Field and
-Relation recovery passed with the original Data Sources and no new database.
-The podcast-to-Notion journey has not started. External-user validation has
-not started.
-
-## Current State
-
-- PR #5 is merged.
-- Skill installation passed in the owner's real Codex environment.
-- The installation conversation discovered the Skill on the next turn without
-  a new conversation or restart.
-- The reply-gated Notion conversation mechanism passed Owner Acceptance.
-- Real setup created four database containers and saved their identifiers.
-- PR #7 is merged into production `main`.
-- Real Notion in-place recovery passed with the existing four Data Sources.
-- New databases created: 0.
-- Required fields and all three single-property relations passed validation.
-- Unknown fields and existing records were preserved.
-- Setup state is `complete`.
-- Real recovery evidence was reviewed and accepted by the AI Tech Lead.
-- PR #8 was merged with merge commit
-  `4e3ed60b1aeac9b4b43ef20302ae270a4e3dddf3`.
-- PR #9 partial-publish recovery is merged and its exact retry behavior passes.
-- The Owner Acceptance Harness is merged.
-- A read-only diagnosis found two complete same-name database groups.
-- Current configured group fingerprint: `8b0ff792`.
-- Intended group fingerprint: `f80be05b`.
-- The intended group is accessible, schema-valid, internally related, and
-  empty.
-- The historical group retains one BE 598 Podcast and 19 related Expressions.
-- The real podcast-to-Notion journey is paused until target-binding repair is
-  reviewed, configuration is switched, and diagnosis passes.
-- The next uncompleted Owner Acceptance gate remains the podcast-to-Notion
-  journey.
-- The existing databases must not be deleted or recreated.
-- The safe first-time setup tool and its interruption recovery are implemented.
-- Safe per-database setup recovery and dependency verification are implemented.
-- Parent-page consistency protection is implemented for setup recovery.
-- The real Notion UI terminology requires “连接” in the developer dashboard
-  and “集成” on the learning page.
-- The Notion plugin is documented as optional and outside the production write path.
-- Owner Acceptance is `OWNER_ACCEPTANCE_BLOCKED`.
-- External-user sessions: 0.
-
-## Completed Phase 4.1 Milestones
-
-- Phase 4.1 clean-clone technical audit
-- Phase 4.1B onboarding fixes for PV-001 through PV-005
-- Codex Skills UI installation contract
-- four-database Notion onboarding flow
-- isolated `.venv` setup
-- complete Codex artifact handoff output
-- Apple Podcasts episode URL scope clarification
-- PR #4 merge into production `main`
-- merged-main regression verification: 351 passed, 3 expected warnings
-
-## Completed Phase 3 Milestones
-
-- Pure Codex Runtime migration
-- Weekly Reflection redesign and product acceptance
-- Notion publishing stabilization and idempotent PATCH verification
-- Podcast/RSS/Local Audio input validation
-- Human Highlight + AI Processing vocabulary workflow
-- Input scope freeze
-- Codex Skill and artifact contract documentation
-- stabilization and release-baseline audits
-- documentation consistency review
-- v1.1.0 release verification: 345 tests, CLI smoke check, annotated tag
-
-## Stable Product Boundary
-
-```text
-Human Highlight
-↓
-AI Processing
-↓
-Vocabulary Database
-```
-
-The user decides what is personally worth learning. AI enriches, structures,
-and stores that selection; it must not automatically discover vocabulary as
-the primary workflow.
-
-## Next Decision
-
-After Product Validation evidence is collected, choose one:
-
-A. Continue improving Skill onboarding
-
-B. Prioritize Learning Asset Reuse
-
-C. Prepare a broader beta
-
-D. Request an Architecture Decision
+- user accounts or payment
+- historical TOC backfill
+- external-user readiness claims
 
 ## Handoff
 
@@ -190,7 +158,6 @@ Read in this order:
 1. `PROJECT_CONTEXT.md`
 2. `ARCHITECTURE.md`
 3. `CURRENT_TASK.md`
-4. `docs/product_validation_plan.md`
-5. `skill/SKILL.md`
-6. `docs/codex_skill_contract.md`
-7. `DECISION_LOG.md`
+4. `skill/SKILL.md`
+5. `docs/codex_skill_contract.md`
+6. `DECISION_LOG.md`

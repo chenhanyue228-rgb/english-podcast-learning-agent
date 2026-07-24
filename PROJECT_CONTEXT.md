@@ -4,116 +4,70 @@
 
 **Name:** English Audio Learning Agent
 
-English Audio Learning Agent is an AI-powered English audio learning system
-that transforms podcasts, RSS feeds, and local audio files into reusable
-learning assets, including:
+English Audio Learning Agent transforms podcasts, RSS feeds, and local audio
+files into reusable English learning assets:
 
-- vocabulary
-- expressions
-- ideas
-- reflections
-
-The system helps users build long-term personal English learning memory.
+- Podcast learning notes
+- professional expressions
+- user-selected vocabulary
+- compounding Weekly Reflections
 
 ## Current Phase
 
-**Phase 4 — Product Validation**
+**Phase:** Phase 4.1C — Owner Acceptance
 
-**Execution stage:** Phase 4.1C — Owner Acceptance
+**Execution stage:** Protected targeted Vocabulary dry-run
 
-**Status:** `OWNER_ACCEPTANCE_BLOCKED`
+**Status:** `VOCABULARY_ACCEPTANCE_DRY_RUN_READY`
 
-The current stable release remains **v1.1.0**, built from release commit
+The stable release remains **v1.1.0**, built from release commit
 `80cbab01ea266e487a0359ddbec562959070d8a0`. Production `main` is
-`9ba69dc3deb79c1ed3e64fe8d395c0d57a79943e`.
+`987c7aa95f68b07b2a258b65166584f468425047`.
 
-Release status:
+Current release and acceptance evidence:
 
-- v1.1.0 is released and tagged locally and remotely
-- the production architecture and workflow boundaries are stable
-- production workflows and CLI behavior are verified
-- PR #4 merged the Phase 4.1B onboarding fixes into `main`
-- PR #5 merged the guided first-time-use flow into `main`
-- PR #6 merged the one-action/one-confirmation Notion guidance into `main`
-- PR #7 merged the Notion API and setup remediation into `main`
-- PR #8 merged the accepted real recovery evidence into `main`
-- production verification: 453 tests passed with 3 expected
-  compatibility-provider deprecation warnings
-- real Notion in-place recovery: PASS
-- the existing four Data Source IDs were reused
-- new databases created: 0
-- required fields and three single-property relations: PASS
-- unknown fields and existing records preserved: PASS
-- setup state: `complete`
-- recovery evidence reviewed and accepted
-- partial Podcast/Expression publishing recovery is merged and verified
-- the protected Owner Acceptance Harness is merged
-- read-only diagnosis found two same-name Notion database groups
-- the current configuration targets the historical group instead of the
-  intended parent
-- the intended group is accessible, schema-valid, internally related, and
-  empty
-- the real podcast-to-Notion journey is paused pending target-binding repair,
-  coordinated configuration switch, and a passing read-only diagnosis
-- external-user sessions: 0
-- Owner Acceptance started
-- Skill installation passed
-- continuing in the installation conversation passed without a restart
-- the one-action/one-confirmation conversation mechanism passed
-- Owner Acceptance is blocked pending the remaining podcast-to-Notion
-  end-to-end journey
-
-Phase 4.1C is running in the owner's real Codex environment. The first
-acceptance attempt confirmed Skill installation, immediate continuation in the
-same conversation, and the reply-gated guidance mechanism. Real setup then
-revealed that the current Notion UI uses “连接” in the developer dashboard and
-“集成” on a normal page, while the local setup used an obsolete database
-creation payload. Four database containers were created in the first attempt.
-The protected in-place recovery reused them, completed their fields and
-one-way relations, and preserved existing records and unknown fields. They
-must not be deleted or recreated. External-user testing has not started.
-
-The formal user flow continues in the current conversation after installation.
-A new conversation is not mandatory, and restarting Codex is only the second
-Skill-refresh fallback. The user does not need to memorize commands, locate the
-project directory, type `cd`, create `.venv`, or run the primary workflow.
-
-Codex locates or safely acquires the complete project and advances onboarding
-one visible action at a time. The user confirms each Notion action before
-Codex proceeds. Only after the user confirms the page link is copied may Codex
-prepare the local runtime and start the safe setup tool. The user enters the
-hidden token and complete page URL only in the local window.
+- PR #9 merged the partial Podcast/Expression publish recovery.
+- PR #10 merged the protected Podcast Owner Acceptance Harness.
+- PR #11 merged fail-closed Notion target-group binding.
+- PR #14 implemented, independently reviewed, and merged the protected
+  Vocabulary Acceptance Harness after all identified P0/P1 false-pass paths
+  were closed.
+- Vocabulary Harness targeted tests: 19 passed.
+- Latest complete regression: 569 passed with 3 existing
+  compatibility-provider deprecation warnings.
+- `compileall`: PASS.
+- `git diff --check`: PASS.
+- The five local target settings now point to the intended database group.
+- The Notion token did not change during the target switch.
+- Read-only Target Binding Diagnosis: PASS.
+- Automated Podcast Owner Acceptance: PASS.
+- Vocabulary Acceptance: NOT RUN.
+- Owner visual review: NOT COMPLETE.
+- External-user sessions: 0.
+- External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`.
 
 ## Runtime Model
 
-### Codex: Reasoning and Generation Layer
+### Codex: Reasoning and Generation
 
-Codex performs language understanding and generates structured artifacts for:
+Codex performs language understanding and creates schema-conformant artifacts
+for Podcast Analysis, Vocabulary enrichment, Reflection Analysis, and Weekly
+Review generation.
 
-- Podcast Analysis
-- vocabulary enrichment
-- Reflection Analysis
-- Weekly Review generation
+### Python: Orchestration and Validation
 
-### Python: Execution, Orchestration, and Validation Layer
+Python performs source processing, transcription, artifact validation,
+deterministic workflow execution, dedupe, state management, and Notion
+synchronization.
 
-Python performs deterministic work:
+### Notion: Long-Term Knowledge Memory
 
-- source processing and transcription
-- request artifact creation
-- schema validation
-- workflow orchestration
-- dedupe and idempotency
-- Notion synchronization
-
-### Notion: Long-Term Knowledge Memory Layer
-
-Notion stores the long-term learning system:
+Notion stores:
 
 - Podcast Library
 - Expression Database
 - Vocabulary Database
-- Weekly Review Database
+- Weekly Review
 
 ## Production Artifact Flow
 
@@ -131,97 +85,179 @@ Workflow
 Notion
 ```
 
-The production Skill flow does not require `OPENAI_API_KEY`. Direct OpenAI
-providers are deprecated compatibility paths only.
+The production Skill path does not require `OPENAI_API_KEY`. Direct OpenAI
+providers remain deprecated compatibility paths only.
 
 ## Supported v1 Inputs
 
-- Podcast episode URL
+- Apple Podcasts episode URL
 - Podcast RSS feed
 - Local audio file
 
-YouTube is intentionally outside v1 product scope. Remaining implementation is
-experimental and must not be advertised as a supported input.
+YouTube is outside v1 product scope.
 
-## Product Principles
-
-1. The user owns learning selection.
-2. AI transforms user-selected content into reusable knowledge assets.
-3. The system optimizes for long-term learning compounding, not content
-   aggregation.
-
-## Accepted Product Workflows
+## Accepted Workflows
 
 ### Podcast Learning
 
-Audio is resolved, validated, transcribed, analyzed by Codex through artifacts,
-validated by Python, and published to Podcast Library and Expression Database.
+```text
+Audio Source
+↓
+Transcript
+↓
+Codex Podcast Analysis
+↓
+Python Validation
+↓
+Podcast Library + Expression Database
+```
+
+The protected automated acceptance against the intended target group passed:
+
+- Podcast first delta: 1
+- Podcast second delta: 0
+- Expression first delta: 19
+- Expression second delta: 0
+- Vocabulary Database: unchanged
+- Weekly Review: unchanged
+- historical database group: unchanged
+
+Podcast body bolding, semantic highlights, Highlight Legend, and Highlighted
+Transcript are working. They are not part of the current visual defect.
 
 ### Vocabulary Memory
 
-The user marks an exact vocabulary target with a pink highlight. Codex enriches
-the resulting artifact, and Python validates, deduplicates, and upserts it into
-Vocabulary Database.
+```text
+User Pink Highlight
+↓
+Explicit Vocabulary Sync
+↓
+Codex Enrichment
+↓
+Python Validation and Dedupe
+↓
+Vocabulary Database Upsert
+```
+
+Podcast publishing and Vocabulary synchronization are separate workflows. An
+empty Vocabulary Database after Podcast acceptance does not prove that the
+Vocabulary sync script is broken.
+
+Accurate current Vocabulary status:
+
+- the protected Vocabulary Acceptance Harness is implemented, independently
+  reviewed, and merged;
+- Harness readiness does not mean the Vocabulary workflow has passed
+  acceptance;
+- the intended-group targeted dry-run has not run;
+- the intended-group targeted publish has not run;
+- the exact retry has not run;
+- Vocabulary record data quality has not been inspected;
+- Owner visual review has not completed;
+- therefore Vocabulary Acceptance is `NOT RUN`;
+- full-scan highlight checkpoints and processed-highlight state are currently
+  global rather than scoped by target group.
 
 ### Weekly Reflection
 
-Weekly learning facts are transformed into ReflectionContext and WeeklyReview
-artifacts, checked by a quality gate, and idempotently published to Notion.
-Weekly Reflection is a compounding learning note rather than a recap.
+```text
+Podcast Library
+↓
+WeeklyLearningContext
+↓
+ReflectionContext
+↓
+WeeklyReview
+↓
+Quality Gate
+↓
+Weekly Review Database
+```
+
+Weekly Reflection is a compounding learning note, not a podcast recap.
+
+## Notion Target Binding
+
+All production writers are bound to one configured parent and one internally
+consistent four-Data-Source group. Target validation checks role, schema,
+common parent, single-property relations, and cross-group isolation before
+writes.
+
+The coordinated local switch changed only:
+
+- Podcast Data Source
+- Expression Data Source
+- Vocabulary Data Source
+- Weekly Data Source
+- target parent page
+
+The token and historical group were preserved.
+
+## Current Visual Review Finding
+
+The Expression Database Select Property options are gray for:
+
+- Category
+- Commonness
+- Review Status
+
+This is a semantic presentation defect for future database creation and a
+manual live-database adjustment. It does not affect Podcast body formatting,
+semantic text highlights, the Highlight Legend, or the Highlighted Transcript.
+
+## Pending Requirements
+
+In execution order:
+
+1. targeted Vocabulary dry-run;
+2. inspect highlights, candidate decisions, enrichment, and planned writes;
+3. obtain exact human confirmation;
+4. targeted Vocabulary publish;
+5. inspect Vocabulary record data quality;
+6. exact Vocabulary retry with zero new records;
+7. make the Vocabulary acceptance decision;
+8. target-group-scoped highlight state;
+9. conversational `同步生词`;
+10. semantic Select option colors for future database creation;
+11. documented manual color adjustment for the live database;
+12. Podcast page table of contents;
+13. Weekly page table of contents;
+14. parent-page usage guide after these workflows stabilize;
+15. complete Owner visual review.
+
+Podcast and Weekly TOCs are presentation enhancements. New pages should place
+the TOC at the beginning, exact retry must not duplicate it, existing body
+contracts remain intact, and historical automatic backfill is not approved.
+
+## Cancelled Proposal
+
+The following proposal was cancelled before implementation and is not part of
+the active goals, blockers, risks, or roadmap:
+
+- Notion AI-assisted page workflow;
+- synchronization of Podcast-page Expressions into Expression Database.
+
+No Architecture Review or user-guide commitment remains active for this
+proposal.
 
 ## Frozen Boundaries
 
-- Podcast Library and Notion schema
-- Podcast page content structure
+- Codex Artifact → Python Validation → Notion architecture
+- four-database product model
+- Podcast page body contracts
 - artifact JSON contracts
 - Vocabulary/Expression ownership separation
 - exact pink-highlight vocabulary intent
 - Weekly Reflection product structure
-- Notion idempotent publishing
-
-## Current Product Risks
-
-Resolved during Phase 4.1C:
-
-- legacy Database / Data Source API mismatch
-- empty database schema reconciliation requirement
-- relation `single_property` compatibility
-- hidden input feedback issue
-- final relation target and mode validation
-- safe stop for existing `dual_property` relations
-
-Current risks:
-
-1. Production target binding must be enforced and reviewed before the five
-   target configuration values are switched.
-2. The intended production workspace has not yet completed a real
-   podcast-to-Notion journey.
-3. Real Podcast Library and Expression Database output has not yet been
-   reviewed after recovery.
-4. End-to-end retry and idempotency have not yet been verified in the
-   recovered owner workspace.
-5. External-user sessions remain 0.
-6. Learning-asset usefulness has not been validated with external users.
-
-## Historical Milestones
-
-### Phase 3 — Product Stabilization / Post v1.1
-
-Phase 3 established the safe v1.1 release baseline, aligned documentation and
-runtime contracts, protected private and generated artifacts, verified the
-full regression suite, and completed the reviewed v1.1.0 release.
+- Notion idempotent publishing and target binding
 
 ## Immediate Milestone
 
-- Review and merge the Notion target-binding repair.
-- Switch all four Data Source settings and the expected parent setting as one
-  operation, without changing the token.
-- Run the read-only target-binding diagnosis and require PASS.
-- Then run one protected real podcast-to-Notion Owner Acceptance journey
-  against the intended empty workspace.
-- Review output quality, database placement, relation behavior, and
-  idempotency.
-- Do not start external-user testing.
+Run the protected targeted Vocabulary dry-run against BE 598 from a clean
+latest-main acceptance worktree. Continue through inspection, exact human
+confirmation, publish, data-quality review, exact retry, and the acceptance
+decision before classifying a core-script defect. External-user testing
+remains paused.
 
-Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md` and
-`skill/SKILL.md` before changing runtime behavior.
+Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md`,
+`skill/SKILL.md`, and `DECISION_LOG.md` before changing runtime behavior.

@@ -431,3 +431,128 @@ relation modes when no two-way relation exists.
 Changing a two-way relation can alter or remove its reverse property. That is a
 data migration, not deterministic schema repair, and is outside the current
 Owner Acceptance remediation.
+
+## DEC-019: Run Vocabulary Acceptance Before Defect Classification
+
+- Date: 2026-07-24
+- Status: Accepted for Owner Acceptance
+
+### Decision
+
+Do not classify an empty Vocabulary Database after Podcast acceptance as proof
+that the Vocabulary sync script is broken. Podcast publishing and Vocabulary
+synchronization remain separate workflows.
+
+Run, in order:
+
+1. targeted Vocabulary dry-run;
+2. targeted Vocabulary publish;
+3. exact retry;
+4. original-word, context, source-relation, and status verification.
+
+### Reason
+
+The protected Podcast acceptance intentionally wrote only Podcast and
+Expression records. A core-script diagnosis requires evidence from the
+Vocabulary workflow itself.
+
+## DEC-020: Scope Highlight State by Target Group
+
+- Date: 2026-07-24
+- Status: Accepted for Phase 4.1C
+
+### Decision
+
+Namespace full-scan checkpoints and processed-highlight state by the configured
+target group. State from a historical database group must not suppress
+highlights in another group.
+
+Do not add a background daemon or infinite polling loop.
+
+### Reason
+
+Highlight processing state is synchronization metadata. Its identity boundary
+must match the Notion target binding boundary.
+
+## DEC-021: Add Podcast and Weekly Page Tables of Contents
+
+- Date: 2026-07-24
+- Status: Accepted as a low-risk presentation enhancement
+
+### Decision
+
+New Podcast and Weekly pages should begin with a navigable table of contents.
+Exact retry must not duplicate it, and existing page body contracts remain
+intact.
+
+Historical automatic backfill is deferred.
+
+### Reason
+
+Long learning pages need navigation, but adding TOCs must not change data
+ownership, page identity, idempotency, or historical content without a
+separate approval.
+
+## DEC-022: Defer the Parent-Page Usage Guide
+
+- Date: 2026-07-24
+- Status: Accepted
+
+### Decision
+
+Add the complete parent-page usage guide only after Vocabulary acceptance,
+Podcast and Weekly TOCs, and related user instructions are stable.
+
+### Reason
+
+Deferral avoids repeated live-page rewrites and prevents instructions from
+describing behavior that is still being accepted.
+
+## DEC-023: Cancel the Notion AI and Expression Synchronization Proposal
+
+- Date: 2026-07-24
+- Status: Cancelled before implementation
+
+### Decision
+
+Notion AI page assistance is not an active product requirement. Synchronizing
+Podcast-page Expressions into Expression Database as a separate workflow is
+also not an active product requirement.
+
+No implementation, Architecture Review, blocker, roadmap item, or user-guide
+commitment remains active for this proposal.
+
+### Reason
+
+The accepted product already has clear ownership boundaries: Codex produces
+reasoning artifacts, Python validates and orchestrates, Podcast publishing
+owns analyzed Expressions, and explicit pink-highlight sync owns Vocabulary.
+The cancelled proposal added complexity without an accepted user need.
+
+## DEC-024: Treat the Vocabulary Harness as an Acceptance Boundary
+
+- Date: 2026-07-24
+- Status: Accepted for Phase 4.1C
+
+### Decision
+
+Merge the protected Vocabulary Acceptance Harness only after independent
+review closes all identified P0/P1 false-pass paths. The merged Harness wraps
+the existing Vocabulary workflow; it does not introduce a new trigger,
+enrichment path, publisher, schema, or state model.
+
+Harness test and review success does not mean the real Vocabulary workflow has
+passed acceptance. Vocabulary Acceptance remains `NOT RUN` until the targeted
+dry-run, candidate and enrichment inspection, confirmed publish, data-quality
+inspection, and exact retry have completed.
+
+The real targeted dry-run remains gated by synchronization of the canonical
+project documents with the merged production baseline. Any real Vocabulary
+write still requires the exact human confirmation defined by the Harness.
+
+### Reason
+
+The Harness can prove that unsafe or ambiguous runs stop, but only the
+protected real workflow can establish product acceptance and record quality.
+Separating Harness readiness from workflow acceptance prevents a test result
+from being reported as production evidence.
