@@ -115,6 +115,13 @@ Notion 插件只是可选的搜索、读取和辅助查看工具。
 
 `Weekly Review` 存储 `Weekly Reflection`（每周复盘内容）。
 
+新建的 `Expression Database` 会自动为 `Category`、`Commonness` 和
+`Review Status` 的现有选项设置语义颜色，选项名称保持不变。
+
+Notion 官方接口不能修改已有 Select option 的颜色。已经存在的
+`Expression Database` 应只在 Notion 界面中调整这些选项的颜色；不要删除、
+重建或重命名现有 options，也不要为了获得颜色而重建数据库。
+
 规范环境变量：
 
 - `NOTION_PODCAST_LIBRARY_DATABASE_ID`

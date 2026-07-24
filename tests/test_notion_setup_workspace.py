@@ -180,6 +180,62 @@ def test_relation_property_is_single_property_data_source_relation() -> None:
     assert "dual_property" not in relation["relation"]
 
 
+def test_expression_database_select_options_have_semantic_colors() -> None:
+    properties = setup_workspace.expression_database_properties("podcast_db")
+
+    assert properties["Category"]["select"]["options"] == [
+        {"name": "Native Expression", "color": "green"},
+        {"name": "Business Phrase", "color": "blue"},
+        {"name": "Industry Term", "color": "yellow"},
+        {"name": "Collocation", "color": "purple"},
+        {"name": "Sentence Pattern", "color": "orange"},
+    ]
+    assert properties["Commonness"]["select"]["options"] == [
+        {"name": "High", "color": "red"},
+        {"name": "Medium", "color": "yellow"},
+        {"name": "Low", "color": "gray"},
+    ]
+    assert properties["Review Status"]["select"]["options"] == [
+        {"name": "New", "color": "blue"},
+        {"name": "Reviewing", "color": "yellow"},
+        {"name": "Mastered", "color": "green"},
+    ]
+
+
+def test_reconcile_does_not_rewrite_existing_expression_option_colors() -> None:
+    expected_schemas = {
+        "podcast_db": setup_workspace.podcast_library_properties(),
+        "expression_db": setup_workspace.expression_database_properties(
+            "podcast_db"
+        ),
+        "vocabulary_db": setup_workspace.vocabulary_database_properties(
+            "podcast_db"
+        ),
+        "weekly_db": setup_workspace.weekly_review_properties("podcast_db"),
+    }
+    schemas = {
+        data_source_id: {
+            "id": data_source_id,
+            "properties": {
+                name: _actual_property(name, definition)
+                for name, definition in properties.items()
+            },
+        }
+        for data_source_id, properties in expected_schemas.items()
+    }
+    for property_name in ("Category", "Commonness", "Review Status"):
+        options = schemas["expression_db"]["properties"][property_name][
+            "select"
+        ]["options"]
+        for option in options:
+            option["color"] = "default"
+
+    notion = FakeNotion(schemas)
+    setup_workspace.reconcile_workspace_schema(notion, DATABASE_IDS)
+
+    assert notion.data_sources.update_calls == []
+
+
 def test_create_base_databases_uses_fixed_product_order(monkeypatch) -> None:
     created_names: list[str] = []
 

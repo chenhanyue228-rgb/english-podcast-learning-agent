@@ -31,6 +31,9 @@ from src.notion.config import (
 from src.notion.schema import (
     COMMONNESS_LEVELS,
     EXPRESSION_CATEGORIES,
+    EXPRESSION_CATEGORY_SELECT_COLORS,
+    EXPRESSION_COMMONNESS_SELECT_COLORS,
+    EXPRESSION_REVIEW_STATUS_SELECT_COLORS,
     REVIEW_STATUSES,
     SOURCE_TYPES,
     VOCABULARY_CATEGORIES,
@@ -92,8 +95,23 @@ def rich_text_property() -> dict[str, Any]:
     return {"rich_text": {}}
 
 
-def select_property(options: list[str]) -> dict[str, Any]:
-    return {"select": {"options": [{"name": option} for option in options]}}
+def select_property(
+    options: list[str],
+    *,
+    option_colors: Optional[Mapping[str, str]] = None,
+) -> dict[str, Any]:
+    colors = option_colors or {}
+    return {
+        "select": {
+            "options": [
+                {
+                    "name": option,
+                    **({"color": colors[option]} if option in colors else {}),
+                }
+                for option in options
+            ]
+        }
+    }
 
 
 def relation_property(data_source_id: str) -> dict[str, Any]:
@@ -120,9 +138,18 @@ def podcast_library_properties() -> dict[str, Any]:
 def expression_database_properties(podcast_library_id: str) -> dict[str, Any]:
     return {
         "Expression": title_property(),
-        "Category": select_property([*EXPRESSION_CATEGORIES]),
-        "Commonness": select_property(COMMONNESS_LEVELS),
-        "Review Status": select_property(REVIEW_STATUSES),
+        "Category": select_property(
+            [*EXPRESSION_CATEGORIES],
+            option_colors=EXPRESSION_CATEGORY_SELECT_COLORS,
+        ),
+        "Commonness": select_property(
+            COMMONNESS_LEVELS,
+            option_colors=EXPRESSION_COMMONNESS_SELECT_COLORS,
+        ),
+        "Review Status": select_property(
+            REVIEW_STATUSES,
+            option_colors=EXPRESSION_REVIEW_STATUS_SELECT_COLORS,
+        ),
         "Source Podcast": relation_property(podcast_library_id),
     }
 
