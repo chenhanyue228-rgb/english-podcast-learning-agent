@@ -5,7 +5,42 @@ entries must be appended or clarified, not removed.
 
 ## Unreleased — Phase 4 Product Validation
 
+### Phase 4.1C Owner Acceptance Closure
+
+- Completed Setup / Notion workspace recovery and Target Binding validation.
+- Passed Automated Podcast Owner Acceptance, including first publish and exact
+  retry.
+- Passed targeted Vocabulary Acceptance: first publish created 2 and exact
+  retry created 0.
+- Passed Weekly Reflection Acceptance: first publish created 1 and exact retry
+  created 0.
+- Confirmed 0 non-target database changes and 0 historical database group
+  changes across acceptance.
+- Recorded Owner Acceptance as `OWNER_ACCEPTANCE_PASS`.
+- Accepted the core internal release as
+  `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`.
+- External-user sessions: 0.
+- External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`.
+- Kept Architecture stable; no Architecture Review is required for closure.
+- Merged PR #16 so future Expression Database creation assigns semantic colors
+  to existing Category, Commonness, and Review Status option names.
+- Preserved existing databases without automatic color rewrites. Existing
+  option colors may be changed manually in the Notion UI only; options must not
+  be deleted, recreated, or renamed.
+- Moved Podcast and Weekly TOCs, the parent-page usage guide, improved Skill
+  `同步生词` interaction, full-scan highlight state namespacing, and existing
+  Expression Database manual color adjustment into a separate non-blocking
+  backlog.
+- Kept the Notion AI-assisted workflow and Podcast-page Expression
+  synchronization cancelled and outside the roadmap.
+- Entered Phase 4.2 External User Validation with a target of 3 real sessions,
+  at least 2 unassisted core-flow completions, time-to-first-value measurement,
+  and evidence-based tracking of confusion, failures, and recovery.
+
 ### Phase 4.1C Podcast Acceptance and Vocabulary Handoff
+
+This subsection records an intermediate Phase 4.1C checkpoint. The completed
+acceptance state is recorded in the closure entry above.
 
 - Merged PR #9 for partial Podcast/Expression publish recovery.
 - Merged PR #10 for the protected Podcast Owner Acceptance Harness.

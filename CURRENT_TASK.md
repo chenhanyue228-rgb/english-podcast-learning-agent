@@ -8,32 +8,46 @@ Phase 4 — Product Validation
 
 - Release: v1.1.0
 - Release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Production `main`: `987c7aa95f68b07b2a258b65166584f468425047`
+- Phase 4.1C closure base:
+  `de9f088a47b58ad54de9ef281ddf427c994dbf0a`
 - PR #9: merged
 - PR #10: merged
 - PR #11: merged
 - PR #14 Vocabulary Acceptance Harness: merged
-- Harness targeted tests: 19 passed
-- Latest regression: 569 passed, 3 existing deprecation warnings
-- `compileall`: PASS
-- `git diff --check`: PASS
+- PR #16 Expression Select semantic colors: merged
 - Architecture: Stable
+- Architecture Review: not required
 
 ## Current Sprint
 
-**Phase 4.1C — Owner Acceptance**
+**Phase 4.2 — External User Validation**
 
 Current status:
 
+- Phase 4.1C: COMPLETED
+- Setup / Notion workspace recovery: PASS
+- Target Binding: PASS
 - Automated Podcast Owner Acceptance: PASS
-- Vocabulary Acceptance Harness: MERGED
-- Vocabulary Acceptance: NOT RUN
-- Owner visual review: NOT COMPLETE
+- Podcast first publish: PASS
+- Podcast exact retry: PASS
+- Targeted Vocabulary Acceptance: PASS
+- Vocabulary first publish: created 2
+- Vocabulary exact retry: created 0
+- Weekly Reflection Acceptance: PASS
+- Weekly first publish: created 1
+- Weekly exact retry: created 0
+- Non-target database changes: 0
+- Historical database group changes: 0
+- Owner Acceptance: `OWNER_ACCEPTANCE_PASS`
+- Internal release:
+  `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`
 - External-user sessions: 0
 - External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`
 
 `NOT_READY_FOR_EXTERNAL_USERS` is the canonical readiness token. Do not use a
 space-separated variant in active project status.
+
+Internal release acceptance does not imply external-user readiness.
 
 ## Completed Gates
 
@@ -50,85 +64,60 @@ space-separated variant in active project status.
 - Historical database group remained unchanged.
 - PR #14 protected Vocabulary Acceptance Harness merged after independent
   review closed all identified P0/P1 false-pass paths.
-- Harness validation passed: 19 targeted tests, 569 full regression tests,
-  `compileall`, and `git diff --check`.
-- Harness development made 0 real Notion calls and 0 real Notion writes.
+- Targeted Vocabulary acceptance passed: first publish created 2 and exact
+  retry created 0.
+- Weekly Reflection acceptance passed: first publish created 1 and exact retry
+  created 0.
+- All acceptance runs preserved non-target databases and the historical
+  database group.
+- PR #16 added semantic Select colors to future Expression Database creation
+  while preserving all option names and existing databases.
 
 ## Current Tasks
 
-1. From a clean latest-main acceptance worktree, run the protected targeted
-   Vocabulary dry-run on the accepted BE 598 Podcast page.
-2. Inspect exact pink highlights, approved/rejected candidates, enrichment,
-   and planned writes.
-3. Obtain exact human confirmation before any real write.
-4. Run targeted Vocabulary publish.
-5. Inspect original word preservation, context, source relation, status, and
-   other Vocabulary data quality.
-6. Run an exact retry and require zero new records.
-7. Make the Vocabulary acceptance decision.
-8. Determine whether a real Vocabulary core-script defect exists.
-9. Namespace highlight state by target group.
-10. Add the Skill `同步生词` interaction.
-11. Fix semantic Select option colors for future database creation.
-12. Document the manual live-database color adjustment.
-13. Add the Podcast page table of contents.
-14. Add the Weekly page table of contents.
-15. Implement the final parent-page usage guide after the above behavior is
-    stable.
-16. Complete Owner visual review.
+1. Complete 3 real external-user sessions.
+2. Require at least 2 users to complete the core journey without developer
+   intervention.
+3. Record time-to-first-value for every session.
+4. Record user confusion, failed steps, and recovery outcomes.
+5. Base changes on repeated evidence; do not start speculative large-scale
+   refactoring.
 
-## Vocabulary Acceptance Rule
+## External Validation Journey
 
-Podcast publishing and Vocabulary synchronization are separate workflows.
-The Podcast acceptance intentionally did not write Vocabulary records.
-
-The merged Harness is a protected acceptance boundary around the existing
-Vocabulary workflow. Its tests and independent review prove the Harness can
-fail closed; they do not prove that real Vocabulary Acceptance has passed.
-
-An empty Vocabulary Database is not evidence of a broken sync script. Defect
-classification requires:
+The core journey under observation is:
 
 ```text
-Targeted dry-run
+Install and configure
 ↓
-Candidate and enrichment inspection
+Process a supported audio source
 ↓
-Exact human confirmation
+Publish Podcast learning assets
 ↓
-Targeted publish
+Capture targeted Vocabulary
 ↓
-Data-quality inspection
-↓
-Exact retry
-↓
-Acceptance decision
+Produce Weekly Reflection when enough learning data exists
 ```
 
-The current full-scan highlight checkpoint and processed-highlight state are
-global. They must be namespaced by target group so historical-group state
-cannot suppress work in another group.
+Session evidence must distinguish a user-facing failure from an environment
+problem and must not include secrets or private Notion identifiers.
 
-## Owner Visual Review Finding
+## Deferred Non-Blocking Backlog
 
-Expression Database Select options currently lack semantic colors for:
+- Podcast page table of contents
+- Weekly page table of contents
+- parent-page usage guide
+- improved Skill `同步生词` interaction
+- full-scan highlight state namespacing
+- manual color adjustment for the existing Expression Database
 
-- Category
-- Commonness
-- Review Status
+PR #16 gives newly created Expression databases semantic colors. Existing
+databases are not automatically rewritten and may still show gray options.
+Existing option colors may be changed manually in the Notion UI only. Do not
+delete, recreate, or rename existing options.
 
-Podcast body bolding, semantic highlights, Highlight Legend, and Highlighted
-Transcript are working and are outside this defect.
-
-## Presentation Enhancements
-
-- New Podcast pages should begin with a navigable table of contents.
-- New Weekly pages should begin with a navigable table of contents.
-- Exact retries must not duplicate either TOC.
-- Existing body contracts remain intact.
-- Historical automatic backfill is not approved.
-- The parent-page usage guide remains deferred until Vocabulary, TOC, and
-  related instructions are stable.
+This backlog is separate from the core external-validation journey and is not
+a release blocker.
 
 ## Cancelled Requirements
 

@@ -1,7 +1,9 @@
 # Decision Log
 
 This file records durable product and architecture decisions. New decisions
-must be appended; previous records must not be removed.
+must be appended; previous records must not be removed. Status statements
+inside earlier decisions describe the project at the time of that decision;
+later accepted decisions supersede them when the current state changes.
 
 ## DEC-001: Use Codex as the Production Reasoning Runtime
 
@@ -556,3 +558,97 @@ The Harness can prove that unsafe or ambiguous runs stop, but only the
 protected real workflow can establish product acceptance and record quality.
 Separating Harness readiness from workflow acceptance prevents a test result
 from being reported as production evidence.
+
+This intermediate gate was subsequently completed; DEC-025 records the final
+Phase 4.1C acceptance state.
+
+## DEC-025: Accept the Core Internal Release and Close Phase 4.1C
+
+- Date: 2026-07-24
+- Status: Accepted
+
+### Decision
+
+Close Phase 4.1C with:
+
+- Owner Acceptance: `OWNER_ACCEPTANCE_PASS`;
+- internal release:
+  `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`;
+- External-user sessions: 0;
+- external readiness: `NOT_READY_FOR_EXTERNAL_USERS`;
+- Architecture: Stable;
+- Architecture Review: not required.
+
+The decision is supported by passing Setup recovery, Target Binding, Podcast,
+targeted Vocabulary, and Weekly Reflection acceptance. Podcast first publish
+and exact retry passed. Vocabulary first publish created 2 and exact retry
+created 0. Weekly first publish created 1 and exact retry created 0.
+Non-target database changes and historical database group changes were both 0.
+
+### Reason
+
+The protected core flows are reliable enough for internal release. External
+readiness requires real external-user evidence and is a separate gate.
+
+## DEC-026: Enter Phase 4.2 External User Validation
+
+- Date: 2026-07-24
+- Status: Accepted
+
+### Decision
+
+Phase 4.2 will:
+
+1. complete 3 real external-user sessions;
+2. require at least 2 users to finish the core flow without developer
+   intervention;
+3. record time-to-first-value;
+4. record confusion, failed steps, and recovery outcomes;
+5. avoid speculative large-scale refactoring before repeated evidence exists.
+
+Podcast and Weekly TOCs, the parent-page usage guide, improved Skill
+`同步生词` interaction, full-scan highlight state namespacing, and manual
+adjustment of existing Expression Select colors remain a separate non-blocking
+backlog.
+
+### Reason
+
+The next product risk is user usability, not unverified architecture work.
+Separating polish from the core journey keeps validation evidence interpretable.
+
+## DEC-027: Apply Expression Select Colors Only to Future Creation
+
+- Date: 2026-07-24
+- Status: Accepted
+
+### Decision
+
+PR #16 adds semantic colors to Category, Commonness, and Review Status when a
+future Expression Database is created. Existing option names remain unchanged.
+Existing databases are not automatically rewritten and may still display gray
+options.
+
+Existing colors may be adjusted manually in the Notion UI only. Do not delete,
+recreate, or rename existing options.
+
+### Reason
+
+The Notion API does not support safely rewriting the color of existing Select
+options. Preserving option identity avoids data migration and compatibility
+risk.
+
+## DEC-028: Keep Cancelled Requirements Out of Phase 4.2
+
+- Date: 2026-07-24
+- Status: Reaffirmed
+
+### Decision
+
+The Notion AI-assisted workflow and Podcast-page Expression synchronization
+into Expression Database remain cancelled. They must not re-enter the roadmap,
+external-validation journey, or release blockers.
+
+### Reason
+
+Neither requirement is needed to validate the accepted core product, and both
+would expand scope without external-user evidence.
