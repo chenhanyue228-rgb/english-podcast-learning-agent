@@ -606,10 +606,10 @@ Phase 4.2 will:
 4. record confusion, failed steps, and recovery outcomes;
 5. avoid speculative large-scale refactoring before repeated evidence exists.
 
-Podcast and Weekly TOCs, the parent-page usage guide, improved Skill
-`同步生词` interaction, full-scan highlight state namespacing, and manual
-adjustment of existing Expression Select colors remain a separate non-blocking
-backlog.
+Podcast and Weekly TOCs remain accepted output contracts under DEC-021. The
+parent-page usage guide, improved Skill `同步生词` interaction, full-scan
+highlight state namespacing, and manual adjustment of existing Expression
+Select colors remain a separate non-blocking backlog.
 
 ### Reason
 

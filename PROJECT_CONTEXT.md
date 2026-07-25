@@ -232,10 +232,12 @@ Phase 4.2 validates the accepted internal release with real external users:
 
 ## Deferred Non-Blocking Backlog
 
+Podcast and Weekly page tables of contents are accepted output contracts under
+DEC-021, not deferred polish. Every newly generated Podcast or Weekly page must
+begin with exactly one navigable table of contents.
+
 The following polish is separate from the core external-validation journey:
 
-- Podcast page table of contents;
-- Weekly page table of contents;
 - parent-page usage guide;
 - improved Skill `同步生词` interaction;
 - full-scan highlight state namespacing;

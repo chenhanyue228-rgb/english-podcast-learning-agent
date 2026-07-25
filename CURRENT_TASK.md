@@ -104,8 +104,10 @@ problem and must not include secrets or private Notion identifiers.
 
 ## Deferred Non-Blocking Backlog
 
-- Podcast page table of contents
-- Weekly page table of contents
+Podcast and Weekly page tables of contents are existing output contracts.
+Every newly generated page must begin with exactly one navigable table of
+contents; they are not deferred backlog items.
+
 - parent-page usage guide
 - improved Skill `同步生词` interaction
 - full-scan highlight state namespacing

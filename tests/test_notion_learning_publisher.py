@@ -24,8 +24,12 @@ from src.notion.learning_publisher import (
     publish_learning_materials,
     update_podcast_learning_page,
 )
-from src.notion.renderers import highlight_legend_blocks
-from src.notion.renderers import expression_body_blocks, expression_table_block
+from src.notion.renderers import (
+    expression_body_blocks,
+    expression_table_block,
+    highlight_legend_blocks,
+    podcast_body_blocks,
+)
 
 
 def expression_schema_properties(
@@ -502,6 +506,41 @@ def test_expression_body_includes_chinese_meaning() -> None:
     assert "Commonness" in block_text
 
 
+def test_podcast_body_starts_with_one_toc_and_preserves_section_order() -> None:
+    blocks = podcast_body_blocks(
+        summary="English summary",
+        transcript="Companies need to take ownership.",
+        expressions=[
+            learning_item_payload(item)
+            for item in analysis_result().all_learning_items()
+        ],
+    )
+
+    assert blocks[0] == {
+        "object": "block",
+        "type": "table_of_contents",
+        "table_of_contents": {"color": "default"},
+    }
+    assert sum(block["type"] == "table_of_contents" for block in blocks) == 1
+
+    heading_texts = [
+        block[block["type"]]["rich_text"][0]["text"]["content"]
+        for block in blocks
+        if block["type"].startswith("heading_")
+        and block[block["type"]]["rich_text"][0].get("text")
+    ]
+    section_positions = [
+        heading_texts.index(section)
+        for section in (
+            "Summary",
+            "Expressions",
+            "Highlight Legend",
+            "Highlighted Transcript",
+        )
+    ]
+    assert section_positions == sorted(section_positions)
+
+
 def test_expression_page_properties_create_relation_and_status() -> None:
     item = analysis_result().learning_items[0]
 
@@ -538,6 +577,14 @@ def test_publish_learning_materials_updates_podcast_and_creates_expressions() ->
 
     append_call = notion.blocks.children.append_calls[0]
     assert append_call["block_id"] == "podcast_page"
+    assert append_call["children"][0]["type"] == "table_of_contents"
+    assert (
+        sum(
+            block["type"] == "table_of_contents"
+            for block in append_call["children"]
+        )
+        == 1
+    )
     headings = [
         block[block["type"]]["rich_text"][0]["text"]["content"]
         for block in append_call["children"]
@@ -783,6 +830,14 @@ def test_create_complete_podcast_learning_page_creates_full_body() -> None:
     assert create_call["properties"]["Difficulty"] == {
         "select": {"name": "Intermediate"}
     }
+    assert create_call["children"][0]["type"] == "table_of_contents"
+    assert (
+        sum(
+            block["type"] == "table_of_contents"
+            for block in create_call["children"]
+        )
+        == 1
+    )
     headings = [
         block[block["type"]]["rich_text"][0]["text"]["content"]
         for block in create_call["children"]
@@ -825,7 +880,7 @@ def test_publish_complete_learning_materials_creates_podcast_then_expressions() 
     }
 
 
-def test_publish_complete_learning_materials_updates_exact_repeat_without_duplicates() -> None:
+def test_publish_complete_learning_materials_exact_retry_does_not_append_body_or_toc() -> None:
     source_url = "https://podcasts.apple.com/podcast/id123?i=456"
     notion = StatefulCompletePublishNotion()
     notion.add_podcast(

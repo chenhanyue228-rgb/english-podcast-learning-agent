@@ -338,6 +338,8 @@ The following behavior is stable and should remain protected:
 - transcript persistence
 - Codex/Python artifact contracts
 - Podcast Library page structure
+- exactly one leading table of contents on each new Podcast page
+- exactly one leading table of contents on each new Weekly page
 - exact pink-highlight vocabulary intent
 - Vocabulary and Expression ownership separation
 - Weekly Reflection output contract and quality gate
@@ -347,8 +349,6 @@ The following behavior is stable and should remain protected:
 
 The following polish is separate from the Phase 4.2 core validation journey:
 
-- Podcast page table of contents;
-- Weekly page table of contents;
 - parent-page usage guide;
 - improved Skill `同步生词` interaction;
 - full-scan highlight state namespacing;
