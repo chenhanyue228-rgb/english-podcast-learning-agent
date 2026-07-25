@@ -15,12 +15,18 @@ Phase 4 — Product Validation
 - PR #11: merged
 - PR #14 Vocabulary Acceptance Harness: merged
 - PR #16 Expression Select semantic colors: merged
+- PR #20 Parent Page Guide: merged and accepted
+- PR #21 Podcast TOC regression fix: merged
+- Production main: `5b08e4bb73db3bffe2a3787cf090d88bdcb4d7be`
 - Architecture: Stable
-- Architecture Review: not required
+- Architecture Review: `OWNER_APPROVED_FOR_PHASE_0`
 
 ## Current Sprint
 
 **Phase 4.2 — External User Validation**
+
+**Execution state:** Automatic Vocabulary Sync Architecture Implementation
+Preparation
 
 Current status:
 
@@ -43,6 +49,9 @@ Current status:
   `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`
 - External-user sessions: 0
 - External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`
+- External User Session #1: BLOCKED
+- Automatic Vocabulary Sync runtime: NOT IMPLEMENTED
+- Isolated unattended Codex synthetic feasibility: PASS
 
 `NOT_READY_FOR_EXTERNAL_USERS` is the canonical readiness token. Do not use a
 space-separated variant in active project status.
@@ -75,13 +84,15 @@ Internal release acceptance does not imply external-user readiness.
 
 ## Current Tasks
 
-1. Complete 3 real external-user sessions.
-2. Require at least 2 users to complete the core journey without developer
-   intervention.
-3. Record time-to-first-value for every session.
-4. Record user confusion, failed steps, and recovery outcomes.
-5. Base changes on repeated evidence; do not start speculative large-scale
-   refactoring.
+1. Complete Phase 0 architecture documentation and unattended Codex synthetic
+   feasibility.
+2. Independently review and accept the exact Phase 0 PR HEAD.
+3. Build Phase 1 read-only automatic detection on target-group-scoped SQLite,
+   exact occurrence fingerprints, a 90-second quiet period, overlap watermark,
+   first-enable baseline, and bounded execution.
+4. Do not connect Phase 1 to the Vocabulary publisher.
+5. Resume External User Session #1 preparation only after the automatic
+   Vocabulary journey is implemented and accepted.
 
 ## External Validation Journey
 
@@ -94,7 +105,7 @@ Process a supported audio source
 ↓
 Publish Podcast learning assets
 ↓
-Capture targeted Vocabulary
+Automatically capture exact pink-highlight Vocabulary
 ↓
 Produce Weekly Reflection when enough learning data exists
 ```
@@ -102,15 +113,16 @@ Produce Weekly Reflection when enough learning data exists
 Session evidence must distinguish a user-facing failure from an environment
 problem and must not include secrets or private Notion identifiers.
 
+The old explicit “同步生词” step is suspended as the default external-user
+journey. Do not ask a participant for a page ID or command while automatic
+sync remains under implementation.
+
 ## Deferred Non-Blocking Backlog
 
 Podcast and Weekly page tables of contents are existing output contracts.
 Every newly generated page must begin with exactly one navigable table of
 contents; they are not deferred backlog items.
 
-- parent-page usage guide
-- improved Skill `同步生词` interaction
-- full-scan highlight state namespacing
 - manual color adjustment for the existing Expression Database
 
 PR #16 gives newly created Expression databases semantic colors. Existing
@@ -135,7 +147,9 @@ They must not reappear in the active roadmap, blockers, or user guide.
 - architecture redesign
 - Notion schema redesign
 - background daemon or infinite polling
-- automatic Vocabulary discovery as the primary workflow
+- Hosted Webhook, OAuth, cloud credential storage, or multi-tenant backend
+- production automatic Vocabulary writes before protected acceptance
+- LaunchAgent installation during Phase 0 or Phase 1
 - YouTube support
 - cloud hosting
 - user accounts or payment

@@ -12,6 +12,17 @@ publication:
 - External-user sessions: 0
 - External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`
 
+## Current Activation Gate
+
+External User Session #1 is blocked. The Owner-approved Vocabulary journey is:
+pink highlight only, followed by bounded automatic synchronization after a
+quiet period. The implementation has not yet passed production acceptance.
+
+Do not recruit or start a session using the former explicit “同步生词” trigger.
+Do not substitute a page ID, terminal command, full-workspace scan, or
+developer workaround. This guide becomes active again only after the automatic
+Vocabulary workflow is implemented and accepted.
+
 ## Target Participant
 
 A suitable participant:
@@ -147,6 +158,9 @@ real learning data, mark Weekly validation as deferred. Do not manufacture
 Podcast, Expression, Vocabulary, or Weekly data to force completion.
 
 ## Session Completion Classification
+
+These classifications are reserved for sessions started after the activation
+gate is removed.
 
 Classify the session as:
 

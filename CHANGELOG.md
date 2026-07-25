@@ -5,6 +5,29 @@ entries must be appended or clarified, not removed.
 
 ## Unreleased — Phase 4 Product Validation
 
+### Automatic Vocabulary Sync Phase 0 Architecture
+
+- Owner-approved a local-first macOS scheduled polling architecture with one
+  bounded process per invocation and a default 90-second quiet period.
+- Kept human pink highlight as the only Vocabulary selection signal and
+  suspended explicit “同步生词” as the default external-user trigger.
+- Required target-group-scoped SQLite state and exact highlight occurrence
+  fingerprints without lowercasing, stemming, punctuation stripping, or
+  same-word occurrence merging.
+- Preserved Codex as the reasoning layer and Python as artifact validation,
+  Target Binding, state, orchestration, and Notion persistence.
+- Added an isolated unattended Codex synthetic feasibility experiment with
+  finite timeout, fail-closed output handling, exact word/context validation,
+  and a child environment that excludes Notion variables and
+  `OPENAI_API_KEY`.
+- Passed the synthetic run with exit code 0, existing schema validation, exact
+  word/context preservation, and a 60-second finite timeout.
+- Deferred Hosted Webhook, OAuth, cloud credential storage, and multi-tenant
+  backend work; none is approved.
+- Made 0 real Notion calls and 0 real Notion writes during Phase 0 preparation.
+- Kept External-user sessions at 0 and readiness at
+  `NOT_READY_FOR_EXTERNAL_USERS`; External User Session #1 remains blocked.
+
 ### Podcast TOC Output Contract Regression Fix
 
 - Restored the accepted Podcast output contract so every newly generated

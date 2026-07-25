@@ -1,5 +1,15 @@
 # External User Session Script
 
+## Activation Hold
+
+Do not start External User Session #1 yet. Automatic Vocabulary Sync is
+Owner-approved for Phase 0 architecture and feasibility but is not implemented
+or accepted. External-user sessions remain 0 and readiness remains
+`NOT_READY_FOR_EXTERNAL_USERS`.
+
+The former explicit “同步生词” journey below is suspended. It must not be read
+to a participant or used to count a completed core session.
+
 ## Moderator Opening
 
 Read this to the participant:
@@ -79,6 +89,8 @@ learning asset.
 
 ## Task 5: Select Personal Vocabulary
 
+**Suspended until automatic synchronization is implemented and accepted.**
+
 Tell the participant:
 
 > 请在这个 Podcast 学习页面中，把至少一个你想学习的英文单词或表达设为粉色高亮。只高亮你真正想保存的文字。
@@ -94,21 +106,13 @@ Record:
 
 ## Task 6: Synchronize Vocabulary
 
-Tell the participant:
+**Suspended. Do not tell the participant to say “同步生词”, provide a page ID,
+or run a command.**
 
-> 高亮完成后，请对英语音频学习助手说：“同步生词”。然后查看 Vocabulary Database，确认刚才选择的内容已经保存。
-
-This is the formal targeted Vocabulary entry. Do not ask the participant to
-run a terminal command, locate a page identifier, or start a full-workspace
-scan.
-
-Record:
-
-- whether the participant understood the phrase “同步生词”;
-- whether synchronization completed;
-- whether the exact highlighted target appeared;
-- whether context and source were understandable;
-- any duplicate or unexpected record behavior.
+The replacement journey will be published only after bounded automatic
+detection, quiet-period handling, exact occurrence identity, isolated Codex
+enrichment, and idempotent Notion publishing pass implementation and
+acceptance. Do not invent interim instructions.
 
 ## Task 7: Conditional Weekly Reflection
 
