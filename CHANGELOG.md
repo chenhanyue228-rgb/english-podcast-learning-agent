@@ -5,6 +5,15 @@ entries must be appended or clarified, not removed.
 
 ## Unreleased — Phase 4 Product Validation
 
+### Podcast TOC Output Contract Regression Fix
+
+- Restored the accepted Podcast output contract so every newly generated
+  Podcast page starts with exactly one navigable table of contents.
+- Preserved the existing Summary, Expressions, Highlight Legend, and
+  Highlighted Transcript order.
+- Kept the already-correct Weekly table of contents contract unchanged.
+- Did not backfill or migrate existing Podcast pages.
+
 ### Phase 4.1C Owner Acceptance Closure
 
 - Completed Setup / Notion workspace recovery and Target Binding validation.
@@ -27,10 +36,12 @@ entries must be appended or clarified, not removed.
 - Preserved existing databases without automatic color rewrites. Existing
   option colors may be changed manually in the Notion UI only; options must not
   be deleted, recreated, or renamed.
-- Moved Podcast and Weekly TOCs, the parent-page usage guide, improved Skill
-  `同步生词` interaction, full-scan highlight state namespacing, and existing
-  Expression Database manual color adjustment into a separate non-blocking
-  backlog.
+- At closure, Podcast and Weekly TOCs were temporarily tracked with the
+  non-blocking polish backlog. DEC-021 and the subsequent regression fix
+  clarify that both TOCs are accepted output contracts; the parent-page usage
+  guide, improved Skill `同步生词` interaction, full-scan highlight state
+  namespacing, and existing Expression Database manual color adjustment remain
+  in the separate non-blocking backlog.
 - Kept the Notion AI-assisted workflow and Podcast-page Expression
   synchronization cancelled and outside the roadmap.
 - Entered Phase 4.2 External User Validation with a target of 3 real sessions,

@@ -61,6 +61,14 @@ def bullet(text_items: Sequence[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def table_of_contents() -> dict[str, Any]:
+    return {
+        "object": "block",
+        "type": "table_of_contents",
+        "table_of_contents": {"color": "default"},
+    }
+
+
 def table_cell(*rich_text: dict[str, Any]) -> list[dict[str, Any]]:
     return list(rich_text)
 
@@ -195,6 +203,7 @@ def podcast_body_blocks(
     expressions: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     blocks = [
+        table_of_contents(),
         heading(2, [plain_text("Summary")]),
         paragraph([plain_text(summary)]),
         heading(2, [plain_text("Expressions")]),
