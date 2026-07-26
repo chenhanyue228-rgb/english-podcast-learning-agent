@@ -322,8 +322,11 @@ def ensure_notion_page_belongs_to_role(
     expected_role: str,
     *,
     config: Optional[NotionConfig] = None,
+    force_refresh: bool = False,
 ) -> NotionTargetBindingResult:
     """Prove a caller-supplied page belongs to the configured role."""
+    if not isinstance(page_id, str):
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
     normalized_page_id = normalize_notion_id(page_id)
     if not normalized_page_id:
         raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
@@ -337,11 +340,12 @@ def ensure_notion_page_belongs_to_role(
         raise NotionTargetBindingError(TARGET_DATABASE_ROLE_MISMATCH)
 
     cache = getattr(notion, _PAGE_CACHE_ATTRIBUTE, None)
-    if not isinstance(cache, set):
-        cache = set()
-        setattr(notion, _PAGE_CACHE_ATTRIBUTE, cache)
     cache_key = (normalized_page_id, expected_role)
-    if cache_key in cache:
+    if (
+        isinstance(cache, set)
+        and cache_key in cache
+        and not force_refresh
+    ):
         return result
 
     try:
@@ -350,14 +354,41 @@ def ensure_notion_page_belongs_to_role(
         raise NotionTargetBindingError(TARGET_BINDING_RETRIEVE_FAILED) from None
     if not isinstance(page, Mapping):
         raise NotionTargetBindingError(TARGET_BINDING_RETRIEVE_FAILED)
+
+    returned_page_id = page.get("id")
+    if not isinstance(returned_page_id, str):
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
+    normalized_returned_page_id = normalize_notion_id(returned_page_id)
+    if (
+        not normalized_returned_page_id
+        or normalized_returned_page_id != normalized_page_id
+    ):
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
+
+    archived = page.get("archived")
+    in_trash = page.get("in_trash")
+    if type(archived) is not bool or type(in_trash) is not bool:
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
+    if archived is not False or in_trash is not False:
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
+
     parent = page.get("parent")
     if not isinstance(parent, Mapping):
         raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
     if parent.get("type") != "data_source_id":
         raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
-    actual_data_source_id = normalize_notion_id(parent.get("data_source_id"))
-    if actual_data_source_id != expected_data_source_id:
+    raw_data_source_id = parent.get("data_source_id")
+    if not isinstance(raw_data_source_id, str):
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
+    actual_data_source_id = normalize_notion_id(raw_data_source_id)
+    if (
+        not actual_data_source_id
+        or actual_data_source_id != expected_data_source_id
+    ):
         raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
 
+    if not isinstance(cache, set):
+        cache = set()
+        setattr(notion, _PAGE_CACHE_ATTRIBUTE, cache)
     cache.add(cache_key)
     return result

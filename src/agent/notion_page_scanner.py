@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Optional
 
 from src.notion.config import load_notion_config
+from src.notion.pagination import next_notion_cursor
 from src.notion.uploader import create_notion_client
 
 
@@ -14,6 +15,9 @@ from src.notion.uploader import create_notion_client
 class ChangedPodcastPage:
     page_id: str
     last_edited_time: str
+
+
+DEFAULT_WATERMARK_OVERLAP_SECONDS = 300
 
 
 def _parse_notion_timestamp(value: str) -> Optional[datetime]:
@@ -26,6 +30,24 @@ def _parse_notion_timestamp(value: str) -> Optional[datetime]:
         return datetime.fromisoformat(cleaned)
     except ValueError:
         return None
+
+
+def _format_notion_timestamp(value: datetime) -> str:
+    normalized = value.astimezone(timezone.utc)
+    return normalized.isoformat().replace("+00:00", "Z")
+
+
+def overlap_checkpoint(
+    checkpoint: str,
+    overlap_seconds: int = DEFAULT_WATERMARK_OVERLAP_SECONDS,
+) -> str:
+    """Move a checkpoint backwards so boundary edits are queried again."""
+    parsed = _parse_notion_timestamp(checkpoint)
+    if parsed is None:
+        return ""
+    return _format_notion_timestamp(
+        parsed - timedelta(seconds=max(0, overlap_seconds))
+    )
 
 
 def _query_pages(
@@ -45,6 +67,7 @@ def _query_pages(
         }
 
     cursor: Optional[str] = None
+    visited_cursors: set[str] = set()
     while True:
         current_kwargs = dict(query_kwargs)
         if cursor:
@@ -63,10 +86,12 @@ def _query_pages(
                 if isinstance(page, Mapping):
                     yield page
 
-        if not response.get("has_more"):
-            break
-        cursor = response.get("next_cursor")
-        if not isinstance(cursor, str) or not cursor.strip():
+        cursor = next_notion_cursor(
+            response,
+            current_cursor=cursor,
+            visited_cursors=visited_cursors,
+        )
+        if cursor is None:
             break
 
 
@@ -96,3 +121,37 @@ def scan_changed_podcast_pages(
         changed.append(ChangedPodcastPage(page_id=page_id, last_edited_time=edited_at))
 
     return changed
+
+
+def scan_podcast_pages_with_overlap(
+    notion: Any,
+    podcast_database_id: str,
+    watermark: str = "",
+    overlap_seconds: int = DEFAULT_WATERMARK_OVERLAP_SECONDS,
+) -> list[ChangedPodcastPage]:
+    """Return Podcast pages using an overlap window around the watermark."""
+    query_checkpoint = overlap_checkpoint(watermark, overlap_seconds)
+    lower_bound = _parse_notion_timestamp(query_checkpoint)
+    pages: list[ChangedPodcastPage] = []
+
+    for page in _query_pages(notion, podcast_database_id, query_checkpoint):
+        page_id = str(page.get("id", "")).strip()
+        if not page_id:
+            continue
+        edited_at = str(
+            page.get("last_edited_time") or page.get("created_time") or ""
+        ).strip()
+        page_timestamp = _parse_notion_timestamp(edited_at)
+        if (
+            lower_bound is not None
+            and page_timestamp is not None
+            and page_timestamp < lower_bound
+        ):
+            continue
+        pages.append(
+            ChangedPodcastPage(
+                page_id=page_id,
+                last_edited_time=edited_at,
+            )
+        )
+    return pages
