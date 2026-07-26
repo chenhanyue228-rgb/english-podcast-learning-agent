@@ -31,25 +31,17 @@ Current state:
 - the pipeline and Notion publishing are stable
 - direct OpenAI providers are deprecated compatibility paths only
 - `OPENAI_API_KEY` is not required for the production Skill workflow
-- production `main` includes the partial-publish recovery and protected Owner
-  Acceptance Harness
-- real Notion in-place recovery passed with the existing four Data Sources
-- new databases created: 0
-- required fields and three single-property relations passed validation
-- unknown fields and existing records were preserved
-- setup state is `complete`
-- real recovery evidence has been reviewed and accepted
-- the partial-publish recovery behavior is fixed and covered by the Harness
-- a later read-only diagnosis found two same-name Notion database groups
-- the current local configuration points to the historical group rather than
-  the intended parent page
-- all production writers now require a shared target-binding proof before any
-  Notion write
-- the podcast-to-Notion journey is paused pending configuration switch and a
-  passing read-only binding diagnosis
-- Owner Acceptance remains blocked pending the podcast-to-Notion journey
+- Podcast, targeted Vocabulary, Weekly Reflection, and Automatic Vocabulary
+  Owner Acceptance all pass
+- adding an exact pink highlight is the only normal Vocabulary capture action
+- a bounded macOS scheduler checks for new highlights every 60 seconds
+- new highlights wait for a 90-second quiet period before Codex enrichment
+- exact occurrence state, Target Binding, strict validation, and idempotent
+  publishing are active
+- the engineering status is
+  `ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`
 - external-user sessions remain 0
-- the product is not ready for external users
+- external-user validation has not started
 
 For the production runtime contract, read:
 
@@ -117,6 +109,10 @@ https://github.com/chenhanyue228-rgb/english-podcast-learning-agent
 - 不需要手动编辑 `.env`
 - 不需要手动运行数据库初始化或验证命令
 - 不需要手动提取 Notion 页面编号
+
+macOS 自动词汇同步要求完整项目位于系统保护目录之外。默认安装位置是
+`~/EnglishAudioLearningAgent`；不要把正式运行目录放在 `Documents`、
+`Desktop` 或 `Downloads` 中。
 
 Notion 设置使用一条统一路径，一次只显示一个操作，用户完成并确认后才进入
 下一步。开发者后台中的入口名称是“连接”，普通 Notion 页面中的授权入口名称是
@@ -189,18 +185,22 @@ Notion publish
 ### Vocabulary Capture
 
 ```text
-Highlight
+Exact Pink Highlight
 ↓
-Vocabulary artifact
+Bounded Scheduled Detection
 ↓
-Validation
+90-Second Quiet Period
+↓
+Codex Enrichment
+↓
+Strict Python Validation
 ↓
 Vocabulary Database
 ```
 
-Vocabulary enrichment requests are stored under
-`data/vocabulary_enrichment_requests/`; Codex writes matching outputs under
-`data/vocabulary_enrichment/` before Python validates and publishes them.
+The user highlights exactly the word or phrase they want to learn. The system
+does not expand it from context or merge it with nearby text. Existing
+highlights are baselined on first enablement and are not backfilled.
 
 ### Weekly Reflection
 
@@ -224,6 +224,10 @@ Notion
   connectivity.
 - If target binding fails, do not retry a writer. Run the read-only diagnosis
   and verify that all five target values belong to one parent page.
+- If scheduler status is loaded but its stderr reports a macOS permission
+  denial, use the supported project location `~/EnglishAudioLearningAgent`.
+  Do not run the production scheduler from `Documents`, `Desktop`, or
+  `Downloads`.
 - If an artifact is missing, rerun the previous stage rather than manually
   editing generated files.
 - If you are unsure which command to use, start with the Skill manifest:
@@ -261,8 +265,23 @@ Workflow commands:
 - `./.venv/bin/python src/main.py "<source>" --transcript-json data/transcripts/<file>.json --analysis-json data/analysis/<file>.json`
 - `./.venv/bin/python src/main.py --weekly-reflection`
 - `./.venv/bin/python src/main.py --weekly-reflection --dry-run`
-- `./.venv/bin/python src/main.py --publish-highlight-vocab PAGE_ID`
+- `./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py status`
+- `./.venv/bin/python scripts/run_automatic_vocabulary_once.py`
 - `./.venv/bin/python -m pytest`
+
+Install the bounded scheduler:
+
+```bash
+./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py install \
+  --confirmation INSTALL_AUTOMATIC_VOCABULARY_LAUNCH_AGENT
+```
+
+Stop the scheduler without deleting state or learning data:
+
+```bash
+./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py uninstall \
+  --confirmation UNINSTALL_AUTOMATIC_VOCABULARY_LAUNCH_AGENT
+```
 
 Read-only Notion target diagnosis:
 
@@ -272,8 +291,9 @@ Read-only Notion target diagnosis:
 
 Legacy compatibility commands such as `--weekly-review` and
 `--sync-vocab-comments` remain available for existing local workflows, but
-they are not part of the primary v1 user journey. Pink highlight capture is
-the production Vocabulary workflow.
+they are not part of the primary v1 user journey.
+`--publish-highlight-vocab PAGE_ID` remains a Developer/recovery command.
+Automatic exact pink-highlight capture is the production Vocabulary workflow.
 
 ## Documentation
 

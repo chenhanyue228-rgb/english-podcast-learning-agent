@@ -3,7 +3,44 @@
 All notable product and architecture changes are recorded here. Historical
 entries must be appended or clarified, not removed.
 
-## Unreleased — Phase 4 Product Validation
+## [v1.2.0] - 2026-07-27
+
+### Automatic Vocabulary Sync Production Runtime
+
+- Completed Phase 1 target-scoped read-only detection with exact occurrence
+  fingerprints, a first-enable baseline, overlap watermark, 90-second quiet
+  period, bounded reads, and restart-safe SQLite state.
+- Completed Phase 2 isolated Codex enrichment, strict independent Python
+  artifact validation, Target Binding, protected Vocabulary publishing,
+  retries, and reconciliation.
+- Completed Phase 3A with a one-shot bounded worker, non-blocking process lock,
+  redacted structured logs, and macOS LaunchAgent install/status/uninstall
+  management at a 60-second default interval.
+- Passed Phase 3B protected real Notion Owner Acceptance:
+  - controlled Podcast created: 1
+  - controlled pink highlight added: 1
+  - Vocabulary created: 1
+  - exact retry created/updated: 0/0
+  - Codex calls: 1
+  - Expression / Weekly / schema / delete-archive writes: 0
+  - historical group reads/writes: 0/0
+- Verified exact word, exact context, complete Vocabulary properties and body,
+  source Podcast relation, occurrence fingerprint, retry stability, and log
+  redaction.
+- Activated the bounded scheduler from the supported non-protected project
+  location and verified a BASELINED first cycle followed by a NO_WORK cycle
+  with zero Codex and Vocabulary publisher calls.
+- Documented that macOS LaunchAgents must not target project roots under
+  `Documents`, `Desktop`, or `Downloads`; the supported default is
+  `~/EnglishAudioLearningAgent`.
+- Kept the LaunchAgent plist free of Notion credentials and preserved state
+  and learning data across uninstall/recovery.
+- Removed the normal-user requirement to say "同步生词", provide a page ID,
+  run a command, or use Notion AI. The exact pink highlight is the only
+  Vocabulary capture action.
+- Recorded engineering status as
+  `ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`.
+- Kept External-user sessions at 0; external-user validation has not started.
 
 ### Automatic Vocabulary Sync Phase 0 Architecture
 
@@ -25,8 +62,8 @@ entries must be appended or clarified, not removed.
 - Deferred Hosted Webhook, OAuth, cloud credential storage, and multi-tenant
   backend work; none is approved.
 - Made 0 real Notion calls and 0 real Notion writes during Phase 0 preparation.
-- Kept External-user sessions at 0 and readiness at
-  `NOT_READY_FOR_EXTERNAL_USERS`; External User Session #1 remains blocked.
+- Kept External-user sessions at 0 during Phase 0 and did not claim external
+  readiness before implementation and protected acceptance.
 
 ### Podcast TOC Output Contract Regression Fix
 

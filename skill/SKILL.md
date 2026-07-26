@@ -71,19 +71,31 @@ Do not use this Skill when the user asks for:
 If the request is unclear, ask one concise clarifying question before running
 the workflow.
 
-### Automatic Vocabulary Migration Hold
+### Automatic Vocabulary Runtime
 
-The Owner-approved product trigger is a pink highlight followed by bounded
-automatic synchronization after a quiet period. That runtime is under
-implementation and has not passed production acceptance.
+The production Vocabulary trigger is an exact pink highlight followed by
+bounded automatic synchronization:
 
-Until acceptance:
+```text
+Exact Pink Highlight
+↓
+60-Second Scheduled Check
+↓
+90-Second Quiet Period
+↓
+Isolated Codex Enrichment
+↓
+Strict Python Validation
+↓
+Target-Bound Vocabulary Upsert
+```
 
-- do not ask a normal user to say “同步生词”;
-- do not ask a normal user for a page ID or command;
-- do not claim that adding a pink highlight already publishes automatically;
-- keep the explicit targeted command as Developer/recovery reference only;
-- do not start an external-user Vocabulary session.
+The user does not say “同步生词”, provide a page ID, or run a command. The
+highlighted rich-text item is the exact vocabulary target; context is
+enrichment context only.
+
+The first scheduler cycle baselines existing highlights and does not backfill
+them. The explicit targeted command remains Developer/recovery only.
 
 ## 3. Guided Onboarding Contract
 
@@ -152,6 +164,9 @@ The suggested destination is `~/EnglishAudioLearningAgent`.
 
 - Clone only when the destination does not exist.
 - If it exists, verify it is the correct repository before using it.
+- Do not place the production project in macOS protected `Documents`,
+  `Desktop`, or `Downloads` folders. A LaunchAgent may be denied access even
+  when an interactive terminal can run the same command.
 - Never overwrite an unrelated directory or delete user files.
 - Never write a Notion token into the repository or a command.
 - Request user approval for necessary downloads, local execution, or network
@@ -515,8 +530,25 @@ reference. Normal users are not expected to run them manually.
 | `./.venv/bin/python src/main.py --weekly-reflection --dry-run` | Run the Weekly Reflection pipeline without Notion publish | Weekly learning context | `output/reflection_context.json`, `output/weekly_review.json`, `output/pipeline_run.json` | Validation and quality output only | Inspect artifacts, then publish if ready |
 | `./.venv/bin/python src/main.py --weekly-review` | Build a Weekly Review request from Notion learning data | Current Notion learning data | `data/weekly_review_requests/<week>.json` | Weekly Review request file path | Codex generates Weekly Review JSON |
 | `./.venv/bin/python src/main.py --publish-highlight-vocab PAGE_ID` | Developer/recovery only: publish exact user-selected pink-highlight vocabulary from one Notion page | Notion page ID | Vocabulary preview / publish artifacts | Updated Vocabulary Database entries | Do not present this as the default user trigger |
+| `./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py status` | Inspect the bounded automatic Vocabulary scheduler | Installed local runtime | None | Installed/loaded state and interval | Diagnose before changing scheduler state |
+| `./.venv/bin/python scripts/run_automatic_vocabulary_once.py` | Developer/recovery only: run one finite automatic Vocabulary cycle | Configured target group | Target-scoped state and enrichment artifacts | Redacted bounded-cycle report | Do not loop this command |
 | `./.venv/bin/python src/main.py --sync-vocab-comments` | Legacy compatibility: sync comment-triggered vocabulary captures | Podcast Library pages with historical comment triggers | Sync state + vocabulary records | Vocabulary sync summary | Prefer the pink-highlight workflow for v1 use |
 | `./.venv/bin/python -m pytest` | Run the full test suite | None | Test reports | Pass/fail summary | Fix issues before publishing |
+
+Automatic Vocabulary scheduler lifecycle:
+
+```bash
+./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py install \
+  --confirmation INSTALL_AUTOMATIC_VOCABULARY_LAUNCH_AGENT
+
+./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py status
+
+./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py uninstall \
+  --confirmation UNINSTALL_AUTOMATIC_VOCABULARY_LAUNCH_AGENT
+```
+
+Install and uninstall are Developer/Codex operations. Normal users only add a
+pink highlight. Uninstall preserves synchronization state and learning data.
 
 ## 7. Workflow Contracts
 
@@ -572,18 +604,21 @@ Python:
 
 ### 7.2 Vocabulary Capture
 
-The current explicit targeted workflow below is a protected recovery path. It
-is suspended as the default user journey while bounded automatic
-synchronization is implemented and accepted.
+The automatic workflow is the production path. Explicit targeted publishing
+remains a protected Developer/recovery path.
 
 #### Flow
 
 ```text
-Highlight
+Exact Pink Highlight
 ↓
-Vocabulary artifact
+Bounded Scheduled Detection
 ↓
-Validation
+90-Second Quiet Period
+↓
+Codex Enrichment Artifact
+↓
+Strict Python Validation and Target Binding
 ↓
 Vocabulary Database
 ```
@@ -613,18 +648,20 @@ Codex:
 
 Artifact handoff:
 
-- Python writes `data/vocabulary_enrichment_requests/<word>.json`
-- Codex writes `data/vocabulary_enrichment/<word>.json`
-- Codex reruns the same publish command
+- Python writes a private target-scoped request artifact.
+- Isolated Codex writes one schema-conformant enrichment artifact.
+- Python independently validates exact word, exact context, and every schema
+  constraint before publishing.
 
 Python:
 
-- collect the highlight
+- detect the exact occurrence
+- enforce the 90-second quiet period
+- maintain target-scoped SQLite state
 - validate the vocabulary payload
-- upsert to Notion
-
-Codex must not tell a normal user to invoke this workflow manually during the
-migration hold.
+- validate Target Binding
+- upsert to Notion with an occurrence fingerprint
+- reconcile exact retry without duplicate records or body sections
 
 ### 7.3 Weekly Reflection
 
@@ -806,6 +843,28 @@ Report:
 Recovery:
 
 - update `.env` and rerun the command
+
+### Automatic Vocabulary Scheduler Failure
+
+Detect:
+
+- scheduler status is not installed or loaded
+- the bounded runtime report returns `SAFE_STOP`
+- launchd stderr reports a macOS file-access denial
+
+Report:
+
+- installed/loaded state
+- redacted stable error code
+- whether any Codex or Vocabulary publisher call occurred
+
+Recovery:
+
+- keep the project at `~/EnglishAudioLearningAgent`
+- never use `Documents`, `Desktop`, or `Downloads` as the production runtime
+  directory
+- inspect status, then reinstall only with the exact install confirmation
+- preserve target-scoped state and never delete learning data during recovery
 
 ## 10. Quality Rules
 

@@ -4,8 +4,8 @@
 
 **Name:** English Audio Learning Agent
 
-English Audio Learning Agent transforms podcasts, RSS feeds, and local audio
-files into reusable English learning assets:
+English Audio Learning Agent transforms Apple Podcasts episodes, podcast RSS
+feeds, and local audio files into reusable English learning assets:
 
 - Podcast learning notes
 - professional expressions
@@ -14,59 +14,48 @@ files into reusable English learning assets:
 
 ## Current Phase
 
-**Phase:** Phase 4.2 — External User Validation
+**Phase:** Phase 4.2 - External User Validation
 
-**Execution stage:** Automatic Vocabulary Sync Architecture Implementation
-Preparation
+**Execution stage:** Automatic Vocabulary engineering complete
 
-**Status:** `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`
+**Engineering status:**
+`ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`
 
-The stable release remains **v1.1.0**, built from release commit
-`80cbab01ea266e487a0359ddbec562959070d8a0`. The Phase 4.1C closure starts
-from production `main` `de9f088a47b58ad54de9ef281ddf427c994dbf0a`.
-The current production `main` is
-`5b08e4bb73db3bffe2a3787cf090d88bdcb4d7be`.
+**Release:** v1.2.0
+
+The Phase 3 runtime baseline is production `main`
+`156b37f08290aa9b985112269d2a373de51c48d2`.
 
 Current release and acceptance evidence:
 
-- PR #9 merged the partial Podcast/Expression publish recovery.
-- PR #10 merged the protected Podcast Owner Acceptance Harness.
-- PR #11 merged fail-closed Notion target-group binding.
-- PR #14 implemented, independently reviewed, and merged the protected
-  Vocabulary Acceptance Harness after all identified P0/P1 false-pass paths
-  were closed.
-- PR #16 added semantic Select colors for future Expression Database creation
-  without changing option names or rewriting existing databases.
-- PR #20 added and accepted the protected Parent Page Guide.
-- PR #21 restored the accepted Podcast table-of-contents output contract.
-- The five local target settings now point to the intended database group.
-- The Notion token did not change during the target switch.
 - Setup / Notion workspace recovery: PASS.
-- Read-only Target Binding Diagnosis: PASS.
+- Target Binding: PASS.
 - Automated Podcast Owner Acceptance: PASS.
-- Podcast first publish: PASS.
-- Podcast exact retry: PASS.
+- Podcast first publish and exact retry: PASS.
 - Targeted Vocabulary Acceptance: PASS.
-- Vocabulary first publish: created 2.
-- Vocabulary exact retry: created 0.
 - Weekly Reflection Acceptance: PASS.
-- Weekly first publish: created 1.
-- Weekly exact retry: created 0.
-- Non-target database changes: 0.
-- Historical database group changes: 0.
-- Owner Acceptance: `OWNER_ACCEPTANCE_PASS`.
-- Internal release decision:
-  `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`.
+- Automatic Vocabulary Phase 0 feasibility: PASS.
+- Phase 1 read-only detection foundation: PASS.
+- Phase 2 isolated Codex enrichment and protected publishing: PASS.
+- Phase 3A bounded runtime and LaunchAgent: PASS.
+- Phase 3B protected real Notion Owner Acceptance: PASS.
+- Automatic Vocabulary first publish: Podcast created 1, controlled pink
+  highlight added 1, Vocabulary created 1.
+- Automatic Vocabulary exact retry: Vocabulary created 0, updated 0.
+- Exact word, exact context, full body, full properties, source relation, and
+  occurrence fingerprint: PASS.
+- Expression, Weekly, schema, delete/archive, and historical-group writes: 0.
+- Automatic scheduler: installed and loaded at a 60-second interval.
+- Scheduler activation: first cycle BASELINED; next cycle NO_WORK; Vocabulary
+  publisher calls 0.
+- Notion AI dependency: none.
 - External-user sessions: 0.
-- External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`.
-- Architecture: Stable.
-- Architecture Review: `OWNER_APPROVED_FOR_PHASE_0`.
-- Automatic Vocabulary Sync application runtime: not implemented.
-- Isolated unattended Codex synthetic feasibility: PASS.
-- External User Session #1: blocked pending implementation and acceptance.
+- External-user validation: NOT RUN.
+- External-user readiness:
+  `ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`.
 
-The internal release decision confirms the core flow for internal use. It does
-not mean the product is `READY_FOR_EXTERNAL_USERS`.
+This readiness token means the engineering journey is ready to be tested by
+external users. It does not mean `EXTERNAL_USER_VALIDATION_PASS`.
 
 ## Runtime Model
 
@@ -79,8 +68,8 @@ Review generation.
 ### Python: Orchestration and Validation
 
 Python performs source processing, transcription, artifact validation,
-deterministic workflow execution, dedupe, state management, and Notion
-synchronization.
+deterministic workflow execution, exact occurrence state management, bounded
+scheduling, and Notion synchronization.
 
 ### Notion: Long-Term Knowledge Memory
 
@@ -134,52 +123,36 @@ Python Validation
 Podcast Library + Expression Database
 ```
 
-The protected automated acceptance against the intended target group passed:
-
-- Podcast first delta: 1
-- Podcast second delta: 0
-- Expression first delta: 19
-- Expression second delta: 0
-- Vocabulary Database: unchanged
-- Weekly Review: unchanged
-- historical database group: unchanged
-
-Podcast body bolding, semantic highlights, Highlight Legend, and Highlighted
-Transcript are working. They are not part of the current visual defect.
+New Podcast pages begin with exactly one Notion table of contents and preserve
+the accepted Summary, Expressions, Highlight Legend, and Highlighted
+Transcript order.
 
 ### Vocabulary Memory
 
 ```text
 User Pink Highlight
 ↓
-Approved automatic detection after a 90-second quiet period
+Bounded 60-Second Scheduled Detection
 ↓
-Target-group-scoped exact occurrence state
+90-Second Quiet Period
+↓
+Target-Scoped Exact Occurrence State
 ↓
 Isolated Codex Enrichment
 ↓
-Python Validation, Target Binding, and Idempotent Upsert
+Strict Python Validation and Target Binding
+↓
+Fingerprint-Idempotent Vocabulary Upsert
 ```
 
-Podcast publishing and Vocabulary synchronization are separate workflows. An
-empty Vocabulary Database after Podcast acceptance does not prove that the
-Vocabulary sync script is broken.
+The exact pink-highlighted rich-text item is the vocabulary target. Context is
+used only for enrichment. The runtime does not infer, expand, normalize, or
+merge the user's target.
 
-This automatic path is Owner-approved for Phase 0 architecture and feasibility
-only. It is not implemented or active. The previously accepted explicit
-targeted sync remains a Developer/recovery path, but “同步生词” is suspended as
-the default user journey.
-
-Accurate current Vocabulary status:
-
-- the protected targeted acceptance passed;
-- the first publish created 2 Vocabulary records;
-- the exact retry created 0 new records;
-- non-target and historical database groups remained unchanged;
-- the current global full-scan checkpoint and normalized highlight identity
-  are not safe for the approved automatic workflow;
-- Phase 1 must replace them with target-group-scoped SQLite and exact
-  occurrence fingerprints before automatic detection can be activated.
+The first enablement cycle baselines existing highlights and does not publish
+them. Each later invocation is finite, overlap-safe, restart-safe, and
+retry-safe. The older explicit targeted command remains a Developer/recovery
+path. Comment-trigger synchronization remains legacy compatibility code.
 
 ### Weekly Reflection
 
@@ -199,9 +172,21 @@ Weekly Review Database
 
 Weekly Reflection is a compounding learning note, not a podcast recap.
 
-Protected Weekly acceptance passed. The first publish created 1 Weekly page,
-the exact retry created 0, and Podcast, Expression, Vocabulary, and historical
-database groups remained unchanged.
+## Production Scheduler
+
+The macOS LaunchAgent runs one bounded worker about every 60 seconds. It is not
+an infinite Python daemon.
+
+The production project must live outside macOS protected user folders such as
+`Documents`, `Desktop`, and `Downloads`. The supported default location is:
+
+```text
+~/EnglishAudioLearningAgent
+```
+
+This avoids `launchd` file-access denial while keeping the runtime local. The
+LaunchAgent stores no Notion credential in its plist. Runtime logs are
+structured and redacted.
 
 ## Notion Target Binding
 
@@ -210,34 +195,20 @@ consistent four-Data-Source group. Target validation checks role, schema,
 common parent, single-property relations, and cross-group isolation before
 writes.
 
-The coordinated local switch changed only:
-
-- Podcast Data Source
-- Expression Data Source
-- Vocabulary Data Source
-- Weekly Data Source
-- target parent page
-
-The token and historical group were preserved.
+Historical database groups are never scanned or written by Automatic
+Vocabulary Sync.
 
 ## Expression Select Colors
 
-PR #16 added semantic Select colors for future Expression Database creation
-for:
-
-- Category
-- Commonness
-- Review Status
-
-Existing option names remain unchanged. Existing databases are not
-automatically rewritten and may still display gray options. Their colors may
-be changed manually in the Notion UI only; existing options must not be
-deleted, recreated, or renamed.
+Future Expression Database creation assigns semantic Select colors to
+Category, Commonness, and Review Status while preserving option names.
+Existing databases are not automatically rewritten. Existing option colors
+may be changed manually in the Notion UI only; options must not be deleted,
+recreated, or renamed.
 
 ## Phase 4.2 Validation Goals
 
-Phase 4.2 will validate the accepted internal release with real external users
-after the automatic Vocabulary trigger passes implementation and acceptance:
+The next evidence-gathering stage will:
 
 - complete 3 real external-user sessions;
 - have at least 2 users complete the core flow without developer intervention;
@@ -245,50 +216,40 @@ after the automatic Vocabulary trigger passes implementation and acceptance:
 - record confusion, failed steps, and recovery outcomes;
 - avoid speculative large-scale refactoring before evidence is collected.
 
-External User Session #1 must not start during architecture preparation.
+External-user sessions remain 0 until a real participant starts the merged
+journey.
 
 ## Deferred Non-Blocking Backlog
 
-Podcast and Weekly page tables of contents are accepted output contracts under
-DEC-021, not deferred polish. Every newly generated Podcast or Weekly page must
-begin with exactly one navigable table of contents.
+- manual color adjustment for the existing Expression Database
 
-The following polish is separate from the automatic Vocabulary implementation:
-
-- manual color adjustment for the existing Expression Database.
-
-The Parent Page Guide is accepted. Automatic trigger replacement and
-target-group state isolation are active architecture work, not deferred polish.
+Podcast and Weekly tables of contents are accepted output contracts, not
+deferred polish. The Parent Page Guide is accepted.
 
 ## Cancelled Proposal
 
-The following proposal was cancelled before implementation and is not part of
-the active goals, blockers, risks, or roadmap:
+The following remain cancelled and outside the roadmap:
 
-- Notion AI-assisted page workflow;
-- synchronization of Podcast-page Expressions into Expression Database.
-
-No Architecture Review or user-guide commitment remains active for this
-proposal.
+- Notion AI-assisted page workflow
+- synchronization of Podcast-page Expressions into Expression Database
 
 ## Frozen Boundaries
 
-- Codex Artifact → Python Validation → Notion architecture
+- Codex Artifact -> Python Validation -> Notion architecture
 - four-database product model
-- Podcast page body contracts
+- Podcast and Weekly page body contracts
 - artifact JSON contracts
 - Vocabulary/Expression ownership separation
 - exact pink-highlight vocabulary intent
 - Weekly Reflection product structure
 - Notion idempotent publishing and target binding
+- bounded local scheduling and target-scoped occurrence state
 
 ## Immediate Milestone
 
-Complete Automatic Vocabulary Sync Phase 0 architecture/feasibility, then
-build the separately reviewed Phase 1 read-only detection foundation.
-External-user sessions remain at 0 until the automatic Vocabulary journey is
-implemented and accepted.
+Run External User Session #1 with the merged Session Kit. Collect evidence
+before changing product behavior.
 
 Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md`,
-`docs/architecture/automatic_vocabulary_sync_architecture_review.md`,
-`skill/SKILL.md`, and `DECISION_LOG.md` before changing runtime behavior.
+`skill/SKILL.md`, `docs/architecture/automatic_vocabulary_sync_architecture_review.md`,
+and `DECISION_LOG.md`.

@@ -29,10 +29,13 @@ selects them unless a user explicitly opts in.
 Current state:
 
 - Skill architecture foundation is complete
-- pipeline logic is frozen
+- Podcast, Weekly Reflection, and Automatic Vocabulary pipelines are accepted
 - Codex artifact providers are the production default
 - OpenAI providers are deprecated compatibility paths
 - Notion runtime publishing and idempotent updates are verified
+- the bounded 60-second Automatic Vocabulary scheduler is active
+- engineering is ready for external-user testing
+- external-user sessions remain 0
 
 Supported v1 inputs are Podcast episode URLs, podcast RSS feeds, and local
 audio files. YouTube is intentionally out of scope; any remaining downloader
@@ -258,14 +261,26 @@ python3 src/main.py "<source>" --analysis-json data/analysis/<file>.json
 python3 src/main.py --sync-vocab-comments
 ```
 
-This command is retained for compatibility. The production Vocabulary path is
-the explicit pink-highlight workflow below.
+This command is retained for compatibility. It is not the production
+Vocabulary path.
 
-### Vocabulary Highlight Publish
+### Automatic Vocabulary Runtime
 
 ```bash
-python3 src/main.py --publish-highlight-vocab PAGE_ID
+./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py status
+./.venv/bin/python scripts/run_automatic_vocabulary_once.py
 ```
+
+Normal users only add an exact pink highlight. The bounded scheduler detects
+the new occurrence, waits for the 90-second quiet period, runs isolated Codex
+enrichment, validates the artifact, and upserts Vocabulary through the
+target-bound publisher.
+
+`--publish-highlight-vocab PAGE_ID` remains a Developer/recovery command.
+
+The production project must live outside macOS protected `Documents`,
+`Desktop`, and `Downloads` folders. The supported default is
+`~/EnglishAudioLearningAgent`.
 
 ### Run Tests
 
@@ -299,6 +314,9 @@ direct OpenAI API access.
 - Direct OpenAI-backed providers remain explicit, deprecated compatibility
   implementations.
 - Notion publishing is isolated and stable.
+- Automatic Vocabulary uses target-scoped SQLite state, exact occurrence
+  fingerprints, a 90-second quiet period, strict Codex artifact validation,
+  process locking, and a bounded macOS LaunchAgent.
 
 ### Target Behavior
 
@@ -306,6 +324,7 @@ direct OpenAI API access.
 - Keep Python responsible for orchestration and validation.
 - Keep generated artifacts as the production AI output contract.
 - Keep Notion as the persistence and presentation layer.
+- Validate the accepted automatic journey with real external users.
 
 ## Testing Status
 
