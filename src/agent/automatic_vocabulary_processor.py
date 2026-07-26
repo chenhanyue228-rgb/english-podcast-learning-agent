@@ -417,6 +417,13 @@ def run_automatic_vocabulary_processing_cycle(
                         timeout_seconds=codex_timeout_seconds,
                         env=codex_env,
                         runner=codex_runner,
+                        validator=lambda candidate: (
+                            validate_automatic_vocabulary_artifact(
+                                candidate,
+                                exact_word=occurrence.exact_text,
+                                exact_context=occurrence.exact_context,
+                            )
+                        ),
                     )
                     enriched += 1
                     artifact = validate_automatic_vocabulary_artifact(

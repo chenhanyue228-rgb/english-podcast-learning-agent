@@ -133,9 +133,15 @@ def _artifact(word: str, context: str) -> dict[str, Any]:
 
 
 class CodexRunner:
-    def __init__(self, *, extra_field: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        extra_field: bool = False,
+        tool_event: bool = False,
+    ) -> None:
         self.calls = 0
         self.extra_field = extra_field
+        self.tool_event = tool_event
         self.environments: list[dict[str, str]] = []
 
     def __call__(
@@ -162,7 +168,11 @@ class CodexRunner:
         return subprocess.CompletedProcess(
             command,
             0,
-            stdout='{"type":"agent_message"}',
+            stdout=(
+                '{"type":"command_execution"}'
+                if self.tool_event
+                else '{"type":"agent_message"}'
+            ),
             stderr="",
         )
 
@@ -387,6 +397,40 @@ def test_invalid_artifact_is_regenerated_on_retry(
     )
 
     assert first.status == "SAFE_STOP"
+    assert second.status == "PASS"
+    assert second.codex_calls == 1
+    assert second.created == 1
+    assert valid_runner.calls == 1
+
+
+def test_tool_rejected_candidate_cannot_be_published_on_retry(
+    tmp_path: Path,
+) -> None:
+    workspace = FakeNotion()
+    _source_page(workspace)
+    state_path, _ = _state(
+        tmp_path,
+        workspace,
+        occurrences=[("occurrence-a", WORD, CONTEXT)],
+    )
+    first = _run(
+        tmp_path,
+        workspace,
+        state_path,
+        CodexRunner(tool_event=True),
+    )
+
+    valid_runner = CodexRunner()
+    second = _run(
+        tmp_path,
+        workspace,
+        state_path,
+        valid_runner,
+    )
+
+    assert first.status == "SAFE_STOP"
+    assert first.error_codes == ("codex_tool_use_blocked",)
+    assert first.vocabulary_publisher_calls == 0
     assert second.status == "PASS"
     assert second.codex_calls == 1
     assert second.created == 1

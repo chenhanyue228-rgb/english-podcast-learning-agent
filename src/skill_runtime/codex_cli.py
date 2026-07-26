@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import uuid
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -93,11 +94,48 @@ class CodexRuntimeError(RuntimeError):
 
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
+ArtifactValidator = Callable[[Mapping[str, Any]], dict[str, Any]]
 
 
 def _make_private_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     os.chmod(path, 0o700)
+
+
+def _unlink_candidate(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise CodexRuntimeError("codex_candidate_cleanup_failed") from exc
+
+
+def _promote_trusted_artifact(
+    output_path: Path,
+    payload: Mapping[str, Any],
+) -> None:
+    temporary_path = output_path.with_name(
+        f".{output_path.name}.{uuid.uuid4().hex}.trusted"
+    )
+    try:
+        descriptor = os.open(
+            temporary_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(dict(payload), handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, output_path)
+        os.chmod(output_path, 0o600)
+    except OSError as exc:
+        try:
+            temporary_path.unlink()
+        except OSError:
+            pass
+        raise CodexRuntimeError("codex_output_promotion_failed") from exc
 
 
 def resolve_codex_executable(
@@ -225,6 +263,7 @@ def generate_codex_json_artifact(
     timeout_seconds: int = DEFAULT_CODEX_TIMEOUT_SECONDS,
     env: Mapping[str, str] | None = None,
     runner: Runner = subprocess.run,
+    validator: ArtifactValidator,
 ) -> dict[str, Any]:
     """Run Codex once and load the current JSON object it generated."""
     if timeout_seconds <= 0:
@@ -240,41 +279,50 @@ def generate_codex_json_artifact(
         encoding="utf-8",
     )
     os.chmod(schema_path, 0o600)
+    candidate_path = output_path.with_name(
+        f".{output_path.name}.{uuid.uuid4().hex}.candidate"
+    )
     codex = executable or resolve_codex_executable(env)
     command = build_codex_json_command(
         codex,
         schema_path=schema_path.resolve(),
-        output_path=output_path,
+        output_path=candidate_path,
         work_dir=work_dir,
     )
     try:
-        completed = runner(
-            command,
-            input=prompt,
-            text=True,
-            capture_output=True,
-            cwd=work_dir,
-            env=sanitized_codex_environment(env),
-            timeout=timeout_seconds,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise CodexRuntimeError("codex_timeout") from exc
-    except OSError as exc:
-        raise CodexRuntimeError("codex_process_start_failed") from exc
-    if completed.returncode != 0:
-        diagnostic = _diagnostic_fingerprint(completed.stderr or "")
-        raise CodexRuntimeError(
-            f"codex_nonzero_exit_{completed.returncode}_{diagnostic}"
-        )
-    _validate_event_stream(completed.stdout or "")
-    try:
-        payload = load_codex_artifact(
-            request_path=request_path,
-            output_path=output_path,
-            stage="automatic vocabulary enrichment",
-        )
-    except (CodexArtifactPendingError, OSError) as exc:
-        raise CodexRuntimeError("codex_output_invalid") from exc
-    os.chmod(output_path, 0o600)
-    return payload
+        try:
+            completed = runner(
+                command,
+                input=prompt,
+                text=True,
+                capture_output=True,
+                cwd=work_dir,
+                env=sanitized_codex_environment(env),
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise CodexRuntimeError("codex_timeout") from exc
+        except OSError as exc:
+            raise CodexRuntimeError("codex_process_start_failed") from exc
+        if completed.returncode != 0:
+            diagnostic = _diagnostic_fingerprint(completed.stderr or "")
+            raise CodexRuntimeError(
+                f"codex_nonzero_exit_{completed.returncode}_{diagnostic}"
+            )
+        _validate_event_stream(completed.stdout or "")
+        try:
+            candidate = load_codex_artifact(
+                request_path=request_path,
+                output_path=candidate_path,
+                stage="automatic vocabulary enrichment",
+            )
+        except (CodexArtifactPendingError, OSError) as exc:
+            raise CodexRuntimeError("codex_output_invalid") from exc
+        payload = validator(candidate)
+        if not isinstance(payload, Mapping):
+            raise CodexRuntimeError("codex_output_invalid")
+        _promote_trusted_artifact(output_path, payload)
+        return dict(payload)
+    finally:
+        _unlink_candidate(candidate_path)

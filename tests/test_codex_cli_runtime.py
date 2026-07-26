@@ -26,6 +26,14 @@ SCHEMA = {
 }
 
 
+def _validator(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict) or payload != {
+        "word": "assumption"
+    }:
+        raise ValueError("invalid")
+    return payload
+
+
 def _request(tmp_path: Path) -> tuple[Path, Path]:
     request_path = tmp_path / "requests" / "request.json"
     output_path = tmp_path / "outputs" / "output.json"
@@ -135,6 +143,7 @@ def test_generate_codex_artifact_is_finite_private_and_sanitized(
             "OPENAI_API_KEY": "secret",
         },
         runner=runner,
+        validator=_validator,
     )
 
     assert result == {"word": "assumption"}
@@ -175,9 +184,12 @@ def test_generate_codex_artifact_rejects_observed_tool_use(
             prompt="Return JSON.",
             executable=tmp_path / "codex",
             runner=runner,
+            validator=_validator,
         )
 
     assert raised.value.code == "codex_tool_use_blocked"
+    assert not output_path.exists()
+    assert list(output_path.parent.glob(".*.candidate")) == []
 
 
 def test_generate_codex_artifact_rejects_nested_tool_event(
@@ -213,9 +225,12 @@ def test_generate_codex_artifact_rejects_nested_tool_event(
             prompt="Return JSON.",
             executable=tmp_path / "codex",
             runner=runner,
+            validator=_validator,
         )
 
     assert raised.value.code == "codex_tool_use_blocked"
+    assert not output_path.exists()
+    assert list(output_path.parent.glob(".*.candidate")) == []
 
 
 def test_generate_codex_artifact_timeout_is_redacted(
@@ -235,6 +250,7 @@ def test_generate_codex_artifact_timeout_is_redacted(
             executable=tmp_path / "codex",
             timeout_seconds=1,
             runner=runner,
+            validator=_validator,
         )
 
     assert raised.value.code == "codex_timeout"
