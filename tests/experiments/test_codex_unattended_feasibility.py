@@ -151,6 +151,28 @@ def test_successful_synthetic_run_preserves_exact_intent(tmp_path: Path) -> None
     assert result.openai_api_key_exposed is False
 
 
+def test_synthetic_run_rejects_unexpected_output_property(tmp_path: Path) -> None:
+    executable = tmp_path / "codex"
+    executable.touch()
+    executable.chmod(0o755)
+
+    with pytest.raises(CodexFeasibilityError) as exc_info:
+        run_synthetic_feasibility(
+            executable=executable,
+            timeout_seconds=9,
+            word=WORD,
+            context=CONTEXT,
+            env={"PATH": "/safe/bin", "HOME": "/safe/home"},
+            work_dir=tmp_path / "run",
+            runner=_successful_runner(
+                _payload(unexpected_field="must-not-appear-in-error")
+            ),
+        )
+
+    assert exc_info.value.code == "schema_validation_failed"
+    assert "must-not-appear-in-error" not in str(exc_info.value)
+
+
 def test_real_child_process_receives_no_notion_or_openai_environment(
     tmp_path: Path,
 ) -> None:

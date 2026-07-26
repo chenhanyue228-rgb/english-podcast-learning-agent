@@ -186,6 +186,14 @@ def validate_against_existing_schema(
             "Vocabulary enrichment schema properties are invalid.",
         )
 
+    if schema.get("additionalProperties") is False:
+        unexpected = set(payload) - set(properties)
+        if unexpected:
+            raise CodexFeasibilityError(
+                "schema_validation_failed",
+                "Codex output contains unexpected vocabulary fields.",
+            )
+
     for key, value in payload.items():
         definition = properties.get(key)
         if not isinstance(definition, Mapping):
@@ -303,6 +311,7 @@ def run_synthetic_feasibility(
         request_path = directory / "vocabulary_enrichment_request.json"
         output_path = directory / "vocabulary_enrichment_output.json"
         schema_path = directory / "vocabulary_enrichment_output_schema.json"
+        output_schema = strict_output_schema()
 
         prepare_codex_request(
             stage="synthetic_vocabulary_enrichment_feasibility",
@@ -313,7 +322,7 @@ def run_synthetic_feasibility(
             output_path=output_path,
         )
         schema_path.write_text(
-            json.dumps(strict_output_schema(), ensure_ascii=False, indent=2),
+            json.dumps(output_schema, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         command = build_codex_command(
@@ -365,7 +374,7 @@ def run_synthetic_feasibility(
                 "Codex did not produce a current JSON object artifact.",
             ) from exc
 
-        validate_against_existing_schema(payload)
+        validate_against_existing_schema(payload, output_schema)
         validate_exact_intent(payload, word=word, context=context)
 
         return CodexFeasibilityResult(
