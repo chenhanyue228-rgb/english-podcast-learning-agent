@@ -1,4 +1,4 @@
-"""Target-scoped SQLite state for read-only vocabulary detection."""
+"""Target-scoped SQLite state for vocabulary detection and processing."""
 
 from __future__ import annotations
 
@@ -17,7 +17,20 @@ BINDING_VERSION = 1
 STATUS_BASELINED = "BASELINED"
 STATUS_QUIET_WAIT = "OBSERVED/QUIET_WAIT"
 STATUS_READY = "READY_FOR_ENRICHMENT"
+STATUS_ENRICHING = "ENRICHING"
+STATUS_VALIDATED = "VALIDATED"
+STATUS_PUBLISHING = "PUBLISHING"
+STATUS_PUBLISHED = "PUBLISHED"
+STATUS_RETRYABLE_FAILURE = "RETRYABLE_FAILURE"
 STATUS_CANCELLED = "CANCELLED_BEFORE_READY"
+
+PROCESSABLE_STATUSES = (
+    STATUS_READY,
+    STATUS_ENRICHING,
+    STATUS_VALIDATED,
+    STATUS_PUBLISHING,
+    STATUS_RETRYABLE_FAILURE,
+)
 
 
 class AutomaticVocabularyStateError(RuntimeError):
@@ -54,6 +67,19 @@ class StoredOccurrence:
     last_changed_at: str
     quiet_eligible_at: str
     baseline: bool
+
+
+@dataclass(frozen=True)
+class ProcessingOccurrence:
+    occurrence_fingerprint: str
+    page_id: str
+    exact_text: str
+    exact_context: str
+    status: str
+    attempts: int
+    artifact_digest: str
+    published_page_id: str
+    last_error_code: str
 
 
 def utc_now() -> datetime:
@@ -177,6 +203,24 @@ class AutomaticVocabularyStateStore:
                         location_fingerprint
                     );
 
+                CREATE TABLE IF NOT EXISTS vocabulary_processing (
+                    workspace_fingerprint TEXT NOT NULL,
+                    target_group_fingerprint TEXT NOT NULL,
+                    binding_version INTEGER NOT NULL,
+                    occurrence_fingerprint TEXT NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    artifact_digest TEXT NOT NULL DEFAULT '',
+                    published_page_id TEXT NOT NULL DEFAULT '',
+                    last_error_code TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (
+                        workspace_fingerprint,
+                        target_group_fingerprint,
+                        binding_version,
+                        occurrence_fingerprint
+                    )
+                );
+
                 CREATE TABLE IF NOT EXISTS detection_cycles (
                     cycle_id TEXT PRIMARY KEY,
                     workspace_fingerprint TEXT NOT NULL,
@@ -293,7 +337,12 @@ class AutomaticVocabularyStateStore:
             ).fetchone()
             current_owner = str(row["lease_owner"]) if row else ""
             current_expiry = parse_timestamp(str(row["lease_expires_at"])) if row else None
-            if current_owner and current_owner != owner and current_expiry and current_expiry > now:
+            if (
+                current_owner
+                and current_owner != owner
+                and current_expiry
+                and current_expiry > now
+            ):
                 raise AutomaticVocabularyStateError("cycle_already_running")
             connection.execute(
                 """
@@ -467,3 +516,222 @@ class AutomaticVocabularyStateStore:
             (str(row["page_id"]), str(row["last_edited_time"]))
             for row in rows
         ]
+
+    def list_processing_candidates(
+        self,
+        namespace: TargetNamespace,
+        *,
+        limit: int = 100,
+    ) -> list[ProcessingOccurrence]:
+        placeholders = ", ".join("?" for _ in PROCESSABLE_STATUSES)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT h.occurrence_fingerprint,
+                       h.page_id,
+                       h.exact_text,
+                       h.exact_context,
+                       h.status,
+                       COALESCE(p.attempts, 0) AS attempts,
+                       COALESCE(p.artifact_digest, '') AS artifact_digest,
+                       COALESCE(p.published_page_id, '') AS published_page_id,
+                       COALESCE(p.last_error_code, '') AS last_error_code
+                FROM highlight_occurrences AS h
+                LEFT JOIN vocabulary_processing AS p
+                  ON p.workspace_fingerprint = h.workspace_fingerprint
+                 AND p.target_group_fingerprint =
+                     h.target_group_fingerprint
+                 AND p.binding_version = h.binding_version
+                 AND p.occurrence_fingerprint =
+                     h.occurrence_fingerprint
+                WHERE h.workspace_fingerprint = ?
+                  AND h.target_group_fingerprint = ?
+                  AND h.binding_version = ?
+                  AND h.status IN ({placeholders})
+                ORDER BY h.last_changed_at, h.occurrence_fingerprint
+                LIMIT ?
+                """,
+                (
+                    *self._namespace_values(namespace),
+                    *PROCESSABLE_STATUSES,
+                    max(1, limit),
+                ),
+            ).fetchall()
+        return [
+            ProcessingOccurrence(
+                occurrence_fingerprint=str(
+                    row["occurrence_fingerprint"]
+                ),
+                page_id=str(row["page_id"]),
+                exact_text=str(row["exact_text"]),
+                exact_context=str(row["exact_context"]),
+                status=str(row["status"]),
+                attempts=int(row["attempts"]),
+                artifact_digest=str(row["artifact_digest"]),
+                published_page_id=str(row["published_page_id"]),
+                last_error_code=str(row["last_error_code"]),
+            )
+            for row in rows
+        ]
+
+    def get_processing_occurrence(
+        self,
+        namespace: TargetNamespace,
+        occurrence_fingerprint: str,
+    ) -> Optional[ProcessingOccurrence]:
+        candidates = self.list_processing_candidates(namespace, limit=10000)
+        for candidate in candidates:
+            if candidate.occurrence_fingerprint == occurrence_fingerprint:
+                return candidate
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT h.occurrence_fingerprint,
+                       h.page_id,
+                       h.exact_text,
+                       h.exact_context,
+                       h.status,
+                       COALESCE(p.attempts, 0) AS attempts,
+                       COALESCE(p.artifact_digest, '') AS artifact_digest,
+                       COALESCE(p.published_page_id, '') AS published_page_id,
+                       COALESCE(p.last_error_code, '') AS last_error_code
+                FROM highlight_occurrences AS h
+                LEFT JOIN vocabulary_processing AS p
+                  ON p.workspace_fingerprint = h.workspace_fingerprint
+                 AND p.target_group_fingerprint =
+                     h.target_group_fingerprint
+                 AND p.binding_version = h.binding_version
+                 AND p.occurrence_fingerprint =
+                     h.occurrence_fingerprint
+                WHERE h.workspace_fingerprint = ?
+                  AND h.target_group_fingerprint = ?
+                  AND h.binding_version = ?
+                  AND h.occurrence_fingerprint = ?
+                """,
+                (
+                    *self._namespace_values(namespace),
+                    occurrence_fingerprint,
+                ),
+            ).fetchone()
+        if row is None:
+            return None
+        return ProcessingOccurrence(
+            occurrence_fingerprint=str(row["occurrence_fingerprint"]),
+            page_id=str(row["page_id"]),
+            exact_text=str(row["exact_text"]),
+            exact_context=str(row["exact_context"]),
+            status=str(row["status"]),
+            attempts=int(row["attempts"]),
+            artifact_digest=str(row["artifact_digest"]),
+            published_page_id=str(row["published_page_id"]),
+            last_error_code=str(row["last_error_code"]),
+        )
+
+    def transition_processing(
+        self,
+        namespace: TargetNamespace,
+        occurrence_fingerprint: str,
+        *,
+        owner: str,
+        now: datetime,
+        expected_statuses: tuple[str, ...],
+        new_status: str,
+        increment_attempt: bool = False,
+        artifact_digest: str = "",
+        published_page_id: str = "",
+        error_code: str = "",
+    ) -> ProcessingOccurrence:
+        if not expected_statuses:
+            raise AutomaticVocabularyStateError(
+                "processing_state_conflict"
+            )
+        now_text = isoformat_utc(now)
+        with self.transaction() as connection:
+            self.assert_active_lease(connection, namespace, owner, now)
+            row = connection.execute(
+                """
+                SELECT status
+                FROM highlight_occurrences
+                WHERE workspace_fingerprint = ?
+                  AND target_group_fingerprint = ?
+                  AND binding_version = ?
+                  AND occurrence_fingerprint = ?
+                """,
+                (
+                    *self._namespace_values(namespace),
+                    occurrence_fingerprint,
+                ),
+            ).fetchone()
+            if row is None or str(row["status"]) not in expected_statuses:
+                raise AutomaticVocabularyStateError(
+                    "processing_state_conflict"
+                )
+            connection.execute(
+                """
+                UPDATE highlight_occurrences
+                SET status = ?, last_seen_at = ?
+                WHERE workspace_fingerprint = ?
+                  AND target_group_fingerprint = ?
+                  AND binding_version = ?
+                  AND occurrence_fingerprint = ?
+                """,
+                (
+                    new_status,
+                    now_text,
+                    *self._namespace_values(namespace),
+                    occurrence_fingerprint,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO vocabulary_processing(
+                    workspace_fingerprint,
+                    target_group_fingerprint,
+                    binding_version,
+                    occurrence_fingerprint,
+                    attempts,
+                    artifact_digest,
+                    published_page_id,
+                    last_error_code,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(
+                    workspace_fingerprint,
+                    target_group_fingerprint,
+                    binding_version,
+                    occurrence_fingerprint
+                ) DO UPDATE SET
+                    attempts = vocabulary_processing.attempts
+                        + excluded.attempts,
+                    artifact_digest = CASE
+                        WHEN excluded.artifact_digest != ''
+                        THEN excluded.artifact_digest
+                        ELSE vocabulary_processing.artifact_digest
+                    END,
+                    published_page_id = CASE
+                        WHEN excluded.published_page_id != ''
+                        THEN excluded.published_page_id
+                        ELSE vocabulary_processing.published_page_id
+                    END,
+                    last_error_code = excluded.last_error_code,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    *self._namespace_values(namespace),
+                    occurrence_fingerprint,
+                    int(increment_attempt),
+                    artifact_digest,
+                    published_page_id,
+                    error_code,
+                    now_text,
+                ),
+            )
+        result = self.get_processing_occurrence(
+            namespace,
+            occurrence_fingerprint,
+        )
+        if result is None:
+            raise AutomaticVocabularyStateError(
+                "processing_state_conflict"
+            )
+        return result

@@ -45,6 +45,18 @@ def _publish_payload_from_item(item: Mapping[str, Any]) -> VocabularyPublishPayl
             or ""
         ).strip(),
         personal_note="",
+        chinese_meaning=str(item.get("chinese_meaning", "")).strip(),
+        part_of_speech=str(item.get("part_of_speech", "")).strip(),
+        common_collocations=tuple(
+            str(value).strip()
+            for value in item.get("common_collocations", [])
+            if str(value).strip()
+        )
+        if isinstance(item.get("common_collocations"), list)
+        else (),
+        semantic_category=str(
+            item.get("professional_category", "")
+        ).strip(),
     )
 
 
