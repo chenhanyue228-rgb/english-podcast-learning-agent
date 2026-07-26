@@ -2,101 +2,70 @@
 
 ## Phase
 
-Phase 4 — Product Validation
+Phase 4.2 - External User Validation
 
 ## Stable Baseline
 
-- Release: v1.1.0
-- Release commit: `80cbab01ea266e487a0359ddbec562959070d8a0`
-- Phase 4.1C closure base:
-  `de9f088a47b58ad54de9ef281ddf427c994dbf0a`
-- PR #9: merged
-- PR #10: merged
-- PR #11: merged
-- PR #14 Vocabulary Acceptance Harness: merged
-- PR #16 Expression Select semantic colors: merged
-- PR #20 Parent Page Guide: merged and accepted
-- PR #21 Podcast TOC regression fix: merged
-- Production main: `5b08e4bb73db3bffe2a3787cf090d88bdcb4d7be`
+- Release: v1.2.0
+- Phase 3 runtime baseline:
+  `156b37f08290aa9b985112269d2a373de51c48d2`
+- PR #23 Phase 1 read-only detection: merged
+- PR #24 Phase 2 enrichment and protected publishing: merged
+- PR #25 Phase 3A bounded runtime and scheduler: merged
 - Architecture: Stable
-- Architecture Review: `OWNER_APPROVED_FOR_PHASE_0`
+- Architecture Review: not required
 
 ## Current Sprint
 
-**Phase 4.2 — External User Validation**
+**Execution state:** External User Session #1 preparation
 
-**Execution state:** Automatic Vocabulary Sync Architecture Implementation
-Preparation
+**Engineering status:**
+`ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`
 
-Current status:
+Current facts:
 
-- Phase 4.1C: COMPLETED
 - Setup / Notion workspace recovery: PASS
 - Target Binding: PASS
 - Automated Podcast Owner Acceptance: PASS
-- Podcast first publish: PASS
-- Podcast exact retry: PASS
 - Targeted Vocabulary Acceptance: PASS
-- Vocabulary first publish: created 2
-- Vocabulary exact retry: created 0
 - Weekly Reflection Acceptance: PASS
-- Weekly first publish: created 1
-- Weekly exact retry: created 0
-- Non-target database changes: 0
-- Historical database group changes: 0
-- Owner Acceptance: `OWNER_ACCEPTANCE_PASS`
-- Internal release:
-  `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`
+- Automatic Vocabulary real Owner Acceptance: PASS
+- Automatic Vocabulary first publish: created 1
+- Automatic Vocabulary exact retry: created 0, updated 0
+- Automatic scheduler: installed and loaded
+- Scheduler interval: 60 seconds
+- First scheduler cycle: BASELINED
+- Second scheduler cycle: NO_WORK
+- Expression / Weekly / schema / historical writes during automatic
+  acceptance: 0
 - External-user sessions: 0
-- External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`
-- External User Session #1: BLOCKED
-- Automatic Vocabulary Sync runtime: NOT IMPLEMENTED
-- Isolated unattended Codex synthetic feasibility: PASS
+- External-user validation: NOT RUN
 
-`NOT_READY_FOR_EXTERNAL_USERS` is the canonical readiness token. Do not use a
-space-separated variant in active project status.
-
-Internal release acceptance does not imply external-user readiness.
+`ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING` means the engineering
+gate is complete. Do not report `EXTERNAL_USER_VALIDATION_PASS` before real
+session evidence exists.
 
 ## Completed Gates
 
-- PR #9 partial Podcast/Expression publish recovery merged.
-- PR #10 protected Owner Acceptance Harness merged.
-- PR #11 Notion target binding merged.
-- Five local target settings switched to the intended group.
-- Notion token preserved.
-- Read-only Target Binding Diagnosis passed.
-- Protected Automated Podcast Owner Acceptance passed.
-- First publish created 1 Podcast and 19 Expressions.
-- Exact retry created 0 Podcast and 0 Expressions.
-- Vocabulary and Weekly databases remained unchanged.
-- Historical database group remained unchanged.
-- PR #14 protected Vocabulary Acceptance Harness merged after independent
-  review closed all identified P0/P1 false-pass paths.
-- Targeted Vocabulary acceptance passed: first publish created 2 and exact
-  retry created 0.
-- Weekly Reflection acceptance passed: first publish created 1 and exact retry
-  created 0.
-- All acceptance runs preserved non-target databases and the historical
-  database group.
-- PR #16 added semantic Select colors to future Expression Database creation
-  while preserving all option names and existing databases.
+- Phase 0 architecture and isolated unattended Codex feasibility.
+- Phase 1 target-scoped SQLite detection, exact occurrence identity,
+  first-enable baseline, overlap watermark, and 90-second quiet period.
+- Phase 2 isolated Codex enrichment, strict artifact validation, Target
+  Binding, protected Vocabulary upsert, retry, and reconciliation.
+- Phase 3A one-shot worker, process lock, redacted logs, protected Owner
+  Acceptance Harness, and bounded macOS LaunchAgent lifecycle.
+- Phase 3B protected dry-run and real Notion Owner Acceptance.
+- Exact word, exact context, full properties, full body, source relation,
+  occurrence fingerprint, and exact retry validation.
+- Production LaunchAgent activation from the supported non-protected project
+  location.
 
 ## Current Tasks
 
-1. Complete Phase 0 architecture documentation and unattended Codex synthetic
-   feasibility.
-2. Independently review and accept the exact Phase 0 PR HEAD.
-3. Build Phase 1 read-only automatic detection on target-group-scoped SQLite,
-   exact occurrence fingerprints, a 90-second quiet period, overlap watermark,
-   first-enable baseline, and bounded execution.
-4. Do not connect Phase 1 to the Vocabulary publisher.
-5. Resume External User Session #1 preparation only after the automatic
-   Vocabulary journey is implemented and accepted.
-
-## External Validation Journey
-
-The core journey under observation is:
+1. Recruit External User Session #1 using the merged Session Kit.
+2. Verify the participant uses a project location outside macOS protected
+   `Documents`, `Desktop`, and `Downloads` folders.
+3. Observe the complete journey without developer intervention:
 
 ```text
 Install and configure
@@ -105,56 +74,55 @@ Process a supported audio source
 ↓
 Publish Podcast learning assets
 ↓
-Automatically capture exact pink-highlight Vocabulary
+Add one exact pink highlight
+↓
+Automatic Vocabulary enrichment and publish
 ↓
 Produce Weekly Reflection when enough learning data exists
 ```
 
-Session evidence must distinguish a user-facing failure from an environment
-problem and must not include secrets or private Notion identifiers.
+4. Record time-to-environment-ready, time-to-first-Notion-page,
+   time-to-first-value, questions, failures, and recovery.
+5. Keep external-user session count at 0 until a real participant starts.
 
-The old explicit “同步生词” step is suspended as the default external-user
-journey. Do not ask a participant for a page ID or command while automatic
-sync remains under implementation.
+## Automatic Vocabulary Operations
+
+Normal users only add a pink highlight. They do not provide a page ID, run a
+command, or say "同步生词".
+
+Developer/recovery operations:
+
+```bash
+./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py status
+./.venv/bin/python scripts/run_automatic_vocabulary_once.py
+```
+
+Install and uninstall require the exact confirmations documented in
+`skill/SKILL.md` and `docs/USER_GUIDE_ZH.md`.
 
 ## Deferred Non-Blocking Backlog
 
-Podcast and Weekly page tables of contents are existing output contracts.
-Every newly generated page must begin with exactly one navigable table of
-contents; they are not deferred backlog items.
-
 - manual color adjustment for the existing Expression Database
 
-PR #16 gives newly created Expression databases semantic colors. Existing
-databases are not automatically rewritten and may still show gray options.
-Existing option colors may be changed manually in the Notion UI only. Do not
-delete, recreate, or rename existing options.
-
-This backlog is separate from the core external-validation journey and is not
-a release blocker.
+The Parent Page Guide and Podcast/Weekly tables of contents are accepted
+contracts, not backlog items.
 
 ## Cancelled Requirements
 
-The following are not active requirements and require no Architecture Review:
-
-- Notion AI-assisted page workflow;
-- Podcast-page Expression synchronization into Expression Database.
+- Notion AI-assisted page workflow
+- Podcast-page Expression synchronization into Expression Database
 
 They must not reappear in the active roadmap, blockers, or user guide.
 
 ## Out of Scope
 
-- architecture redesign
-- Notion schema redesign
-- background daemon or infinite polling
+- architecture or Notion schema redesign
 - Hosted Webhook, OAuth, cloud credential storage, or multi-tenant backend
-- production automatic Vocabulary writes before protected acceptance
-- LaunchAgent installation during Phase 0 or Phase 1
+- infinite polling daemon
 - YouTube support
-- cloud hosting
-- user accounts or payment
-- historical TOC backfill
-- external-user readiness claims
+- historical Vocabulary backfill
+- historical database-group access
+- external-user validation claims without session evidence
 
 ## Handoff
 

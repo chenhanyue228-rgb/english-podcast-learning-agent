@@ -712,3 +712,48 @@ Automatic execution must preserve the Codex/Python/Notion responsibility
 boundary. Isolating credentials and failing closed at the artifact boundary
 allows feasibility to be tested without granting an AI child process access to
 Notion persistence.
+
+## DEC-031: Activate the Accepted Automatic Vocabulary Runtime
+
+- Date: 2026-07-27
+- Status: Accepted
+
+### Decision
+
+Complete Automatic Vocabulary delivery with:
+
+- a target-group-scoped SQLite detection and processing state;
+- exact occurrence fingerprints without linguistic normalization;
+- a 90-second quiet period;
+- isolated, finite Codex enrichment;
+- strict Python artifact validation;
+- Target Binding before every Notion write;
+- fingerprint-idempotent Vocabulary upsert and exact reconciliation;
+- one bounded macOS LaunchAgent invocation every 60 seconds;
+- a non-blocking process lock and redacted structured logs.
+
+The exact pink-highlighted rich-text item remains the user's only Vocabulary
+selection action. Normal users do not say "同步生词", provide a page ID, run a
+command, or use Notion AI.
+
+Protected real Owner Acceptance passed with one controlled Podcast, one new
+pink highlight, and one Vocabulary create. Exact retry created and updated
+zero Vocabulary records. Expression, Weekly, schema, delete/archive, and
+historical-group writes were zero.
+
+The supported macOS production project location is
+`~/EnglishAudioLearningAgent`. Do not install the LaunchAgent against
+`Documents`, `Desktop`, or `Downloads`, because launchd can be denied access
+to those protected folders even when interactive Python succeeds.
+
+The resulting engineering status is
+`ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`. External-user sessions
+remain 0, and this decision does not claim `EXTERNAL_USER_VALIDATION_PASS`.
+
+### Reason
+
+The accepted runtime gives the user the intended one-action learning loop
+while preserving the Codex/Python/Notion responsibility boundary, target
+isolation, restart safety, and fail-closed publishing. The production-location
+constraint records an observed macOS launchd behavior and avoids embedding
+credentials in the LaunchAgent plist.
