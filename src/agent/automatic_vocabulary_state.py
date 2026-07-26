@@ -320,6 +320,41 @@ class AutomaticVocabularyStateStore:
                 (*self._namespace_values(namespace), owner),
             )
 
+    def assert_active_lease(
+        self,
+        connection: sqlite3.Connection,
+        namespace: TargetNamespace,
+        owner: str,
+        now: datetime,
+    ) -> None:
+        """Atomically prove the current worker still owns an unexpired lease."""
+        current_time = now
+        if current_time.tzinfo is None:
+            current_time = current_time.replace(tzinfo=timezone.utc)
+        current_time = current_time.astimezone(timezone.utc)
+        row = connection.execute(
+            """
+            SELECT lease_owner, lease_expires_at
+            FROM target_bindings
+            WHERE workspace_fingerprint = ?
+              AND target_group_fingerprint = ?
+              AND binding_version = ?
+            """,
+            self._namespace_values(namespace),
+        ).fetchone()
+        expires_at = (
+            parse_timestamp(str(row["lease_expires_at"]))
+            if row is not None
+            else None
+        )
+        if (
+            row is None
+            or str(row["lease_owner"]) != owner
+            or expires_at is None
+            or expires_at <= current_time
+        ):
+            raise AutomaticVocabularyStateError("cycle_lease_lost")
+
     def occurrences_for_page(
         self,
         connection: sqlite3.Connection,

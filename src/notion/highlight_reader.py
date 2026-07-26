@@ -6,11 +6,11 @@ and only inspects page blocks and their rich text annotations.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Optional
 
 from src.notion.config import load_notion_config
+from src.notion.pagination import next_notion_cursor
 from src.notion.uploader import create_notion_client
 
 
@@ -42,8 +42,25 @@ class PinkHighlightOccurrence:
         cell = "" if self.cell_index is None else str(self.cell_index)
         return (
             f"path={path};row={row};cell={cell};rich_text={self.rich_text_index};"
-            f"span={self.start_offset}:{self.end_offset}"
+            f"item_span={self.item_start_offset}:{self.item_end_offset};"
+            f"source_span={self.start_offset}:{self.end_offset}"
         )
+
+    @property
+    def item_start_offset(self) -> int:
+        return 0
+
+    @property
+    def item_end_offset(self) -> int:
+        return len(self.text)
+
+    @property
+    def source_absolute_start(self) -> int:
+        return self.start_offset
+
+    @property
+    def source_absolute_end(self) -> int:
+        return self.end_offset
 
 
 @dataclass(frozen=True)
@@ -82,20 +99,6 @@ def _table_row_cells(block: Mapping[str, Any]) -> list[list[Mapping[str, Any]]]:
     return []
 
 
-def _plain_text_from_rich_text_item(item: Mapping[str, Any]) -> str:
-    plain_text = item.get("plain_text")
-    if isinstance(plain_text, str) and plain_text.strip():
-        return plain_text.strip()
-
-    text_value = item.get("text")
-    if isinstance(text_value, Mapping):
-        content = text_value.get("content")
-        if isinstance(content, str) and content.strip():
-            return content.strip()
-
-    return ""
-
-
 def _exact_text_from_rich_text_item(item: Mapping[str, Any]) -> str:
     plain_text = item.get("plain_text")
     if isinstance(plain_text, str):
@@ -110,45 +113,39 @@ def _exact_text_from_rich_text_item(item: Mapping[str, Any]) -> str:
     return ""
 
 
-def _block_context(block: Mapping[str, Any]) -> str:
-    texts: list[str] = []
-    block_type = str(block.get("type", "")).strip().lower()
-    if block_type == "table_row":
-        for cell in _table_row_cells(block):
-            cell_texts = []
-            for item in cell:
-                text = _plain_text_from_rich_text_item(item)
-                if text:
-                    cell_texts.append(text)
-            if cell_texts:
-                texts.append(" ".join(cell_texts))
-    else:
-        for item in _block_rich_text(block):
-            text = _plain_text_from_rich_text_item(item)
-            if text:
-                texts.append(text)
-    return " ".join(texts).strip()
+def _exact_source(items: Iterable[Mapping[str, Any]]) -> str:
+    return "".join(_exact_text_from_rich_text_item(item) for item in items)
 
 
-def _split_sentences(text: str) -> list[str]:
-    normalized = re.sub(r"\s+", " ", text).strip()
-    if not normalized:
-        return []
-    sentences = re.split(r"(?<=[.!?])\s+", normalized)
-    return [sentence.strip() for sentence in sentences if sentence.strip()]
-
-
-def _sentence_for_highlight(block_context: str, highlighted_text: str) -> str:
-    if not block_context:
+def _sentence_for_span(source: str, start: int, end: int) -> str:
+    if not source:
         return ""
-    if not highlighted_text:
-        return block_context
+    if start < 0 or end < start or end > len(source):
+        return source
 
-    highlight_lower = highlighted_text.strip().lower()
-    for sentence in _split_sentences(block_context):
-        if highlight_lower in sentence.lower():
-            return sentence
-    return block_context
+    previous_boundaries = [
+        source.rfind(marker, 0, start)
+        for marker in (".", "!", "?")
+    ]
+    previous_boundary = max(previous_boundaries)
+    slice_start = 0 if previous_boundary < 0 else previous_boundary + 1
+    while slice_start < start and source[slice_start].isspace():
+        slice_start += 1
+
+    if end > 0 and source[end - 1] in ".!?":
+        slice_end = end
+    else:
+        following = [
+            position
+            for marker in (".", "!", "?")
+            if (position := source.find(marker, end)) >= 0
+        ]
+        if not following:
+            return source
+        slice_end = min(following) + 1
+    if slice_start > start or slice_end < end:
+        return source
+    return source[slice_start:slice_end]
 
 
 def _is_pink_highlight(item: Mapping[str, Any]) -> bool:
@@ -161,6 +158,7 @@ def _is_pink_highlight(item: Mapping[str, Any]) -> bool:
 
 def _list_child_blocks(notion: Any, block_id: str) -> Iterable[Mapping[str, Any]]:
     cursor: Optional[str] = None
+    visited_cursors: set[str] = set()
     while True:
         kwargs: dict[str, Any] = {"block_id": block_id, "page_size": 100}
         if cursor:
@@ -171,12 +169,13 @@ def _list_child_blocks(notion: Any, block_id: str) -> Iterable[Mapping[str, Any]
             for block in results:
                 if isinstance(block, Mapping):
                     yield block
-        if not response.get("has_more"):
+        cursor = next_notion_cursor(
+            response,
+            current_cursor=cursor,
+            visited_cursors=visited_cursors,
+        )
+        if cursor is None:
             break
-        next_cursor = response.get("next_cursor")
-        if not isinstance(next_cursor, str) or not next_cursor.strip():
-            break
-        cursor = next_cursor
 
 
 def _iter_traversed_child_blocks(
@@ -225,7 +224,7 @@ def _occurrence_from_item(
     item: Mapping[str, Any],
     rich_text_index: int,
     start_offset: int,
-    context: str,
+    source: str,
     cell_index: Optional[int] = None,
 ) -> Optional[PinkHighlightOccurrence]:
     if not _is_pink_highlight(item):
@@ -248,7 +247,11 @@ def _occurrence_from_item(
         cell_index=cell_index,
         text=text,
         color=_highlight_color(item),
-        context=_sentence_for_highlight(context, text),
+        context=_sentence_for_span(
+            source,
+            start_offset,
+            start_offset + len(text),
+        ),
     )
 
 
@@ -267,9 +270,9 @@ def read_pink_highlight_occurrences(
         block_type = str(block.get("type", "")).strip().lower()
         if not _is_text_block(block) and block_type != "table_row":
             continue
-        block_context = _block_context(block)
         if block_type == "table_row":
             for cell_index, cell in enumerate(_table_row_cells(block)):
+                cell_source = _exact_source(cell)
                 cell_offset = 0
                 for rich_text_index, item in enumerate(cell):
                     occurrence = _occurrence_from_item(
@@ -278,7 +281,7 @@ def read_pink_highlight_occurrences(
                         item=item,
                         rich_text_index=rich_text_index,
                         start_offset=cell_offset,
-                        context=block_context,
+                        source=cell_source,
                         cell_index=cell_index,
                     )
                     if occurrence is not None:
@@ -286,15 +289,17 @@ def read_pink_highlight_occurrences(
                     cell_offset += len(_exact_text_from_rich_text_item(item))
             continue
 
+        block_items = _block_rich_text(block)
+        block_source = _exact_source(block_items)
         block_offset = 0
-        for rich_text_index, item in enumerate(_block_rich_text(block)):
+        for rich_text_index, item in enumerate(block_items):
             occurrence = _occurrence_from_item(
                 page_id=page_id,
                 traversed=traversed,
                 item=item,
                 rich_text_index=rich_text_index,
                 start_offset=block_offset,
-                context=block_context,
+                source=block_source,
             )
             if occurrence is not None:
                 occurrences.append(occurrence)

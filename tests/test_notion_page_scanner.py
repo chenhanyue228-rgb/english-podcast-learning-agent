@@ -5,6 +5,12 @@ from src.agent.notion_page_scanner import (
     scan_changed_podcast_pages,
     scan_podcast_pages_with_overlap,
 )
+from src.notion.pagination import (
+    NOTION_PAGINATION_INVALID,
+    NotionPaginationError,
+)
+
+import pytest
 
 
 class FakeDataSources:
@@ -123,3 +129,71 @@ def test_overlap_scan_ignores_items_older_than_overlap_window() -> None:
     )
 
     assert [item.page_id for item in changed] == ["boundary"]
+
+
+@pytest.mark.parametrize("next_cursor", [None, "", "   "])
+def test_data_source_pagination_missing_or_blank_cursor_fails_closed(
+    next_cursor,
+) -> None:
+    notion = FakeNotion()
+    notion.data_sources.responses = [
+        {
+            "results": [
+                {
+                    "id": "partial-page",
+                    "last_edited_time": "2026-07-18T12:00:00Z",
+                }
+            ],
+            "has_more": True,
+            "next_cursor": next_cursor,
+        }
+    ]
+
+    with pytest.raises(NotionPaginationError) as raised:
+        scan_podcast_pages_with_overlap(
+            notion=notion,
+            podcast_database_id="podcast_db",
+        )
+
+    assert raised.value.code == NOTION_PAGINATION_INVALID
+    assert str(raised.value) == NOTION_PAGINATION_INVALID
+
+
+def test_data_source_pagination_repeated_cursor_fails_closed() -> None:
+    notion = FakeNotion()
+    notion.data_sources.responses = [
+        {
+            "results": [],
+            "has_more": True,
+            "next_cursor": "cursor_1",
+        },
+        {
+            "results": [],
+            "has_more": True,
+            "next_cursor": "cursor_1",
+        },
+    ]
+
+    with pytest.raises(NotionPaginationError):
+        scan_podcast_pages_with_overlap(
+            notion=notion,
+            podcast_database_id="podcast_db",
+        )
+
+
+def test_legacy_database_query_pagination_also_fails_closed() -> None:
+    legacy = type("LegacyNotion", (), {})()
+    legacy.databases = FakeDataSources()
+    legacy.databases.responses = [
+        {
+            "results": [],
+            "has_more": True,
+            "next_cursor": "",
+        }
+    ]
+
+    with pytest.raises(NotionPaginationError):
+        scan_podcast_pages_with_overlap(
+            notion=legacy,
+            podcast_database_id="podcast_db",
+        )

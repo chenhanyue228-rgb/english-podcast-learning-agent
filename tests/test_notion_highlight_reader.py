@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import pytest
+
 from src.notion.highlight_reader import (
     debug_print_pink_highlights,
     read_pink_highlight_occurrences,
     read_pink_highlights,
+)
+from src.notion.pagination import (
+    NOTION_PAGINATION_INVALID,
+    NotionPaginationError,
 )
 
 
@@ -271,7 +277,9 @@ def test_occurrence_preserves_exact_text_and_rich_text_span() -> None:
     assert occurrence.rich_text_index == 1
     assert occurrence.start_offset == len("Before ")
     assert occurrence.end_offset == len("Before Fundraising!")
-    assert occurrence.position_descriptor.endswith("span=7:19")
+    assert occurrence.position_descriptor.endswith(
+        "item_span=0:12;source_span=7:19"
+    )
 
 
 def test_table_occurrence_keeps_row_cell_and_item_position() -> None:
@@ -420,3 +428,346 @@ def test_non_pink_annotations_are_ignored_by_occurrence_reader() -> None:
     )
 
     assert read_pink_highlight_occurrences("page_1", notion=notion) == []
+
+
+@pytest.mark.parametrize("next_cursor", [None, "", "   "])
+def test_top_level_pagination_missing_or_blank_cursor_fails_closed(
+    next_cursor,
+) -> None:
+    notion = FakeNotion(
+        {
+            ("page_1", None): {
+                "results": [
+                    {
+                        "id": "partial",
+                        "type": "paragraph",
+                        "paragraph": {
+                            "rich_text": [
+                                {
+                                    "plain_text": "private learning text",
+                                    "annotations": {"color": "pink"},
+                                }
+                            ]
+                        },
+                    }
+                ],
+                "has_more": True,
+                "next_cursor": next_cursor,
+            }
+        }
+    )
+
+    with pytest.raises(NotionPaginationError) as raised:
+        read_pink_highlight_occurrences("page_1", notion=notion)
+
+    assert raised.value.code == NOTION_PAGINATION_INVALID
+    assert str(raised.value) == NOTION_PAGINATION_INVALID
+
+
+def test_top_level_pagination_repeated_cursor_fails_closed() -> None:
+    notion = FakeNotion(
+        {
+            ("page_1", None): {
+                "results": [],
+                "has_more": True,
+                "next_cursor": "cursor_1",
+            },
+            ("page_1", "cursor_1"): {
+                "results": [],
+                "has_more": True,
+                "next_cursor": "cursor_1",
+            },
+        }
+    )
+
+    with pytest.raises(NotionPaginationError):
+        read_pink_highlight_occurrences("page_1", notion=notion)
+
+
+@pytest.mark.parametrize("next_cursor", [None, "cursor_1"])
+def test_nested_pagination_non_progress_fails_closed(next_cursor) -> None:
+    second_response = {
+        "results": [],
+        "has_more": True,
+        "next_cursor": next_cursor,
+    }
+    notion = FakeNotion(
+        {
+            "page_1": [
+                {
+                    "id": "nested",
+                    "type": "toggle",
+                    "has_children": True,
+                    "toggle": {"rich_text": []},
+                }
+            ],
+            ("nested", None): {
+                "results": [],
+                "has_more": True,
+                "next_cursor": (
+                    "cursor_1"
+                    if next_cursor == "cursor_1"
+                    else next_cursor
+                ),
+            },
+            ("nested", "cursor_1"): second_response,
+        }
+    )
+
+    with pytest.raises(NotionPaginationError):
+        read_pink_highlight_occurrences("page_1", notion=notion)
+
+
+def test_table_child_pagination_malformed_fails_closed() -> None:
+    notion = FakeNotion(
+        {
+            "page_1": [
+                {
+                    "id": "table_1",
+                    "type": "table",
+                    "has_children": True,
+                    "table": {},
+                }
+            ],
+            ("table_1", None): {
+                "results": [
+                    {
+                        "id": "row_1",
+                        "type": "table_row",
+                        "table_row": {
+                            "cells": [[
+                                {
+                                    "plain_text": "partial",
+                                    "annotations": {"color": "pink"},
+                                }
+                            ]]
+                        },
+                    }
+                ],
+                "has_more": True,
+                "next_cursor": "",
+            },
+        }
+    )
+
+    with pytest.raises(NotionPaginationError):
+        read_pink_highlight_occurrences("page_1", notion=notion)
+
+
+def test_exact_context_preserves_rich_text_boundaries_and_spacing() -> None:
+    notion = FakeNotion(
+        {
+            "page_1": [
+                {
+                    "id": "block_1",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "plain_text": "The  ",
+                                "annotations": {"color": "default"},
+                            },
+                            {
+                                "plain_text": "Word",
+                                "annotations": {"color": "pink"},
+                            },
+                            {
+                                "plain_text": ",  exactly.",
+                                "annotations": {"color": "default"},
+                            },
+                        ]
+                    },
+                }
+            ]
+        }
+    )
+
+    occurrence = read_pink_highlight_occurrences(
+        "page_1",
+        notion=notion,
+    )[0]
+
+    assert occurrence.text == "Word"
+    assert occurrence.context == "The  Word,  exactly."
+    assert occurrence.source_absolute_start == 5
+    assert occurrence.source_absolute_end == 9
+
+
+def test_exact_context_preserves_tabs_newlines_and_case() -> None:
+    exact_source = "Lead\tWORD\ninto context"
+    notion = FakeNotion(
+        {
+            "page_1": [
+                {
+                    "id": "block_1",
+                    "type": "quote",
+                    "quote": {
+                        "rich_text": [
+                            {
+                                "plain_text": "Lead\t",
+                                "annotations": {"color": "default"},
+                            },
+                            {
+                                "plain_text": "WORD",
+                                "annotations": {"color": "pink"},
+                            },
+                            {
+                                "plain_text": "\ninto context",
+                                "annotations": {"color": "default"},
+                            },
+                        ]
+                    },
+                }
+            ]
+        }
+    )
+
+    occurrence = read_pink_highlight_occurrences(
+        "page_1",
+        notion=notion,
+    )[0]
+
+    assert occurrence.context == exact_source
+
+
+def test_repeated_text_in_different_sentences_gets_exact_context() -> None:
+    notion = FakeNotion(
+        {
+            "page_1": [
+                {
+                    "id": "block_1",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "plain_text": "Word",
+                                "annotations": {"color": "pink"},
+                            },
+                            {
+                                "plain_text": " opens the first point. ",
+                                "annotations": {"color": "default"},
+                            },
+                            {
+                                "plain_text": "Word",
+                                "annotations": {"color": "pink"},
+                            },
+                            {
+                                "plain_text": " closes the second point.",
+                                "annotations": {"color": "default"},
+                            },
+                        ]
+                    },
+                }
+            ]
+        }
+    )
+
+    occurrences = read_pink_highlight_occurrences(
+        "page_1",
+        notion=notion,
+    )
+
+    assert [item.context for item in occurrences] == [
+        "Word opens the first point.",
+        "Word closes the second point.",
+    ]
+    assert occurrences[0].start_offset != occurrences[1].start_offset
+
+
+def test_repeated_text_in_same_sentence_has_distinct_absolute_spans() -> None:
+    notion = FakeNotion(
+        {
+            "page_1": [
+                {
+                    "id": "block_1",
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [
+                            {
+                                "plain_text": "Word",
+                                "annotations": {"color": "pink"},
+                            },
+                            {
+                                "plain_text": " and ",
+                                "annotations": {"color": "default"},
+                            },
+                            {
+                                "plain_text": "Word",
+                                "annotations": {"color": "pink"},
+                            },
+                            {
+                                "plain_text": " are distinct.",
+                                "annotations": {"color": "default"},
+                            },
+                        ]
+                    },
+                }
+            ]
+        }
+    )
+
+    occurrences = read_pink_highlight_occurrences(
+        "page_1",
+        notion=notion,
+    )
+
+    assert occurrences[0].context == "Word and Word are distinct."
+    assert occurrences[1].context == "Word and Word are distinct."
+    assert occurrences[0].position_descriptor != (
+        occurrences[1].position_descriptor
+    )
+
+
+def test_table_context_is_scoped_to_exact_cell() -> None:
+    notion = FakeNotion(
+        {
+            "page_1": [
+                {
+                    "id": "table_1",
+                    "type": "table",
+                    "has_children": True,
+                    "table": {},
+                }
+            ],
+            "table_1": [
+                {
+                    "id": "row_1",
+                    "type": "table_row",
+                    "table_row": {
+                        "cells": [
+                            [
+                                {
+                                    "plain_text": "Word",
+                                    "annotations": {"color": "pink"},
+                                },
+                                {
+                                    "plain_text": " in first cell.",
+                                    "annotations": {"color": "default"},
+                                }
+                            ],
+                            [
+                                {
+                                    "plain_text": "Word",
+                                    "annotations": {"color": "pink"},
+                                },
+                                {
+                                    "plain_text": " in second cell.",
+                                    "annotations": {"color": "default"},
+                                }
+                            ],
+                        ]
+                    },
+                }
+            ],
+        }
+    )
+
+    occurrences = read_pink_highlight_occurrences(
+        "page_1",
+        notion=notion,
+    )
+
+    assert occurrences[0].context == "Word in first cell."
+    assert occurrences[1].context == "Word in second cell."
+    assert occurrences[0].cell_index == 0
+    assert occurrences[1].cell_index == 1

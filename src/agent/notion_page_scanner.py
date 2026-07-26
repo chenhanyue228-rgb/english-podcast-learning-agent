@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Optional
 
 from src.notion.config import load_notion_config
+from src.notion.pagination import next_notion_cursor
 from src.notion.uploader import create_notion_client
 
 
@@ -66,6 +67,7 @@ def _query_pages(
         }
 
     cursor: Optional[str] = None
+    visited_cursors: set[str] = set()
     while True:
         current_kwargs = dict(query_kwargs)
         if cursor:
@@ -84,10 +86,12 @@ def _query_pages(
                 if isinstance(page, Mapping):
                     yield page
 
-        if not response.get("has_more"):
-            break
-        cursor = response.get("next_cursor")
-        if not isinstance(cursor, str) or not cursor.strip():
+        cursor = next_notion_cursor(
+            response,
+            current_cursor=cursor,
+            visited_cursors=visited_cursors,
+        )
+        if cursor is None:
             break
 
 

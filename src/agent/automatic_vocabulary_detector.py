@@ -21,6 +21,7 @@ from src.agent.automatic_vocabulary_state import (
     TargetNamespace,
     isoformat_utc,
     parse_timestamp,
+    utc_now,
 )
 from src.agent.notion_page_scanner import (
     DEFAULT_WATERMARK_OVERLAP_SECONDS,
@@ -32,6 +33,10 @@ from src.notion.highlight_reader import (
     PinkHighlightOccurrence,
     read_pink_highlight_occurrences,
 )
+from src.notion.pagination import (
+    NOTION_PAGINATION_INVALID,
+    NotionPaginationError,
+)
 from src.notion.schema import (
     EXPRESSION_DATABASE,
     PODCAST_LIBRARY,
@@ -39,7 +44,9 @@ from src.notion.schema import (
     WEEKLY_REVIEW,
 )
 from src.notion.target_binding import (
+    NotionTargetBindingError,
     NotionTargetBindingResult,
+    ensure_notion_page_belongs_to_role,
     normalize_notion_id,
     validate_notion_target_binding,
 )
@@ -53,6 +60,7 @@ DEFAULT_STATE_DIRECTORY = Path("data/automatic_vocabulary")
 
 ERROR_ARTIFACT_OUTSIDE_ALLOWLIST = "local_artifact_outside_allowlist"
 ERROR_DETECTION_CYCLE_FAILED = "read_only_detection_failed"
+ERROR_PENDING_PAGE_MEMBERSHIP = "pending_page_membership_invalid"
 
 
 class AutomaticVocabularyDetectionError(RuntimeError):
@@ -61,6 +69,14 @@ class AutomaticVocabularyDetectionError(RuntimeError):
     def __init__(self, code: str) -> None:
         self.code = code
         super().__init__(code)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": "SAFE_STOP",
+            "error_code": self.code,
+            "notion_writes": 0,
+            "vocabulary_publisher_calls": 0,
+        }
 
 
 @dataclass(frozen=True)
@@ -246,6 +262,20 @@ def _latest_watermark(
             latest = candidate
             latest_text = isoformat_utc(candidate)
     return latest_text
+
+
+def _prove_pending_page_membership(
+    notion: Any,
+    page_id: str,
+    config: NotionConfig,
+) -> None:
+    ensure_notion_page_belongs_to_role(
+        notion,
+        page_id,
+        PODCAST_LIBRARY,
+        config=config,
+        force_refresh=True,
+    )
 
 
 def _insert_or_restart_occurrence(
@@ -536,6 +566,20 @@ def run_read_only_detection_cycle(
     binding_validator: Callable[
         [Any, NotionConfig], NotionTargetBindingResult
     ] = validate_notion_target_binding,
+    pending_page_validator: Callable[
+        [Any, str, NotionConfig], None
+    ] = _prove_pending_page_membership,
+    commit_clock: Callable[[], datetime] = utc_now,
+    before_commit: Optional[
+        Callable[
+            [
+                AutomaticVocabularyStateStore,
+                TargetNamespace,
+                str,
+            ],
+            None,
+        ]
+    ] = None,
     local_artifact_changes: Iterable[Path] = (),
 ) -> ReadOnlyDetectionReport:
     """Run one finite read-only cycle and stop at readiness."""
@@ -582,6 +626,16 @@ def run_read_only_detection_cycle(
             namespace
         ):
             if pending_page_id not in page_ids:
+                try:
+                    pending_page_validator(
+                        notion,
+                        pending_page_id,
+                        config,
+                    )
+                except NotionTargetBindingError:
+                    raise AutomaticVocabularyDetectionError(
+                        ERROR_PENDING_PAGE_MEMBERSHIP
+                    ) from None
                 pages.append(
                     ChangedPodcastPage(
                         page_id=pending_page_id,
@@ -615,11 +669,24 @@ def run_read_only_detection_cycle(
         )
         now_text = isoformat_utc(cycle_now)
 
+        if before_commit is not None:
+            before_commit(store, namespace, owner)
+        commit_now = commit_clock()
+        if commit_now.tzinfo is None:
+            commit_now = commit_now.replace(tzinfo=timezone.utc)
+        commit_now = commit_now.astimezone(timezone.utc)
+        commit_now_text = isoformat_utc(commit_now)
         with store.transaction() as connection:
+            store.assert_active_lease(
+                connection,
+                namespace,
+                owner,
+                commit_now,
+            )
             store.ensure_binding(
                 connection,
                 namespace,
-                now_text,
+                commit_now_text,
             )
             for page, occurrences in page_occurrences:
                 if baseline:
@@ -658,7 +725,7 @@ def run_read_only_detection_cycle(
                 """,
                 (
                     watermark_end,
-                    now_text,
+                    commit_now_text,
                     namespace.workspace_fingerprint,
                     namespace.target_group_fingerprint,
                     namespace.binding_version,
@@ -688,7 +755,7 @@ def run_read_only_detection_cycle(
                     namespace.target_group_fingerprint,
                     namespace.binding_version,
                     now_text,
-                    now_text,
+                    commit_now_text,
                     (
                         STATUS_BASELINED
                         if baseline
@@ -705,11 +772,14 @@ def run_read_only_detection_cycle(
                     ready,
                 ),
             )
-    except (
-        AutomaticVocabularyDetectionError,
-        AutomaticVocabularyStateError,
-    ):
+    except AutomaticVocabularyDetectionError:
         raise
+    except NotionPaginationError:
+        raise AutomaticVocabularyDetectionError(
+            NOTION_PAGINATION_INVALID
+        ) from None
+    except AutomaticVocabularyStateError as exc:
+        raise AutomaticVocabularyDetectionError(exc.code) from None
     except Exception:
         raise AutomaticVocabularyDetectionError(
             ERROR_DETECTION_CYCLE_FAILED

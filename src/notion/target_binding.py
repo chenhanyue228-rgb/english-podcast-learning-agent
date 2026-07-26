@@ -322,6 +322,7 @@ def ensure_notion_page_belongs_to_role(
     expected_role: str,
     *,
     config: Optional[NotionConfig] = None,
+    force_refresh: bool = False,
 ) -> NotionTargetBindingResult:
     """Prove a caller-supplied page belongs to the configured role."""
     normalized_page_id = normalize_notion_id(page_id)
@@ -341,7 +342,7 @@ def ensure_notion_page_belongs_to_role(
         cache = set()
         setattr(notion, _PAGE_CACHE_ATTRIBUTE, cache)
     cache_key = (normalized_page_id, expected_role)
-    if cache_key in cache:
+    if cache_key in cache and not force_refresh:
         return result
 
     try:
@@ -350,6 +351,8 @@ def ensure_notion_page_belongs_to_role(
         raise NotionTargetBindingError(TARGET_BINDING_RETRIEVE_FAILED) from None
     if not isinstance(page, Mapping):
         raise NotionTargetBindingError(TARGET_BINDING_RETRIEVE_FAILED)
+    if page.get("archived") is True or page.get("in_trash") is True:
+        raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)
     parent = page.get("parent")
     if not isinstance(parent, Mapping):
         raise NotionTargetBindingError(TARGET_PAGE_OUTSIDE_GROUP)

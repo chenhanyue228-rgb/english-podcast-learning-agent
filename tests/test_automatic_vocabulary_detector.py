@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import inspect
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,6 +11,7 @@ import pytest
 
 from src.agent.automatic_vocabulary_detector import (
     ERROR_ARTIFACT_OUTSIDE_ALLOWLIST,
+    ERROR_PENDING_PAGE_MEMBERSHIP,
     AutomaticVocabularyDetectionError,
     allowed_state_artifacts,
     default_state_path,
@@ -29,6 +30,8 @@ from src.agent.automatic_vocabulary_state import (
 )
 from src.notion.config import NotionConfig
 from src.notion.highlight_reader import PinkHighlightOccurrence
+from src.notion.pagination import NOTION_PAGINATION_INVALID
+from src.notion.target_binding import NotionTargetBindingError
 
 
 NOW = datetime(2026, 7, 26, 8, 0, tzinfo=timezone.utc)
@@ -80,8 +83,10 @@ class FakeDataSources:
 
     def query(self, **kwargs):
         self.owner.query_calls.append(kwargs)
+        if self.owner.query_responses:
+            return dict(self.owner.query_responses.pop(0))
         return {
-            "results": list(self.owner.pages),
+            "results": list(self.owner.query_pages),
             "has_more": False,
             "next_cursor": None,
         }
@@ -95,6 +100,11 @@ class FakeChildren:
         self.owner.block_calls.append(kwargs)
         if self.owner.fail_block_reads:
             raise RuntimeError("redacted fake read failure")
+        response = self.owner.block_responses.get(
+            (kwargs["block_id"], kwargs.get("start_cursor"))
+        )
+        if response is not None:
+            return dict(response)
         return {
             "results": list(
                 self.owner.blocks_by_parent.get(kwargs["block_id"], [])
@@ -112,6 +122,26 @@ class FakePages:
     def __init__(self, owner) -> None:
         self.owner = owner
 
+    def retrieve(self, **kwargs):
+        page_id = kwargs["page_id"]
+        self.owner.page_retrieve_calls.append(page_id)
+        if self.owner.fail_page_retrieves:
+            raise RuntimeError("redacted fake page failure")
+        return dict(
+            self.owner.page_metadata.get(
+                page_id,
+                {
+                    "id": page_id,
+                    "parent": {
+                        "type": "data_source_id",
+                        "data_source_id": config().podcast_database_id,
+                    },
+                    "archived": False,
+                    "in_trash": False,
+                },
+            )
+        )
+
     def create(self, **_kwargs):
         self.owner.write_calls += 1
         raise AssertionError("write must not be called")
@@ -123,7 +153,7 @@ class FakePages:
 
 class FakeNotion:
     def __init__(self) -> None:
-        self.pages = [
+        self.query_pages = [
             {
                 "id": "page-1",
                 "last_edited_time": "2026-07-26T08:00:00Z",
@@ -132,13 +162,35 @@ class FakeNotion:
         self.blocks_by_parent = {
             "page-1": [paragraph("block-1", "assumptions")]
         }
+        self.block_responses = {}
         self.query_calls = []
+        self.query_responses = []
         self.block_calls = []
+        self.page_retrieve_calls = []
         self.write_calls = 0
         self.fail_block_reads = False
+        self.fail_page_retrieves = False
+        self.page_metadata = {}
         self.data_sources = FakeDataSources(self)
         self.blocks = SimpleNamespace(children=FakeChildren(self))
-        self.pages_api = FakePages(self)
+        self.pages = FakePages(self)
+
+
+def pending_page_pass(notion, page_id, cfg):
+    try:
+        page = notion.pages.retrieve(page_id=page_id)
+    except Exception:
+        raise NotionTargetBindingError(
+            "target_binding_retrieve_failed"
+        ) from None
+    parent = page.get("parent", {})
+    if (
+        page.get("archived") is True
+        or page.get("in_trash") is True
+        or parent.get("type") != "data_source_id"
+        or parent.get("data_source_id") != cfg.podcast_database_id
+    ):
+        raise NotionTargetBindingError("target_page_outside_group")
 
 
 def cycle(
@@ -146,14 +198,62 @@ def cycle(
     state_path: Path,
     at: datetime,
     cfg: NotionConfig | None = None,
+    **kwargs,
 ):
+    commit_clock = kwargs.pop("commit_clock", lambda: at)
     return run_read_only_detection_cycle(
         notion=notion,
         config=cfg or config(),
         state_path=state_path,
         now=at,
         binding_validator=binding_pass,
+        pending_page_validator=pending_page_pass,
+        commit_clock=commit_clock,
+        **kwargs,
     )
+
+
+def business_snapshot(state_path: Path) -> dict:
+    with sqlite3.connect(state_path) as connection:
+        connection.row_factory = sqlite3.Row
+        binding = [
+            dict(row)
+            for row in connection.execute(
+                """
+                SELECT workspace_fingerprint, target_group_fingerprint,
+                       binding_version, baseline_completed, watermark
+                FROM target_bindings
+                ORDER BY workspace_fingerprint, target_group_fingerprint
+                """
+            )
+        ]
+        pages = [
+            dict(row)
+            for row in connection.execute(
+                "SELECT * FROM page_observations ORDER BY page_id"
+            )
+        ]
+        occurrences = [
+            dict(row)
+            for row in connection.execute(
+                """
+                SELECT * FROM highlight_occurrences
+                ORDER BY occurrence_fingerprint
+                """
+            )
+        ]
+        cycles = [
+            dict(row)
+            for row in connection.execute(
+                "SELECT * FROM detection_cycles ORDER BY cycle_id"
+            )
+        ]
+    return {
+        "binding": binding,
+        "pages": pages,
+        "occurrences": occurrences,
+        "cycles": cycles,
+    }
 
 
 def occurrence(
@@ -163,6 +263,8 @@ def occurrence(
     context: str = "Fundraising! supports the strategy.",
     rich_text_index: int = 0,
     page_id: str = "page-1",
+    row_index: int | None = None,
+    cell_index: int | None = None,
 ) -> PinkHighlightOccurrence:
     return PinkHighlightOccurrence(
         page_id=page_id,
@@ -172,8 +274,8 @@ def occurrence(
         rich_text_index=rich_text_index,
         start_offset=0,
         end_offset=len(text),
-        row_index=None,
-        cell_index=None,
+        row_index=row_index,
+        cell_index=cell_index,
         text=text,
         color="pink",
         context=context,
@@ -257,6 +359,21 @@ def test_identical_text_across_pages_remains_distinct() -> None:
     )
     second = exact_occurrence_identity(
         occurrence(page_id="page-2"),
+        namespace,
+    )
+
+    assert first.occurrence_fingerprint != second.occurrence_fingerprint
+
+
+def test_identical_text_in_different_table_cells_remains_distinct() -> None:
+    namespace = target_namespace(config())
+
+    first = exact_occurrence_identity(
+        occurrence(row_index=0, cell_index=0),
+        namespace,
+    )
+    second = exact_occurrence_identity(
+        occurrence(row_index=0, cell_index=1),
         namespace,
     )
 
@@ -370,7 +487,7 @@ def test_new_highlight_enters_quiet_wait_after_baseline(tmp_path) -> None:
     notion = FakeNotion()
     state_path = tmp_path / "state.sqlite3"
     cycle(notion, state_path, NOW)
-    notion.pages[0]["last_edited_time"] = "2026-07-26T08:01:00Z"
+    notion.query_pages[0]["last_edited_time"] = "2026-07-26T08:01:00Z"
     notion.blocks_by_parent["page-1"].append(
         paragraph("block-2", "fundraising")
     )
@@ -408,9 +525,9 @@ def test_page_edit_resets_quiet_period_deadline(tmp_path) -> None:
     notion.blocks_by_parent["page-1"].append(
         paragraph("block-2", "fundraising")
     )
-    notion.pages[0]["last_edited_time"] = "2026-07-26T08:01:00Z"
+    notion.query_pages[0]["last_edited_time"] = "2026-07-26T08:01:00Z"
     cycle(notion, state_path, NOW + timedelta(minutes=1))
-    notion.pages[0]["last_edited_time"] = "2026-07-26T08:02:20Z"
+    notion.query_pages[0]["last_edited_time"] = "2026-07-26T08:02:20Z"
 
     report = cycle(
         notion,
@@ -458,7 +575,7 @@ def test_pending_page_is_rechecked_even_outside_global_overlap(
         paragraph("block-2", "fundraising")
     )
     cycle(notion, state_path, NOW + timedelta(minutes=1))
-    notion.pages = [
+    notion.query_pages = [
         {
             "id": "page-2",
             "last_edited_time": "2026-07-26T09:00:00Z",
@@ -554,7 +671,7 @@ def test_read_failure_does_not_advance_watermark(tmp_path) -> None:
     before = AutomaticVocabularyStateStore(
         state_path
     ).get_binding(target_namespace(config())).watermark
-    notion.pages[0]["last_edited_time"] = "2026-07-26T08:10:00Z"
+    notion.query_pages[0]["last_edited_time"] = "2026-07-26T08:10:00Z"
     notion.fail_block_reads = True
 
     with pytest.raises(AutomaticVocabularyDetectionError) as raised:
@@ -694,6 +811,286 @@ def test_each_successful_run_records_one_bounded_cycle(tmp_path) -> None:
             "SELECT COUNT(*) FROM detection_cycles"
         ).fetchone()[0]
     assert count == 2
+
+
+def test_partial_block_pagination_never_commits_occurrence_or_watermark(
+    tmp_path,
+) -> None:
+    notion = FakeNotion()
+    state_path = tmp_path / "state.sqlite3"
+    cycle(notion, state_path, NOW)
+    before = business_snapshot(state_path)
+    notion.query_pages[0]["last_edited_time"] = "2026-07-26T08:01:00Z"
+    notion.block_responses[("page-1", None)] = {
+        "results": [
+            paragraph("block-1", "assumptions"),
+            paragraph("partial-block", "private learning text"),
+        ],
+        "has_more": True,
+        "next_cursor": "",
+    }
+
+    with pytest.raises(AutomaticVocabularyDetectionError) as raised:
+        cycle(notion, state_path, NOW + timedelta(minutes=1))
+
+    assert raised.value.code == NOTION_PAGINATION_INVALID
+    assert str(raised.value) == NOTION_PAGINATION_INVALID
+    assert raised.value.to_dict() == {
+        "status": "SAFE_STOP",
+        "error_code": NOTION_PAGINATION_INVALID,
+        "notion_writes": 0,
+        "vocabulary_publisher_calls": 0,
+    }
+    assert business_snapshot(state_path) == before
+
+
+def test_pagination_failure_does_not_cancel_later_quiet_occurrence(
+    tmp_path,
+) -> None:
+    notion = FakeNotion()
+    state_path = tmp_path / "state.sqlite3"
+    cycle(notion, state_path, NOW)
+    notion.blocks_by_parent["page-1"].append(
+        paragraph("later-block", "fundraising")
+    )
+    notion.query_pages[0]["last_edited_time"] = "2026-07-26T08:01:00Z"
+    cycle(notion, state_path, NOW + timedelta(minutes=1))
+    before = business_snapshot(state_path)
+    notion.block_responses[("page-1", None)] = {
+        "results": [paragraph("block-1", "assumptions")],
+        "has_more": True,
+        "next_cursor": None,
+    }
+
+    with pytest.raises(AutomaticVocabularyDetectionError):
+        cycle(notion, state_path, NOW + timedelta(minutes=2))
+
+    assert business_snapshot(state_path) == before
+    statuses = {
+        item.status
+        for item in AutomaticVocabularyStateStore(
+            state_path
+        ).list_occurrence_statuses(target_namespace(config()))
+    }
+    assert STATUS_QUIET_WAIT in statuses
+    assert STATUS_CANCELLED not in statuses
+
+
+def test_data_source_pagination_failure_leaves_business_state_unchanged(
+    tmp_path,
+) -> None:
+    notion = FakeNotion()
+    state_path = tmp_path / "state.sqlite3"
+    cycle(notion, state_path, NOW)
+    before = business_snapshot(state_path)
+    notion.query_responses = [
+        {
+            "results": [],
+            "has_more": True,
+            "next_cursor": " ",
+        }
+    ]
+
+    with pytest.raises(AutomaticVocabularyDetectionError) as raised:
+        cycle(notion, state_path, NOW + timedelta(minutes=1))
+
+    assert raised.value.code == NOTION_PAGINATION_INVALID
+    assert business_snapshot(state_path) == before
+
+
+def test_stale_worker_cannot_commit_after_lease_takeover(tmp_path) -> None:
+    notion = FakeNotion()
+    state_path = tmp_path / "state.sqlite3"
+    captured = {}
+
+    def worker_b_takes_over(store, namespace, _owner):
+        store.acquire_lease(
+            namespace,
+            "worker-b",
+            NOW + timedelta(seconds=2),
+            ttl_seconds=60,
+        )
+        captured["namespace"] = namespace
+
+    with pytest.raises(AutomaticVocabularyDetectionError) as raised:
+        cycle(
+            notion,
+            state_path,
+            NOW,
+            lease_seconds=1,
+            before_commit=worker_b_takes_over,
+            commit_clock=lambda: NOW + timedelta(seconds=2),
+        )
+
+    assert raised.value.code == "cycle_lease_lost"
+    snapshot = business_snapshot(state_path)
+    assert snapshot["binding"][0]["baseline_completed"] == 0
+    assert snapshot["binding"][0]["watermark"] == ""
+    assert snapshot["pages"] == []
+    assert snapshot["occurrences"] == []
+    assert snapshot["cycles"] == []
+    binding = AutomaticVocabularyStateStore(
+        state_path
+    ).get_binding(captured["namespace"])
+    assert binding.lease_owner == "worker-b"
+
+
+def test_normal_unexpired_owner_commits_business_state(tmp_path) -> None:
+    notion = FakeNotion()
+    state_path = tmp_path / "state.sqlite3"
+
+    report = cycle(
+        notion,
+        state_path,
+        NOW,
+        lease_seconds=60,
+        commit_clock=lambda: NOW + timedelta(seconds=59),
+    )
+
+    assert report.status == STATUS_BASELINED
+    assert business_snapshot(state_path)["pages"]
+
+
+def test_transaction_failure_after_lease_check_rolls_back_all_business_state(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    notion = FakeNotion()
+    state_path = tmp_path / "state.sqlite3"
+    original_observe = detector_module._observe_page
+
+    def fail_after_observation(*args, **kwargs):
+        original_observe(*args, **kwargs)
+        raise RuntimeError("simulated commit failure")
+
+    monkeypatch.setattr(
+        detector_module,
+        "_observe_page",
+        fail_after_observation,
+    )
+
+    with pytest.raises(AutomaticVocabularyDetectionError) as raised:
+        cycle(notion, state_path, NOW)
+
+    assert raised.value.code == "read_only_detection_failed"
+    snapshot = business_snapshot(state_path)
+    assert snapshot["binding"][0]["baseline_completed"] == 0
+    assert snapshot["pages"] == []
+    assert snapshot["occurrences"] == []
+    assert snapshot["cycles"] == []
+
+
+def _prepare_pending_page(notion, state_path):
+    cycle(notion, state_path, NOW)
+    notion.blocks_by_parent["page-1"].append(
+        paragraph("pending-block", "fundraising")
+    )
+    notion.query_pages[0]["last_edited_time"] = "2026-07-26T08:01:00Z"
+    cycle(notion, state_path, NOW + timedelta(minutes=1))
+    notion.query_pages = []
+    notion.block_calls.clear()
+    notion.page_retrieve_calls.clear()
+
+
+def test_pending_page_membership_pass_allows_block_read(tmp_path) -> None:
+    notion = FakeNotion()
+    state_path = tmp_path / "state.sqlite3"
+    _prepare_pending_page(notion, state_path)
+
+    report = cycle(
+        notion,
+        state_path,
+        NOW + timedelta(minutes=3),
+    )
+
+    assert notion.page_retrieve_calls == ["page-1"]
+    assert [call["block_id"] for call in notion.block_calls] == [
+        "page-1"
+    ]
+    assert report.ready_for_enrichment == 1
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {
+            "id": "page-1",
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "other-current-data-source",
+            },
+            "archived": False,
+            "in_trash": False,
+        },
+        {
+            "id": "page-1",
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "historical-group",
+            },
+            "archived": False,
+            "in_trash": False,
+        },
+        {
+            "id": "page-1",
+            "parent": {},
+            "archived": False,
+            "in_trash": False,
+        },
+        {
+            "id": "page-1",
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "archived": True,
+            "in_trash": False,
+        },
+        {
+            "id": "page-1",
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "archived": False,
+            "in_trash": True,
+        },
+    ],
+)
+def test_invalid_pending_page_membership_stops_before_block_read(
+    tmp_path,
+    metadata,
+) -> None:
+    notion = FakeNotion()
+    state_path = tmp_path / "state.sqlite3"
+    _prepare_pending_page(notion, state_path)
+    notion.page_metadata["page-1"] = metadata
+    before = business_snapshot(state_path)
+
+    with pytest.raises(AutomaticVocabularyDetectionError) as raised:
+        cycle(notion, state_path, NOW + timedelta(minutes=3))
+
+    assert raised.value.code == ERROR_PENDING_PAGE_MEMBERSHIP
+    assert notion.block_calls == []
+    assert business_snapshot(state_path) == before
+    assert "page-1" not in str(raised.value)
+
+
+def test_pending_page_retrieve_failure_stops_before_block_read(
+    tmp_path,
+) -> None:
+    notion = FakeNotion()
+    state_path = tmp_path / "state.sqlite3"
+    _prepare_pending_page(notion, state_path)
+    notion.fail_page_retrieves = True
+    before = business_snapshot(state_path)
+
+    with pytest.raises(AutomaticVocabularyDetectionError) as raised:
+        cycle(notion, state_path, NOW + timedelta(minutes=3))
+
+    assert raised.value.code == ERROR_PENDING_PAGE_MEMBERSHIP
+    assert notion.block_calls == []
+    assert business_snapshot(state_path) == before
 
 
 def test_binding_failure_stops_before_query_and_state_creation(

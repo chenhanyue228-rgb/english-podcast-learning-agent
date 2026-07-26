@@ -414,6 +414,52 @@ def test_page_role_proof_accepts_current_group_and_caches_read() -> None:
     assert notion.writes == []
 
 
+def test_page_role_proof_force_refresh_reads_current_metadata() -> None:
+    notion = BindingFakeNotion()
+    page_id = notion.page_ids["new"][PODCAST_LIBRARY]
+
+    ensure_notion_page_belongs_to_role(
+        notion,
+        page_id,
+        PODCAST_LIBRARY,
+        config=notion.config(),
+    )
+    ensure_notion_page_belongs_to_role(
+        notion,
+        page_id,
+        PODCAST_LIBRARY,
+        config=notion.config(),
+        force_refresh=True,
+    )
+
+    page_reads = [
+        call
+        for call in notion.calls
+        if call == ("pages.retrieve", normalize_notion_id(page_id))
+    ]
+    assert len(page_reads) == 2
+    assert notion.writes == []
+
+
+@pytest.mark.parametrize("flag", ("archived", "in_trash"))
+def test_page_role_proof_rejects_archived_or_trashed_page(flag) -> None:
+    notion = BindingFakeNotion()
+    page_id = notion.page_ids["new"][PODCAST_LIBRARY]
+    notion.page_records[normalize_notion_id(page_id)][flag] = True
+
+    with pytest.raises(NotionTargetBindingError) as raised:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            page_id,
+            PODCAST_LIBRARY,
+            config=notion.config(),
+            force_refresh=True,
+        )
+
+    assert raised.value.code == TARGET_PAGE_OUTSIDE_GROUP
+    assert notion.writes == []
+
+
 def _restore_writer_guards(monkeypatch, module) -> None:
     monkeypatch.setattr(
         module,
