@@ -10,6 +10,7 @@ import pytest
 
 from src.skill_runtime.artifacts import prepare_codex_request
 from src.skill_runtime.codex_cli import (
+    DISABLED_CODEX_FEATURES,
     CodexRuntimeError,
     build_codex_json_command,
     generate_codex_json_artifact,
@@ -80,11 +81,18 @@ def test_command_disables_tools_and_uses_read_only_sandbox(
         for index, value in enumerate(command)
         if value == "--disable"
     }
+    assert disabled == set(DISABLED_CODEX_FEATURES)
     assert {
+        "apps",
+        "browser_use",
+        "computer_use",
+        "image_generation",
+        "multi_agent",
+        "plugins",
         "shell_tool",
         "unified_exec",
-        "code_mode",
         "web_search_request",
+        "workspace_dependencies",
     }.issubset(disabled)
 
 
@@ -156,6 +164,44 @@ def test_generate_codex_artifact_rejects_observed_tool_use(
             command,
             0,
             stdout='{"type":"command_execution","command":"redacted"}',
+            stderr="",
+        )
+
+    with pytest.raises(CodexRuntimeError) as raised:
+        generate_codex_json_artifact(
+            request_path=request_path,
+            output_path=output_path,
+            schema=SCHEMA,
+            prompt="Return JSON.",
+            executable=tmp_path / "codex",
+            runner=runner,
+        )
+
+    assert raised.value.code == "codex_tool_use_blocked"
+
+
+def test_generate_codex_artifact_rejects_nested_tool_event(
+    tmp_path: Path,
+) -> None:
+    request_path, output_path = _request(tmp_path)
+
+    def runner(
+        command: list[str],
+        **_: Any,
+    ) -> subprocess.CompletedProcess[str]:
+        output = Path(
+            command[command.index("--output-last-message") + 1]
+        )
+        output.write_text('{"word":"assumption"}', encoding="utf-8")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps(
+                {
+                    "type": "item.started",
+                    "item": {"type": "mcp_tool_call"},
+                }
+            ),
             stderr="",
         )
 

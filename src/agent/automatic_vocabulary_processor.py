@@ -363,11 +363,27 @@ def run_automatic_vocabulary_processing_cycle(
                     request_path,
                     output_path,
                 )
-                artifact = _load_current_artifact(
-                    occurrence,
-                    request_path,
-                    output_path,
-                )
+                try:
+                    artifact = _load_current_artifact(
+                        occurrence,
+                        request_path,
+                        output_path,
+                    )
+                except AutomaticVocabularyArtifactError:
+                    if status not in {
+                        STATUS_READY,
+                        STATUS_ENRICHING,
+                        STATUS_RETRYABLE_FAILURE,
+                    }:
+                        raise
+                    artifact = None
+                except AutomaticVocabularyProcessingError as exc:
+                    if (
+                        exc.code != "artifact_digest_mismatch"
+                        or status != STATUS_RETRYABLE_FAILURE
+                    ):
+                        raise
+                    artifact = None
                 if artifact is None:
                     if status not in {
                         STATUS_READY,

@@ -233,3 +233,32 @@ def test_automatic_upsert_query_failure_never_creates() -> None:
         raise AssertionError("Expected VocabularyPublisherError")
 
     assert notion.pages.create_calls == []
+
+
+def test_automatic_upsert_fails_closed_on_truncated_source_relation() -> None:
+    notion = FakeNotion(
+        query_results=[
+            {
+                "id": "existing_page",
+                "properties": {
+                    "Source": {
+                        "relation": [{"id": "existing_source"}],
+                        "has_more": True,
+                    }
+                },
+            }
+        ]
+    )
+
+    try:
+        upsert_automatic_vocabulary_occurrence(
+            sample_payload(),
+            notion=notion,
+            vocabulary_database_id="vocabulary_db",
+        )
+    except VocabularyPublisherError as exc:
+        assert str(exc) == "vocabulary_source_relation_incomplete"
+    else:
+        raise AssertionError("Expected VocabularyPublisherError")
+
+    assert notion.pages.update_calls == []

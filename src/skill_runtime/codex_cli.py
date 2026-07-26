@@ -18,6 +18,53 @@ from src.skill_runtime.artifacts import (
 
 DEFAULT_CODEX_TIMEOUT_SECONDS = 60
 MACOS_CODEX_PATH = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
+DISABLED_CODEX_FEATURES = (
+    "apps",
+    "auth_elicitation",
+    "browser_use",
+    "browser_use_external",
+    "browser_use_full_cdp_access",
+    "code_mode",
+    "code_mode_host",
+    "code_mode_only",
+    "computer_use",
+    "deferred_executor",
+    "enable_fanout",
+    "enable_mcp_apps",
+    "hooks",
+    "image_generation",
+    "in_app_browser",
+    "multi_agent",
+    "multi_agent_v2",
+    "network_proxy",
+    "plugins",
+    "remote_plugin",
+    "request_permissions_tool",
+    "shell_tool",
+    "shell_zsh_fork",
+    "skill_mcp_dependency_install",
+    "skill_search",
+    "standalone_web_search",
+    "tool_call_mcp_elicitation",
+    "tool_suggest",
+    "unified_exec",
+    "unified_exec_zsh_fork",
+    "web_search_cached",
+    "web_search_request",
+    "workspace_dependencies",
+)
+FORBIDDEN_CODEX_EVENT_NAMES = (
+    "browser",
+    "command_execution",
+    "computer_use",
+    "dynamic_tool_call",
+    "exec_command",
+    "function_call",
+    "image_generation",
+    "mcp_tool_call",
+    "tool_call",
+    "web_search",
+)
 SAFE_CHILD_ENV_KEYS = frozenset(
     {
         "CODEX_HOME",
@@ -103,7 +150,7 @@ def build_codex_json_command(
     work_dir: Path,
 ) -> list[str]:
     """Build one non-interactive, read-only Codex command."""
-    return [
+    command = [
         str(executable),
         "-a",
         "never",
@@ -111,36 +158,61 @@ def build_codex_json_command(
         "--ephemeral",
         "--ignore-user-config",
         "--ignore-rules",
-        "--disable",
-        "shell_tool",
-        "--disable",
-        "shell_zsh_fork",
-        "--disable",
-        "unified_exec",
-        "--disable",
-        "unified_exec_zsh_fork",
-        "--disable",
-        "code_mode",
-        "--disable",
-        "web_search_request",
-        "--disable",
-        "web_search_cached",
-        "-c",
-        'web_search="disabled"',
-        "--skip-git-repo-check",
-        "--sandbox",
-        "read-only",
-        "--color",
-        "never",
-        "--json",
-        "--cd",
-        str(work_dir),
-        "--output-schema",
-        str(schema_path),
-        "--output-last-message",
-        str(output_path),
-        "-",
     ]
+    for feature in DISABLED_CODEX_FEATURES:
+        command.extend(("--disable", feature))
+    command.extend(
+        [
+            "-c",
+            'web_search="disabled"',
+            "--skip-git-repo-check",
+            "--sandbox",
+            "read-only",
+            "--color",
+            "never",
+            "--json",
+            "--cd",
+            str(work_dir),
+            "--output-schema",
+            str(schema_path),
+            "--output-last-message",
+            str(output_path),
+            "-",
+        ]
+    )
+    return command
+
+
+def _event_uses_forbidden_capability(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if (
+                key in {"type", "name", "tool_name", "method"}
+                and isinstance(item, str)
+                and any(
+                    marker in item.casefold()
+                    for marker in FORBIDDEN_CODEX_EVENT_NAMES
+                )
+            ):
+                return True
+            if _event_uses_forbidden_capability(item):
+                return True
+    elif isinstance(value, list):
+        return any(_event_uses_forbidden_capability(item) for item in value)
+    return False
+
+
+def _validate_event_stream(stdout: str) -> None:
+    for line in stdout.splitlines():
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+        try:
+            event = json.loads(cleaned)
+        except json.JSONDecodeError as exc:
+            raise CodexRuntimeError("codex_event_stream_invalid") from exc
+        if _event_uses_forbidden_capability(event):
+            raise CodexRuntimeError("codex_tool_use_blocked")
 
 
 def generate_codex_json_artifact(
@@ -195,15 +267,7 @@ def generate_codex_json_artifact(
         raise CodexRuntimeError(
             f"codex_nonzero_exit_{completed.returncode}_{diagnostic}"
         )
-    forbidden_events = (
-        '"type":"command_execution"',
-        '"type":"mcp_tool_call"',
-        '"type":"web_search"',
-        '"type":"dynamic_tool_call"',
-    )
-    compact_stdout = (completed.stdout or "").replace(" ", "")
-    if any(marker in compact_stdout for marker in forbidden_events):
-        raise CodexRuntimeError("codex_tool_use_blocked")
+    _validate_event_stream(completed.stdout or "")
     try:
         payload = load_codex_artifact(
             request_path=request_path,

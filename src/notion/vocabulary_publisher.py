@@ -399,16 +399,37 @@ def _property_mapping(
 
 
 def _relation_ids(page: Mapping[str, Any], property_name: str) -> list[str]:
-    relation = _property_mapping(page, property_name).get("relation")
+    relation_property = _property_mapping(page, property_name)
+    if not relation_property:
+        raise VocabularyPublisherError(
+            "vocabulary_source_relation_invalid"
+        )
+    has_more = relation_property.get("has_more")
+    if has_more is True:
+        raise VocabularyPublisherError(
+            "vocabulary_source_relation_incomplete"
+        )
+    if has_more is not None and has_more is not False:
+        raise VocabularyPublisherError(
+            "vocabulary_source_relation_invalid"
+        )
+    relation = relation_property.get("relation")
     if not isinstance(relation, list):
-        return []
-    return [
-        str(item["id"])
-        for item in relation
-        if isinstance(item, Mapping)
-        and isinstance(item.get("id"), str)
-        and str(item["id"]).strip()
-    ]
+        raise VocabularyPublisherError(
+            "vocabulary_source_relation_invalid"
+        )
+    relation_ids: list[str] = []
+    for item in relation:
+        if (
+            not isinstance(item, Mapping)
+            or not isinstance(item.get("id"), str)
+            or not str(item["id"]).strip()
+        ):
+            raise VocabularyPublisherError(
+                "vocabulary_source_relation_invalid"
+            )
+        relation_ids.append(str(item["id"]))
+    return relation_ids
 
 
 def _merged_relation_property(
@@ -504,10 +525,11 @@ def upsert_automatic_vocabulary_occurrence(
         VOCABULARY_DATABASE,
         force_refresh=True,
     )
+    properties = _automatic_update_properties(payload, existing)
     try:
         response = notion.pages.update(
             page_id=page_id,
-            properties=_automatic_update_properties(payload, existing),
+            properties=properties,
         )
     except Exception as exc:
         raise VocabularyPublisherError(

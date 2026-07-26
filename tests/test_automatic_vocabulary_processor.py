@@ -21,6 +21,9 @@ from src.agent.automatic_vocabulary_state import (
     AutomaticVocabularyStateStore,
 )
 from src.notion.schema import PODCAST_LIBRARY, VOCABULARY_DATABASE
+from src.notion.vocabulary_publisher import (
+    upsert_automatic_vocabulary_occurrence,
+)
 from tests.acceptance.fakes import (
     FakeNotion,
     date_property,
@@ -358,6 +361,38 @@ def test_strict_artifact_failure_never_calls_publisher(
     assert stored.last_error_code == "schema_validation_failed"
 
 
+def test_invalid_artifact_is_regenerated_on_retry(
+    tmp_path: Path,
+) -> None:
+    workspace = FakeNotion()
+    _source_page(workspace)
+    state_path, _ = _state(
+        tmp_path,
+        workspace,
+        occurrences=[("occurrence-a", WORD, CONTEXT)],
+    )
+    first = _run(
+        tmp_path,
+        workspace,
+        state_path,
+        CodexRunner(extra_field=True),
+    )
+
+    valid_runner = CodexRunner()
+    second = _run(
+        tmp_path,
+        workspace,
+        state_path,
+        valid_runner,
+    )
+
+    assert first.status == "SAFE_STOP"
+    assert second.status == "PASS"
+    assert second.codex_calls == 1
+    assert second.created == 1
+    assert valid_runner.calls == 1
+
+
 def test_target_binding_failure_happens_before_codex_or_write(
     tmp_path: Path,
 ) -> None:
@@ -503,6 +538,71 @@ def test_restart_from_publishing_reconciles_without_second_codex_call(
     assert report.status == "PASS"
     assert report.codex_calls == 0
     assert report.created == 1
+    assert store.get_processing_occurrence(
+        namespace,
+        "occurrence-a",
+    ).status == STATUS_PUBLISHED
+
+
+def test_restart_after_successful_create_does_not_duplicate_page(
+    tmp_path: Path,
+) -> None:
+    workspace = FakeNotion()
+    _source_page(workspace)
+    state_path, store = _state(
+        tmp_path,
+        workspace,
+        occurrences=[("occurrence-a", WORD, CONTEXT)],
+    )
+
+    def create_then_interrupt(payload, **kwargs):
+        upsert_automatic_vocabulary_occurrence(
+            payload,
+            notion=kwargs["notion"],
+            vocabulary_database_id=kwargs["vocabulary_database_id"],
+        )
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        _run(
+            tmp_path,
+            workspace,
+            state_path,
+            CodexRunner(),
+            publisher=create_then_interrupt,
+        )
+    namespace = target_namespace(workspace.config.as_notion_config())
+    assert store.get_processing_occurrence(
+        namespace,
+        "occurrence-a",
+    ).status == STATUS_PUBLISHING
+    vocabulary_pages_after_crash = [
+        page
+        for page in workspace.pages_by_id.values()
+        if page.data_source_id
+        == workspace.config.vocabulary_data_source_id
+        and page.page_id != "existing-vocabulary"
+    ]
+    assert len(vocabulary_pages_after_crash) == 1
+
+    report = _run(
+        tmp_path,
+        workspace,
+        state_path,
+        CodexRunner(),
+    )
+    vocabulary_pages_after_retry = [
+        page
+        for page in workspace.pages_by_id.values()
+        if page.data_source_id
+        == workspace.config.vocabulary_data_source_id
+        and page.page_id != "existing-vocabulary"
+    ]
+
+    assert report.codex_calls == 0
+    assert report.created == 0
+    assert report.updated == 1
+    assert len(vocabulary_pages_after_retry) == 1
     assert store.get_processing_occurrence(
         namespace,
         "occurrence-a",
