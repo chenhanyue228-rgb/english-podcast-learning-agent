@@ -12,6 +12,7 @@ from typing import Any, Mapping, Optional, TYPE_CHECKING
 from notion_client import APIResponseError
 
 from src.notion.schema import PODCAST_LIBRARY, VOCABULARY_DATABASE
+from src.notion.pagination import NotionPaginationError, next_notion_cursor
 from src.notion.target_binding import (
     ensure_notion_page_belongs_to_role,
     ensure_notion_target_binding_for_write,
@@ -41,6 +42,10 @@ class VocabularyPublishPayload:
     last_review: str = ""
     usage_example: str = ""
     personal_note: str = ""
+    chinese_meaning: str = ""
+    part_of_speech: str = ""
+    common_collocations: tuple[str, ...] = ()
+    semantic_category: str = ""
 
 
 @dataclass(frozen=True)
@@ -92,22 +97,92 @@ def _date_property(value: str) -> dict[str, Any]:
     return {"date": {"start": value}} if value else {"date": None}
 
 
-def _query_records(notion: "Client", vocabulary_database_id: str, word: str) -> list[dict[str, Any]]:
+def _heading(level: int, value: str) -> dict[str, Any]:
+    block_type = f"heading_{level}"
+    return {
+        "object": "block",
+        "type": block_type,
+        block_type: {
+            "rich_text": [{"type": "text", "text": {"content": value}}]
+        },
+    }
+
+
+def _paragraph(value: str) -> dict[str, Any]:
+    return {
+        "object": "block",
+        "type": "paragraph",
+        "paragraph": {
+            "rich_text": (
+                [{"type": "text", "text": {"content": value}}]
+                if value
+                else []
+            )
+        },
+    }
+
+
+def _query_records(
+    notion: "Client",
+    vocabulary_database_id: str,
+    word: str,
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    cursor: Optional[str] = None
+    visited: set[str] = set()
     try:
-        if hasattr(notion, "data_sources") and hasattr(notion.data_sources, "query"):
-            response = notion.data_sources.query(
-                data_source_id=vocabulary_database_id,
-                filter={"property": "Name", "title": {"equals": word}},
+        while True:
+            request: dict[str, Any] = {
+                "filter": {
+                    "property": "Name",
+                    "title": {"equals": word},
+                },
+                "page_size": 100,
+            }
+            if cursor is not None:
+                request["start_cursor"] = cursor
+            if hasattr(notion, "data_sources") and hasattr(
+                notion.data_sources,
+                "query",
+            ):
+                response = notion.data_sources.query(
+                    data_source_id=vocabulary_database_id,
+                    **request,
+                )
+            else:
+                response = notion.databases.query(
+                    database_id=vocabulary_database_id,
+                    **request,
+                )
+            if not isinstance(response, Mapping):
+                raise VocabularyPublisherError(
+                    "vocabulary_identity_query_failed"
+                )
+            page = response.get("results")
+            if not isinstance(page, list) or any(
+                not isinstance(item, Mapping) for item in page
+            ):
+                raise VocabularyPublisherError(
+                    "vocabulary_identity_query_failed"
+                )
+            results.extend(dict(item) for item in page)
+            cursor = next_notion_cursor(
+                response,
+                current_cursor=cursor,
+                visited_cursors=visited,
             )
-        else:
-            response = notion.databases.query(
-                database_id=vocabulary_database_id,
-                filter={"property": "Name", "title": {"equals": word}},
-            )
-    except Exception:
-        return []
-    results = response.get("results", [])
-    return results if isinstance(results, list) else []
+            if cursor is None:
+                return results
+    except VocabularyPublisherError:
+        raise
+    except NotionPaginationError as exc:
+        raise VocabularyPublisherError(
+            "vocabulary_identity_query_failed"
+        ) from exc
+    except Exception as exc:
+        raise VocabularyPublisherError(
+            "vocabulary_identity_query_failed"
+        ) from exc
 
 
 def find_existing_vocabulary_page(
@@ -116,121 +191,54 @@ def find_existing_vocabulary_page(
     word: str,
 ) -> Optional[dict[str, Any]]:
     records = _query_records(notion, vocabulary_database_id, word)
+    if len(records) > 1:
+        raise VocabularyPublisherError("vocabulary_identity_not_unique")
     return records[0] if records else None
 
 
 def _page_body(payload: VocabularyPublishPayload) -> list[dict[str, Any]]:
-    blocks: list[dict[str, Any]] = [
-        {
-            "object": "block",
-            "type": "heading_1",
-            "heading_1": {"rich_text": [{"type": "text", "text": {"content": payload.word}}]},
-        },
-        {
-            "object": "block",
-            "type": "heading_2",
-            "heading_2": {"rich_text": [{"type": "text", "text": {"content": "Context"}}]},
-        },
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [{"type": "text", "text": {"content": payload.original_context}}]
-                if payload.original_context
-                else []
-            },
-        },
-        {
-            "object": "block",
-            "type": "heading_2",
-            "heading_2": {"rich_text": [{"type": "text", "text": {"content": "Meaning"}}]},
-        },
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [{"type": "text", "text": {"content": payload.meaning}}]
-                if payload.meaning
-                else []
-            },
-        },
-        {
-            "object": "block",
-            "type": "heading_2",
-            "heading_2": {
-                "rich_text": [{"type": "text", "text": {"content": "Professional Context"}}]
-            },
-        },
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [
-                    {"type": "text", "text": {"content": payload.professional_category}}
-                ]
-                if payload.professional_category
-                else []
-            },
-        },
-        {
-            "object": "block",
-            "type": "heading_2",
-            "heading_2": {"rich_text": [{"type": "text", "text": {"content": "Usage Example"}}]},
-        },
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [{"type": "text", "text": {"content": payload.usage_example}}]
-                if payload.usage_example
-                else []
-            },
-        },
-        {
-            "object": "block",
-            "type": "heading_2",
-            "heading_2": {"rich_text": [{"type": "text", "text": {"content": "Personal Note"}}]},
-        },
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [{"type": "text", "text": {"content": payload.personal_note}}]
-                if payload.personal_note
-                else []
-            },
-        },
-        {
-            "object": "block",
-            "type": "heading_2",
-            "heading_2": {"rich_text": [{"type": "text", "text": {"content": "Source"}}]},
-        },
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [
-                    {"type": "text", "text": {"content": f"Podcast Library page ID: {payload.source_page_id}"}}
-                ]
-                if payload.source_page_id
-                else [{"type": "text", "text": {"content": "Podcast Library source not provided."}}]
-            },
-        },
-        {
-            "object": "block",
-            "type": "heading_2",
-            "heading_2": {"rich_text": [{"type": "text", "text": {"content": "Review Status"}}]},
-        },
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [{"type": "text", "text": {"content": payload.review_status}}]
-                if payload.review_status
-                else []
-            },
-        },
+    blocks = [
+        _heading(1, payload.word),
+        _heading(2, "Context"),
+        _paragraph(payload.original_context),
+        _heading(2, "Meaning"),
+        _paragraph(payload.meaning),
+        _heading(2, "Chinese Meaning"),
+        _paragraph(payload.chinese_meaning),
+        _heading(2, "Part of Speech"),
+        _paragraph(payload.part_of_speech),
+        _heading(2, "Professional Context"),
+        _paragraph(payload.semantic_category or payload.professional_category),
+        _heading(2, "Usage Example"),
+        _paragraph(payload.usage_example),
+        _heading(2, "Common Collocations"),
     ]
+    blocks.extend(
+        {
+            "object": "block",
+            "type": "bulleted_list_item",
+            "bulleted_list_item": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": value}}
+                ]
+            },
+        }
+        for value in payload.common_collocations
+    )
+    blocks.extend(
+        (
+            _heading(2, "Personal Note"),
+            _paragraph(payload.personal_note),
+            _heading(2, "Source"),
+            _paragraph(
+                "Podcast Library source linked."
+                if payload.source_page_id
+                else "Podcast Library source not provided."
+            ),
+            _heading(2, "Review Status"),
+            _paragraph(payload.review_status),
+        )
+    )
     return blocks
 
 
@@ -330,7 +338,10 @@ def update_vocabulary_page(
     except Exception as exc:
         raise VocabularyPublisherError(f"Failed to update vocabulary page: {exc}") from exc
 
-    return VocabularyPublishResult(page_id=response.get("id", page_id), page_url=response.get("url"))
+    return VocabularyPublishResult(
+        page_id=response.get("id", page_id),
+        page_url=response.get("url"),
+    )
 
 
 def upsert_vocabulary_page(
@@ -373,6 +384,166 @@ def upsert_vocabulary_page(
         page_id=created.page_id,
         page_url=created.page_url,
         action="created",
+    )
+
+
+def _property_mapping(
+    page: Mapping[str, Any],
+    property_name: str,
+) -> Mapping[str, Any]:
+    properties = page.get("properties")
+    if not isinstance(properties, Mapping):
+        return {}
+    value = properties.get(property_name)
+    return value if isinstance(value, Mapping) else {}
+
+
+def _relation_ids(page: Mapping[str, Any], property_name: str) -> list[str]:
+    relation_property = _property_mapping(page, property_name)
+    if not relation_property:
+        raise VocabularyPublisherError(
+            "vocabulary_source_relation_invalid"
+        )
+    has_more = relation_property.get("has_more")
+    if has_more is True:
+        raise VocabularyPublisherError(
+            "vocabulary_source_relation_incomplete"
+        )
+    if has_more is not None and has_more is not False:
+        raise VocabularyPublisherError(
+            "vocabulary_source_relation_invalid"
+        )
+    relation = relation_property.get("relation")
+    if not isinstance(relation, list):
+        raise VocabularyPublisherError(
+            "vocabulary_source_relation_invalid"
+        )
+    relation_ids: list[str] = []
+    for item in relation:
+        if (
+            not isinstance(item, Mapping)
+            or not isinstance(item.get("id"), str)
+            or not str(item["id"]).strip()
+        ):
+            raise VocabularyPublisherError(
+                "vocabulary_source_relation_invalid"
+            )
+        relation_ids.append(str(item["id"]))
+    return relation_ids
+
+
+def _merged_relation_property(
+    existing_page: Mapping[str, Any],
+    source_page_id: str,
+) -> dict[str, Any]:
+    relation_ids = _relation_ids(existing_page, "Source")
+    if source_page_id and source_page_id not in relation_ids:
+        relation_ids.append(source_page_id)
+    return {"relation": [{"id": page_id} for page_id in relation_ids]}
+
+
+def _automatic_update_properties(
+    payload: VocabularyPublishPayload,
+    existing_page: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return only machine-managed properties for an automatic retry/update."""
+    return {
+        "Original Context": _rich_text_property(payload.original_context),
+        "Meaning": _rich_text_property(payload.meaning),
+        "Professional Category": _select_property(
+            payload.professional_category
+        ),
+        "Source": _merged_relation_property(
+            existing_page,
+            payload.source_page_id,
+        ),
+        "Usage Example": _rich_text_property(payload.usage_example),
+    }
+
+
+def upsert_automatic_vocabulary_occurrence(
+    payload: VocabularyPublishPayload,
+    *,
+    notion: "Client",
+    vocabulary_database_id: str,
+) -> VocabularyUpsertResult:
+    """Fail-closed automatic upsert that preserves user-managed fields/body."""
+    if not payload.word.strip() or not payload.source_page_id.strip():
+        raise VocabularyPublisherError("automatic_vocabulary_payload_invalid")
+
+    ensure_notion_target_binding_for_write(
+        notion,
+        configured_role_ids={VOCABULARY_DATABASE: vocabulary_database_id},
+    )
+    ensure_notion_page_belongs_to_role(
+        notion,
+        payload.source_page_id,
+        PODCAST_LIBRARY,
+        force_refresh=True,
+    )
+    records = _query_records(
+        notion,
+        vocabulary_database_id,
+        payload.word,
+    )
+    if len(records) > 1:
+        raise VocabularyPublisherError("vocabulary_identity_not_unique")
+
+    if not records:
+        try:
+            response = notion.pages.create(
+                parent={"data_source_id": vocabulary_database_id},
+                properties=vocabulary_page_properties(payload),
+                children=_page_body(payload),
+            )
+        except Exception as exc:
+            raise VocabularyPublisherError(
+                "automatic_vocabulary_create_failed"
+            ) from exc
+        page_id = response.get("id") if isinstance(response, Mapping) else None
+        if not isinstance(page_id, str) or not page_id.strip():
+            raise VocabularyPublisherError(
+                "automatic_vocabulary_create_failed"
+            )
+        return VocabularyUpsertResult(
+            page_id=page_id,
+            page_url=(
+                response.get("url")
+                if isinstance(response.get("url"), str)
+                else None
+            ),
+            action="created",
+        )
+
+    existing = records[0]
+    page_id = existing.get("id")
+    if not isinstance(page_id, str) or not page_id.strip():
+        raise VocabularyPublisherError("vocabulary_identity_invalid")
+    ensure_notion_page_belongs_to_role(
+        notion,
+        page_id,
+        VOCABULARY_DATABASE,
+        force_refresh=True,
+    )
+    properties = _automatic_update_properties(payload, existing)
+    try:
+        response = notion.pages.update(
+            page_id=page_id,
+            properties=properties,
+        )
+    except Exception as exc:
+        raise VocabularyPublisherError(
+            "automatic_vocabulary_update_failed"
+        ) from exc
+    return VocabularyUpsertResult(
+        page_id=page_id,
+        page_url=(
+            response.get("url")
+            if isinstance(response, Mapping)
+            and isinstance(response.get("url"), str)
+            else None
+        ),
+        action="updated",
     )
 
 
@@ -470,6 +641,19 @@ def publish_vocabulary_memory(
             or vocabulary_json.get("my_note")
             or ""
         ).strip(),
+        chinese_meaning=str(
+            vocabulary_json.get("chinese_meaning", "")
+        ).strip(),
+        part_of_speech=str(
+            vocabulary_json.get("part_of_speech", "")
+        ).strip(),
+        common_collocations=tuple(
+            str(value).strip()
+            for value in vocabulary_json.get("common_collocations", [])
+            if str(value).strip()
+        )
+        if isinstance(vocabulary_json.get("common_collocations"), list)
+        else (),
     )
     return create_vocabulary_page(
         payload,

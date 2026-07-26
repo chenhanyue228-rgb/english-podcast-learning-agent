@@ -5,6 +5,7 @@ from src.notion.vocabulary_publisher import (
     VocabularyPublisherError,
     create_vocabulary_page,
     publish_vocabulary_memory,
+    upsert_automatic_vocabulary_occurrence,
     vocabulary_page_properties,
 )
 
@@ -137,3 +138,127 @@ def test_publish_vocabulary_memory_requires_word() -> None:
         assert "word" in str(exc)
     else:
         raise AssertionError("Expected VocabularyPublisherError")
+
+
+def test_automatic_upsert_preserves_manual_fields_and_merges_source() -> None:
+    notion = FakeNotion(
+        query_results=[
+            {
+                "id": "existing_page",
+                "properties": {
+                    "Source": {
+                        "relation": [{"id": "existing_source"}]
+                    },
+                    "Review Status": {
+                        "select": {"name": "Mastered"}
+                    },
+                    "Last Review": {
+                        "date": {"start": "2026-07-20"}
+                    },
+                    "Personal Note": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {"content": "Keep this note."},
+                            }
+                        ]
+                    },
+                },
+            }
+        ]
+    )
+    payload = sample_payload()
+
+    result = upsert_automatic_vocabulary_occurrence(
+        payload,
+        notion=notion,
+        vocabulary_database_id="vocabulary_db",
+    )
+
+    assert result.action == "updated"
+    update = notion.pages.update_calls[0]
+    assert update["properties"]["Source"] == {
+        "relation": [
+            {"id": "existing_source"},
+            {"id": "podcast_page_1"},
+        ]
+    }
+    assert "Review Status" not in update["properties"]
+    assert "Last Review" not in update["properties"]
+    assert "Personal Note" not in update["properties"]
+    assert "children" not in update
+
+
+def test_automatic_upsert_rejects_duplicate_identity() -> None:
+    notion = FakeNotion(
+        query_results=[
+            {"id": "duplicate-a"},
+            {"id": "duplicate-b"},
+        ]
+    )
+
+    try:
+        upsert_automatic_vocabulary_occurrence(
+            sample_payload(),
+            notion=notion,
+            vocabulary_database_id="vocabulary_db",
+        )
+    except VocabularyPublisherError as exc:
+        assert str(exc) == "vocabulary_identity_not_unique"
+    else:
+        raise AssertionError("Expected VocabularyPublisherError")
+
+    assert notion.pages.create_calls == []
+    assert notion.pages.update_calls == []
+
+
+def test_automatic_upsert_query_failure_never_creates() -> None:
+    notion = FakeNotion()
+
+    def fail_query(**_kwargs):
+        raise RuntimeError("private failure detail")
+
+    notion.data_sources.query = fail_query
+
+    try:
+        upsert_automatic_vocabulary_occurrence(
+            sample_payload(),
+            notion=notion,
+            vocabulary_database_id="vocabulary_db",
+        )
+    except VocabularyPublisherError as exc:
+        assert str(exc) == "vocabulary_identity_query_failed"
+        assert "private failure detail" not in str(exc)
+    else:
+        raise AssertionError("Expected VocabularyPublisherError")
+
+    assert notion.pages.create_calls == []
+
+
+def test_automatic_upsert_fails_closed_on_truncated_source_relation() -> None:
+    notion = FakeNotion(
+        query_results=[
+            {
+                "id": "existing_page",
+                "properties": {
+                    "Source": {
+                        "relation": [{"id": "existing_source"}],
+                        "has_more": True,
+                    }
+                },
+            }
+        ]
+    )
+
+    try:
+        upsert_automatic_vocabulary_occurrence(
+            sample_payload(),
+            notion=notion,
+            vocabulary_database_id="vocabulary_db",
+        )
+    except VocabularyPublisherError as exc:
+        assert str(exc) == "vocabulary_source_relation_incomplete"
+    else:
+        raise AssertionError("Expected VocabularyPublisherError")
+
+    assert notion.pages.update_calls == []
