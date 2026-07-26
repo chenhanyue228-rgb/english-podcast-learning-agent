@@ -69,6 +69,7 @@ class FakePage:
     children: list[dict[str, Any]] = field(default_factory=list)
     archived: bool = False
     in_trash: bool = False
+    last_edited_time: str = "2026-07-26T08:00:00Z"
 
     def to_api(self) -> dict[str, Any]:
         return {
@@ -80,6 +81,7 @@ class FakePage:
             "properties": deepcopy(self.properties),
             "archived": self.archived,
             "in_trash": self.in_trash,
+            "last_edited_time": self.last_edited_time,
             "url": f"https://notion.so/{self.page_id}",
         }
 
@@ -183,6 +185,14 @@ class FakeDataSources:
                 for relation in relations
                 if isinstance(relation, Mapping)
             )
+        if query_filter.get("timestamp") == "last_edited_time":
+            threshold = (
+                query_filter.get("last_edited_time", {}).get("after")
+            )
+            return (
+                isinstance(threshold, str)
+                and page.last_edited_time > threshold
+            )
         return False
 
 
@@ -216,6 +226,8 @@ class FakePages:
             if self.fail_expression_create_at == self.expression_create_attempts:
                 raise RuntimeError("fake_expression_create_failure")
             page_id = self.workspace.next_id("target-expression")
+        elif data_source_id == self.workspace.config.vocabulary_data_source_id:
+            page_id = self.workspace.next_id("target-vocabulary")
         else:
             page_id = self.workspace.next_id("unexpected-page")
         self.workspace.pages_by_id[page_id] = FakePage(
@@ -284,6 +296,9 @@ class FakeBlocksChildren:
         self.workspace.pages_by_id[kwargs["block_id"]].children.extend(
             deepcopy(kwargs.get("children", []))
         )
+        self.workspace.pages_by_id[
+            kwargs["block_id"]
+        ].last_edited_time = "2026-07-26T08:02:00Z"
         return {"results": []}
 
 
