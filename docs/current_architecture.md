@@ -330,15 +330,18 @@ direct OpenAI API access.
 
 Current test result:
 
-- `344 passed`
+- `837 passed, 3 existing deprecation warnings`
 
 ## Remaining Work
 
-The remaining work is not core pipeline logic.
+The remaining work is external-user evidence, not core pipeline logic:
 
-Pending items:
+- run 3 real external-user sessions;
+- have at least 2 participants finish the core flow without developer
+  intervention;
+- measure time-to-first-value;
+- record confusion, failures, and recovery outcomes;
+- avoid speculative architecture or schema changes before evidence exists.
 
-- establish a clean repository release baseline
-- validate the end-to-end Skill user experience
-- refine product onboarding
-- improve reuse of existing learning assets without changing frozen schemas
+External-user sessions remain 0. Engineering readiness does not mean
+`EXTERNAL_USER_VALIDATION_PASS`.

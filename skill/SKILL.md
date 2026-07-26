@@ -842,7 +842,10 @@ Report:
 
 Recovery:
 
-- update `.env` and rerun the command
+- rerun the local safe setup flow
+- enter credentials only in the local hidden-input window
+- never ask the user to edit `.env` or send credentials in chat
+- rerun the failed deterministic step after configuration validates
 
 ### Automatic Vocabulary Scheduler Failure
 
