@@ -49,7 +49,6 @@ Use this Skill when the user asks to:
 - "Analyze this podcast"
 - "Create English learning notes"
 - "Extract useful expressions"
-- "Sync vocabulary"
 - "Generate weekly reflection"
 - publish a learning page
 
@@ -71,6 +70,20 @@ Do not use this Skill when the user asks for:
 
 If the request is unclear, ask one concise clarifying question before running
 the workflow.
+
+### Automatic Vocabulary Migration Hold
+
+The Owner-approved product trigger is a pink highlight followed by bounded
+automatic synchronization after a quiet period. That runtime is under
+implementation and has not passed production acceptance.
+
+Until acceptance:
+
+- do not ask a normal user to say “同步生词”;
+- do not ask a normal user for a page ID or command;
+- do not claim that adding a pink highlight already publishes automatically;
+- keep the explicit targeted command as Developer/recovery reference only;
+- do not start an external-user Vocabulary session.
 
 ## 3. Guided Onboarding Contract
 
@@ -501,7 +514,7 @@ reference. Normal users are not expected to run them manually.
 | `./.venv/bin/python src/main.py --weekly-reflection` | Run the Weekly Reflection pipeline | Weekly learning context from the current period | `output/weekly_learning_context.json`, `output/reflection_context.json`, `output/weekly_review.json`, `output/pipeline_run.json` | Weekly Reflection page, or dry-run output if configured | Review result in Notion or rerun with dry-run |
 | `./.venv/bin/python src/main.py --weekly-reflection --dry-run` | Run the Weekly Reflection pipeline without Notion publish | Weekly learning context | `output/reflection_context.json`, `output/weekly_review.json`, `output/pipeline_run.json` | Validation and quality output only | Inspect artifacts, then publish if ready |
 | `./.venv/bin/python src/main.py --weekly-review` | Build a Weekly Review request from Notion learning data | Current Notion learning data | `data/weekly_review_requests/<week>.json` | Weekly Review request file path | Codex generates Weekly Review JSON |
-| `./.venv/bin/python src/main.py --publish-highlight-vocab PAGE_ID` | Publish exact user-selected pink-highlight vocabulary from a Notion page | Notion page ID | Vocabulary preview / publish artifacts | Updated Vocabulary Database entries | Verify vocabulary entries in Notion |
+| `./.venv/bin/python src/main.py --publish-highlight-vocab PAGE_ID` | Developer/recovery only: publish exact user-selected pink-highlight vocabulary from one Notion page | Notion page ID | Vocabulary preview / publish artifacts | Updated Vocabulary Database entries | Do not present this as the default user trigger |
 | `./.venv/bin/python src/main.py --sync-vocab-comments` | Legacy compatibility: sync comment-triggered vocabulary captures | Podcast Library pages with historical comment triggers | Sync state + vocabulary records | Vocabulary sync summary | Prefer the pink-highlight workflow for v1 use |
 | `./.venv/bin/python -m pytest` | Run the full test suite | None | Test reports | Pass/fail summary | Fix issues before publishing |
 
@@ -559,6 +572,10 @@ Python:
 
 ### 7.2 Vocabulary Capture
 
+The current explicit targeted workflow below is a protected recovery path. It
+is suspended as the default user journey while bounded automatic
+synchronization is implemented and accepted.
+
 #### Flow
 
 ```text
@@ -605,6 +622,9 @@ Python:
 - collect the highlight
 - validate the vocabulary payload
 - upsert to Notion
+
+Codex must not tell a normal user to invoke this workflow manually during the
+migration hold.
 
 ### 7.3 Weekly Reflection
 

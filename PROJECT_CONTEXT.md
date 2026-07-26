@@ -16,13 +16,16 @@ files into reusable English learning assets:
 
 **Phase:** Phase 4.2 — External User Validation
 
-**Execution stage:** External-user session preparation
+**Execution stage:** Automatic Vocabulary Sync Architecture Implementation
+Preparation
 
 **Status:** `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`
 
 The stable release remains **v1.1.0**, built from release commit
 `80cbab01ea266e487a0359ddbec562959070d8a0`. The Phase 4.1C closure starts
 from production `main` `de9f088a47b58ad54de9ef281ddf427c994dbf0a`.
+The current production `main` is
+`5b08e4bb73db3bffe2a3787cf090d88bdcb4d7be`.
 
 Current release and acceptance evidence:
 
@@ -34,6 +37,8 @@ Current release and acceptance evidence:
   were closed.
 - PR #16 added semantic Select colors for future Expression Database creation
   without changing option names or rewriting existing databases.
+- PR #20 added and accepted the protected Parent Page Guide.
+- PR #21 restored the accepted Podcast table-of-contents output contract.
 - The five local target settings now point to the intended database group.
 - The Notion token did not change during the target switch.
 - Setup / Notion workspace recovery: PASS.
@@ -55,7 +60,10 @@ Current release and acceptance evidence:
 - External-user sessions: 0.
 - External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`.
 - Architecture: Stable.
-- Architecture Review: not required.
+- Architecture Review: `OWNER_APPROVED_FOR_PHASE_0`.
+- Automatic Vocabulary Sync application runtime: not implemented.
+- Isolated unattended Codex synthetic feasibility: PASS.
+- External User Session #1: blocked pending implementation and acceptance.
 
 The internal release decision confirms the core flow for internal use. It does
 not mean the product is `READY_FOR_EXTERNAL_USERS`.
@@ -144,18 +152,23 @@ Transcript are working. They are not part of the current visual defect.
 ```text
 User Pink Highlight
 ↓
-Explicit Vocabulary Sync
+Approved automatic detection after a 90-second quiet period
 ↓
-Codex Enrichment
+Target-group-scoped exact occurrence state
 ↓
-Python Validation and Dedupe
+Isolated Codex Enrichment
 ↓
-Vocabulary Database Upsert
+Python Validation, Target Binding, and Idempotent Upsert
 ```
 
 Podcast publishing and Vocabulary synchronization are separate workflows. An
 empty Vocabulary Database after Podcast acceptance does not prove that the
 Vocabulary sync script is broken.
+
+This automatic path is Owner-approved for Phase 0 architecture and feasibility
+only. It is not implemented or active. The previously accepted explicit
+targeted sync remains a Developer/recovery path, but “同步生词” is suspended as
+the default user journey.
 
 Accurate current Vocabulary status:
 
@@ -163,9 +176,10 @@ Accurate current Vocabulary status:
 - the first publish created 2 Vocabulary records;
 - the exact retry created 0 new records;
 - non-target and historical database groups remained unchanged;
-- full-scan highlight checkpoints and processed-highlight state are still
-  global rather than scoped by target group, but this is deferred and does not
-  block the accepted targeted workflow.
+- the current global full-scan checkpoint and normalized highlight identity
+  are not safe for the approved automatic workflow;
+- Phase 1 must replace them with target-group-scoped SQLite and exact
+  occurrence fingerprints before automatic detection can be activated.
 
 ### Weekly Reflection
 
@@ -222,7 +236,8 @@ deleted, recreated, or renamed.
 
 ## Phase 4.2 Validation Goals
 
-Phase 4.2 validates the accepted internal release with real external users:
+Phase 4.2 will validate the accepted internal release with real external users
+after the automatic Vocabulary trigger passes implementation and acceptance:
 
 - complete 3 real external-user sessions;
 - have at least 2 users complete the core flow without developer intervention;
@@ -230,20 +245,20 @@ Phase 4.2 validates the accepted internal release with real external users:
 - record confusion, failed steps, and recovery outcomes;
 - avoid speculative large-scale refactoring before evidence is collected.
 
+External User Session #1 must not start during architecture preparation.
+
 ## Deferred Non-Blocking Backlog
 
 Podcast and Weekly page tables of contents are accepted output contracts under
 DEC-021, not deferred polish. Every newly generated Podcast or Weekly page must
 begin with exactly one navigable table of contents.
 
-The following polish is separate from the core external-validation journey:
+The following polish is separate from the automatic Vocabulary implementation:
 
-- parent-page usage guide;
-- improved Skill `同步生词` interaction;
-- full-scan highlight state namespacing;
 - manual color adjustment for the existing Expression Database.
 
-These items are not current core release blockers.
+The Parent Page Guide is accepted. Automatic trigger replacement and
+target-group state isolation are active architecture work, not deferred polish.
 
 ## Cancelled Proposal
 
@@ -269,10 +284,11 @@ proposal.
 
 ## Immediate Milestone
 
-Begin Phase 4.2 with three evidence-driven external-user sessions. Keep the
-accepted core journey stable, measure time-to-first-value and recovery, and
-defer broad product changes until the session evidence identifies a repeated
-problem.
+Complete Automatic Vocabulary Sync Phase 0 architecture/feasibility, then
+build the separately reviewed Phase 1 read-only detection foundation.
+External-user sessions remain at 0 until the automatic Vocabulary journey is
+implemented and accepted.
 
 Start with `CURRENT_TASK.md`, then consult `ARCHITECTURE.md`,
+`docs/architecture/automatic_vocabulary_sync_architecture_review.md`,
 `skill/SKILL.md`, and `DECISION_LOG.md` before changing runtime behavior.

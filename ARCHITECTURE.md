@@ -10,12 +10,14 @@ is implemented after the v1.1 runtime migration, not a future target design.
 - Phase 4.1C closure base:
   `de9f088a47b58ad54de9ef281ddf427c994dbf0a`
 - Product phase: Phase 4.2 — External User Validation
+- Execution state: Automatic Vocabulary Sync Architecture Implementation
+  Preparation
 - Owner Acceptance: `OWNER_ACCEPTANCE_PASS`
 - Internal release:
   `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`
 - External-user sessions: 0
 - External-user readiness: `NOT_READY_FOR_EXTERNAL_USERS`
-- Architecture Review: not required
+- Architecture Review: `OWNER_APPROVED_FOR_PHASE_0`
 - Production AI runtime: Codex Artifact Runtime
 - Python role: deterministic orchestration and validation
 - Persistence layer: Notion
@@ -26,10 +28,10 @@ Direct OpenAI providers may remain importable as deprecated compatibility
 paths. They are not the default production reasoning runtime and
 `OPENAI_API_KEY` is not required for the Codex Skill workflow.
 
-Phase 4.1C completed without an architecture change. The v1.1.0 architecture
-remains frozen during Phase 4.2 External User Validation. User evidence may
-produce future proposals, but a proposal is not accepted until it passes the
-required Product and Architecture review.
+The accepted v1.1.0 core remains stable. The Owner has approved a bounded
+local-first Automatic Vocabulary Sync extension for Phase 0 architecture and
+feasibility. The application runtime is not implemented or active. Hosted
+Webhook remains deferred and not approved.
 
 ## 2. System Purpose
 
@@ -190,10 +192,12 @@ published only after transcript and analysis artifacts pass validation.
 
 ### 5.2 Vocabulary Memory
 
+Current accepted recovery path:
+
 ```text
 User Pink Highlight
 ↓
-Explicit Vocabulary Sync Trigger
+Explicit targeted Vocabulary Sync
 ↓
 Vocabulary Enrichment Request Artifact
 ↓
@@ -203,6 +207,31 @@ Python Validation and Dedupe
 ↓
 Vocabulary Database Upsert
 ```
+
+The explicit trigger is no longer the default product behavior and is
+suspended in external-user testing while automatic sync is implemented.
+
+Owner-approved target behavior:
+
+```text
+User Pink Highlight
+↓
+Bounded Local Scheduled Detection
+↓
+90-Second Quiet Period
+↓
+Target-Group-Scoped Exact Occurrence State
+↓
+Isolated Codex Enrichment
+↓
+Python Validation and Target Binding
+↓
+Fingerprint-Idempotent Vocabulary Upsert
+```
+
+This target behavior is approved for architecture preparation only. It must
+not be described as implemented until later exact-HEAD implementation and
+acceptance gates pass.
 
 The exact pink-highlighted rich-text item is the vocabulary target. Context is
 used only for enrichment; Python must not infer, expand, or merge the target.
@@ -242,9 +271,11 @@ Targeted Vocabulary Acceptance passed. The first publish created 2 Vocabulary
 records and the exact retry created 0. Non-target databases and the historical
 database group remained unchanged.
 
-The current full-scan checkpoint and processed-highlight state are global.
-They must be namespaced by target group before full-scan synchronization is
-trusted across historical and current database groups.
+The current full-scan checkpoint and processed-highlight state are global and
+normalize case, punctuation, and some plural forms. They are not safe for the
+approved automatic workflow. Phase 1 must use target-group-scoped SQLite and
+exact occurrence fingerprints with no linguistic normalization or same-word
+occurrence merge.
 
 The older block-comment trigger implementation remains as legacy compatibility
 code. It is not the primary v1.1 Vocabulary capture path and must not be invoked
@@ -349,12 +380,11 @@ The following behavior is stable and should remain protected:
 
 The following polish is separate from the Phase 4.2 core validation journey:
 
-- parent-page usage guide;
-- improved Skill `同步生词` interaction;
-- full-scan highlight state namespacing;
 - manual color adjustment for the existing Expression Database.
 
-These items do not block the accepted core internal release.
+The Parent Page Guide is accepted. Automatic trigger replacement and
+target-group state isolation are active implementation preparation, not
+deferred polish.
 
 ## 9. Experimental and Legacy Paths
 
@@ -387,10 +417,13 @@ The internal release decision is
 `OWNER_ACCEPTED_CORE_INTERNAL_RELEASE_WITH_NON_BLOCKING_ISSUES`. This does not
 mean `READY_FOR_EXTERNAL_USERS`.
 
-Phase 4.2 must complete 3 real external-user sessions, with at least 2 users
-finishing the core flow without developer intervention. It records
-time-to-first-value, confusion, failures, and recovery outcomes before any
-large-scale refactoring is considered. The architecture remains unchanged.
+Phase 4.2 must eventually complete 3 real external-user sessions, with at least
+2 users finishing the core flow without developer intervention. External User
+Session #1 is currently blocked because the old explicit Vocabulary trigger no
+longer matches the approved user journey.
+
+The approved architecture extension is documented in
+`docs/architecture/automatic_vocabulary_sync_architecture_review.md`.
 
 Allowed during Phase 4:
 
@@ -400,11 +433,13 @@ Allowed during Phase 4:
 - diagnostic visibility
 - low-risk bug fixes supported by user evidence
 
-Not allowed without an explicit Architecture Decision:
+Not allowed without an additional explicit Architecture Decision:
 
 - new runtime providers
 - a new storage layer
-- automatic Vocabulary discovery as the primary workflow
+- Hosted Webhook, OAuth, cloud credential storage, or a multi-tenant backend
+- background infinite polling loops
+- production automatic Vocabulary writes before protected acceptance
 - returning YouTube to the v1 core scope
 - schema redesign
 - major workflow rewrites

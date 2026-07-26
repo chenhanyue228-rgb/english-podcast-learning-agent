@@ -577,7 +577,7 @@ Close Phase 4.1C with:
 - External-user sessions: 0;
 - external readiness: `NOT_READY_FOR_EXTERNAL_USERS`;
 - Architecture: Stable;
-- Architecture Review: not required.
+- Phase 4.1C Architecture Review: closed without further action.
 
 The decision is supported by passing Setup recovery, Target Binding, Podcast,
 targeted Vocabulary, and Weekly Reflection acceptance. Podcast first publish
@@ -652,3 +652,63 @@ external-validation journey, or release blockers.
 
 Neither requirement is needed to validate the accepted core product, and both
 would expand scope without external-user evidence.
+
+## DEC-029: Automatic Vocabulary Sync Trigger and Lifecycle
+
+- Date: 2026-07-26
+- Status: Owner Approved for Phase 0
+
+### Decision
+
+Human pink highlight remains the only user selection signal for Vocabulary.
+The explicit “同步生词” request is no longer the default product trigger.
+
+The approved Phase 4.2 minimum architecture is local-first macOS scheduled
+polling with one bounded process per invocation. A highlight becomes eligible
+only after a default 90-second quiet period; this value may be configured
+internally after implementation testing.
+
+Synchronization state must be scoped by workspace, configured target group,
+source page, and exact highlight occurrence. Historical database groups are
+never scanned or written.
+
+Hosted Webhook is deferred and not approved. Background infinite loops remain
+disallowed. DEC-020 remains valid for target-group isolation and for its ban on
+an infinite polling loop; it is superseded only where “background execution”
+could be read as forbidding the approved bounded scheduler.
+
+### Reason
+
+The accepted explicit workflow preserves safety but does not meet the product
+requirement that highlighting is the user's only action. A bounded local
+scheduler provides automation without introducing hosted credentials, OAuth,
+multi-tenant infrastructure, or a long-running daemon.
+
+## DEC-030: Unattended Codex Vocabulary Enrichment Runtime
+
+- Date: 2026-07-26
+- Status: Owner Approved for Phase 0 Feasibility
+
+### Decision
+
+Codex remains the production reasoning layer for automatic Vocabulary
+enrichment. Python creates request artifacts, validates output artifacts,
+manages synchronization state, validates Target Binding, and alone performs
+Notion writes.
+
+Unattended Codex feasibility must pass before production activation. The Codex
+child process must never receive the Notion token or other Notion-related
+environment variables. It also must not depend on `OPENAI_API_KEY`; the
+deprecated OpenAI provider remains compatibility-only and does not become the
+default.
+
+Production activation requires accepted limits for timeout, retry count,
+resource use, malformed output, non-zero exit, process overlap, and credential
+isolation.
+
+### Reason
+
+Automatic execution must preserve the Codex/Python/Notion responsibility
+boundary. Isolating credentials and failing closed at the artifact boundary
+allows feasibility to be tested without granting an AI child process access to
+Notion persistence.
