@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Mapping
 
 import pytest
 
@@ -31,7 +32,11 @@ from src.agent.automatic_vocabulary_state import (
 from src.notion.config import NotionConfig
 from src.notion.highlight_reader import PinkHighlightOccurrence
 from src.notion.pagination import NOTION_PAGINATION_INVALID
-from src.notion.target_binding import NotionTargetBindingError
+from src.notion.target_binding import (
+    NotionTargetBindingError,
+    PODCAST_LIBRARY,
+    normalize_notion_id,
+)
 
 
 NOW = datetime(2026, 7, 26, 8, 0, tzinfo=timezone.utc)
@@ -183,12 +188,37 @@ def pending_page_pass(notion, page_id, cfg):
         raise NotionTargetBindingError(
             "target_binding_retrieve_failed"
         ) from None
-    parent = page.get("parent", {})
+    if not isinstance(page, Mapping):
+        raise NotionTargetBindingError("target_page_outside_group")
+    returned_page_id = page.get("id")
     if (
-        page.get("archived") is True
-        or page.get("in_trash") is True
+        not isinstance(returned_page_id, str)
+        or not normalize_notion_id(returned_page_id)
+        or normalize_notion_id(returned_page_id)
+        != normalize_notion_id(page_id)
+    ):
+        raise NotionTargetBindingError("target_page_outside_group")
+    archived = page.get("archived")
+    in_trash = page.get("in_trash")
+    if (
+        type(archived) is not bool
+        or type(in_trash) is not bool
+        or archived is not False
+        or in_trash is not False
+    ):
+        raise NotionTargetBindingError("target_page_outside_group")
+    parent = page.get("parent")
+    if (
+        not isinstance(parent, Mapping)
         or parent.get("type") != "data_source_id"
-        or parent.get("data_source_id") != cfg.podcast_database_id
+    ):
+        raise NotionTargetBindingError("target_page_outside_group")
+    parent_data_source_id = parent.get("data_source_id")
+    if (
+        not isinstance(parent_data_source_id, str)
+        or not normalize_notion_id(parent_data_source_id)
+        or normalize_notion_id(parent_data_source_id)
+        != normalize_notion_id(cfg.podcast_database_id)
     ):
         raise NotionTargetBindingError("target_page_outside_group")
 
@@ -1010,9 +1040,93 @@ def test_pending_page_membership_pass_allows_block_read(tmp_path) -> None:
     assert report.ready_for_enrichment == 1
 
 
+def test_default_pending_membership_uses_production_role_proof(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    def prove(notion, page_id, role, **kwargs):
+        calls.append((notion, page_id, role, kwargs))
+
+    notion = FakeNotion()
+    monkeypatch.setattr(
+        detector_module,
+        "ensure_notion_page_belongs_to_role",
+        prove,
+    )
+
+    detector_module._prove_pending_page_membership(
+        notion,
+        "page-1",
+        config(),
+    )
+
+    assert len(calls) == 1
+    assert calls[0][0] is notion
+    assert calls[0][1] == "page-1"
+    assert calls[0][2] == PODCAST_LIBRARY
+    assert calls[0][3] == {
+        "config": config(),
+        "force_refresh": True,
+    }
+
+
 @pytest.mark.parametrize(
     "metadata",
     [
+        {
+            "id": "different-private-page-id",
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "archived": False,
+            "in_trash": False,
+        },
+        {
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "archived": False,
+            "in_trash": False,
+        },
+        {
+            "id": "",
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "archived": False,
+            "in_trash": False,
+        },
+        {
+            "id": None,
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "archived": False,
+            "in_trash": False,
+        },
+        {
+            "id": 123,
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "archived": False,
+            "in_trash": False,
+        },
+        {
+            "id": {},
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "archived": False,
+            "in_trash": False,
+        },
         {
             "id": "page-1",
             "parent": {
@@ -1055,6 +1169,46 @@ def test_pending_page_membership_pass_allows_block_read(tmp_path) -> None:
             "archived": False,
             "in_trash": True,
         },
+        {
+            "id": "page-1",
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "in_trash": False,
+        },
+        {
+            "id": "page-1",
+            "parent": {
+                "type": "data_source_id",
+                "data_source_id": "podcast-a",
+            },
+            "archived": False,
+        },
+        *[
+            {
+                "id": "page-1",
+                "parent": {
+                    "type": "data_source_id",
+                    "data_source_id": "podcast-a",
+                },
+                "archived": invalid_value,
+                "in_trash": False,
+            }
+            for invalid_value in (None, "false", 0, {}, [])
+        ],
+        *[
+            {
+                "id": "page-1",
+                "parent": {
+                    "type": "data_source_id",
+                    "data_source_id": "podcast-a",
+                },
+                "archived": False,
+                "in_trash": invalid_value,
+            }
+            for invalid_value in (None, "false", 0, {}, [])
+        ],
     ],
 )
 def test_invalid_pending_page_membership_stops_before_block_read(
@@ -1073,7 +1227,12 @@ def test_invalid_pending_page_membership_stops_before_block_read(
     assert raised.value.code == ERROR_PENDING_PAGE_MEMBERSHIP
     assert notion.block_calls == []
     assert business_snapshot(state_path) == before
+    assert all(
+        row["status"] != STATUS_READY
+        for row in before["occurrences"]
+    )
     assert "page-1" not in str(raised.value)
+    assert "different-private-page-id" not in str(raised.value)
 
 
 def test_pending_page_retrieve_failure_stops_before_block_read(

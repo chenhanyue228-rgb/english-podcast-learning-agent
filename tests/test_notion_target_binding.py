@@ -115,6 +115,8 @@ class _PageApi(_ReadApi):
             "id": page_id,
             "parent": parent,
             "properties": deepcopy(kwargs.get("properties", {})),
+            "archived": False,
+            "in_trash": False,
         }
         self.calls.append(("pages.create", normalize_notion_id(page_id)))
         self.writes.append(("pages.create", deepcopy(kwargs)))
@@ -217,6 +219,8 @@ class BindingFakeNotion:
                         "data_source_id": data_source_id,
                     },
                     "properties": {},
+                    "archived": False,
+                    "in_trash": False,
                 }
         self.data_source_records = {
             normalize_notion_id(key): value for key, value in data_sources.items()
@@ -411,6 +415,240 @@ def test_page_role_proof_accepts_current_group_and_caches_read() -> None:
         if call == ("pages.retrieve", normalize_notion_id(page_id))
     ]
     assert len(page_reads) == 1
+    assert notion.writes == []
+
+
+@pytest.mark.parametrize(
+    ("remove_id", "returned_id"),
+    (
+        (True, None),
+        (False, ""),
+        (False, "----"),
+        (False, None),
+        (False, 123),
+        (False, {}),
+        (False, []),
+        (False, "different-private-page-id"),
+    ),
+)
+def test_page_role_proof_rejects_missing_malformed_or_mismatched_page_id(
+    remove_id,
+    returned_id,
+) -> None:
+    notion = BindingFakeNotion()
+    page_id = notion.page_ids["new"][PODCAST_LIBRARY]
+    record = notion.page_records[normalize_notion_id(page_id)]
+    if remove_id:
+        record.pop("id")
+    else:
+        record["id"] = returned_id
+
+    with pytest.raises(NotionTargetBindingError) as raised:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            page_id,
+            PODCAST_LIBRARY,
+            config=notion.config(),
+        )
+
+    assert raised.value.code == TARGET_PAGE_OUTSIDE_GROUP
+    assert str(raised.value) == TARGET_PAGE_OUTSIDE_GROUP
+    assert "different-private-page-id" not in str(raised.value)
+    assert not hasattr(notion, "_epla_target_page_role_proofs")
+    assert notion.writes == []
+
+
+def test_page_role_proof_accepts_normalized_equivalent_page_id() -> None:
+    notion = BindingFakeNotion()
+    compact = "1234567890abcdef1234567890abcdef"
+    hyphenated = (
+        f"{compact[:8]}-{compact[8:12]}-{compact[12:16]}-"
+        f"{compact[16:20]}-{compact[20:]}"
+    )
+    notion.page_records[compact] = {
+        "id": compact.upper(),
+        "parent": {
+            "type": "data_source_id",
+            "data_source_id": notion.role_ids["new"][PODCAST_LIBRARY],
+        },
+        "properties": {},
+        "archived": False,
+        "in_trash": False,
+    }
+
+    ensure_notion_page_belongs_to_role(
+        notion,
+        hyphenated,
+        PODCAST_LIBRARY,
+        config=notion.config(),
+    )
+
+    assert (
+        "pages.retrieve",
+        compact,
+    ) in notion.calls
+    assert (
+        compact,
+        PODCAST_LIBRARY,
+    ) in notion._epla_target_page_role_proofs
+    assert notion.writes == []
+
+
+@pytest.mark.parametrize("flag", ("archived", "in_trash"))
+def test_page_role_proof_requires_lifecycle_field(flag) -> None:
+    notion = BindingFakeNotion()
+    page_id = notion.page_ids["new"][PODCAST_LIBRARY]
+    notion.page_records[normalize_notion_id(page_id)].pop(flag)
+
+    with pytest.raises(NotionTargetBindingError) as raised:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            page_id,
+            PODCAST_LIBRARY,
+            config=notion.config(),
+        )
+
+    assert raised.value.code == TARGET_PAGE_OUTSIDE_GROUP
+    assert not hasattr(notion, "_epla_target_page_role_proofs")
+    assert notion.writes == []
+
+
+@pytest.mark.parametrize("flag", ("archived", "in_trash"))
+@pytest.mark.parametrize(
+    "value",
+    (None, "false", 0, {}, [], True),
+)
+def test_page_role_proof_rejects_non_bool_or_true_lifecycle_value(
+    flag,
+    value,
+) -> None:
+    notion = BindingFakeNotion()
+    page_id = notion.page_ids["new"][PODCAST_LIBRARY]
+    notion.page_records[normalize_notion_id(page_id)][flag] = value
+
+    with pytest.raises(NotionTargetBindingError) as raised:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            page_id,
+            PODCAST_LIBRARY,
+            config=notion.config(),
+        )
+
+    assert raised.value.code == TARGET_PAGE_OUTSIDE_GROUP
+    assert not hasattr(notion, "_epla_target_page_role_proofs")
+    assert notion.writes == []
+
+
+@pytest.mark.parametrize(
+    "parent",
+    (
+        None,
+        {},
+        {"type": "page_id", "page_id": "private-parent"},
+        {"type": "data_source_id"},
+        {"type": "data_source_id", "data_source_id": None},
+        {"type": "data_source_id", "data_source_id": 123},
+        {"type": "data_source_id", "data_source_id": ""},
+        {"type": "data_source_id", "data_source_id": "----"},
+    ),
+)
+def test_page_role_proof_rejects_malformed_parent(parent) -> None:
+    notion = BindingFakeNotion()
+    page_id = notion.page_ids["new"][PODCAST_LIBRARY]
+    notion.page_records[normalize_notion_id(page_id)]["parent"] = parent
+
+    with pytest.raises(NotionTargetBindingError) as raised:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            page_id,
+            PODCAST_LIBRARY,
+            config=notion.config(),
+        )
+
+    assert raised.value.code == TARGET_PAGE_OUTSIDE_GROUP
+    assert "private-parent" not in str(raised.value)
+    assert not hasattr(notion, "_epla_target_page_role_proofs")
+    assert notion.writes == []
+
+
+def test_page_role_proof_failure_does_not_pollute_cache() -> None:
+    notion = BindingFakeNotion()
+    page_id = notion.page_ids["new"][PODCAST_LIBRARY]
+    record = notion.page_records[normalize_notion_id(page_id)]
+    record["id"] = "different-private-page-id"
+
+    with pytest.raises(NotionTargetBindingError):
+        ensure_notion_page_belongs_to_role(
+            notion,
+            page_id,
+            PODCAST_LIBRARY,
+            config=notion.config(),
+        )
+
+    assert not hasattr(notion, "_epla_target_page_role_proofs")
+    record["id"] = page_id
+
+    ensure_notion_page_belongs_to_role(
+        notion,
+        page_id,
+        PODCAST_LIBRARY,
+        config=notion.config(),
+    )
+
+    page_reads = [
+        call
+        for call in notion.calls
+        if call == ("pages.retrieve", normalize_notion_id(page_id))
+    ]
+    assert len(page_reads) == 2
+    assert (
+        normalize_notion_id(page_id),
+        PODCAST_LIBRARY,
+    ) in notion._epla_target_page_role_proofs
+    assert notion.writes == []
+
+
+def test_page_role_proof_retrieve_failure_is_redacted() -> None:
+    notion = BindingFakeNotion()
+    page_id = notion.page_ids["new"][PODCAST_LIBRARY]
+    validate_notion_target_binding(notion, notion.config())
+
+    def fail_retrieve(**_kwargs):
+        raise RuntimeError("private SDK detail and private page id")
+
+    notion.pages.retrieve = fail_retrieve
+
+    with pytest.raises(NotionTargetBindingError) as raised:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            page_id,
+            PODCAST_LIBRARY,
+            config=notion.config(),
+        )
+
+    assert raised.value.code == TARGET_BINDING_RETRIEVE_FAILED
+    assert str(raised.value) == TARGET_BINDING_RETRIEVE_FAILED
+    assert "private SDK detail" not in str(raised.value)
+    assert not hasattr(notion, "_epla_target_page_role_proofs")
+    assert notion.writes == []
+
+
+def test_page_role_proof_rejects_non_mapping_retrieve_result() -> None:
+    notion = BindingFakeNotion()
+    page_id = notion.page_ids["new"][PODCAST_LIBRARY]
+    validate_notion_target_binding(notion, notion.config())
+    notion.pages.retrieve = lambda **_kwargs: []
+
+    with pytest.raises(NotionTargetBindingError) as raised:
+        ensure_notion_page_belongs_to_role(
+            notion,
+            page_id,
+            PODCAST_LIBRARY,
+            config=notion.config(),
+        )
+
+    assert raised.value.code == TARGET_BINDING_RETRIEVE_FAILED
+    assert not hasattr(notion, "_epla_target_page_role_proofs")
     assert notion.writes == []
 
 
