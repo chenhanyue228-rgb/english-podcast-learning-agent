@@ -132,6 +132,27 @@ def test_installed_plist_is_valid_and_private(tmp_path: Path) -> None:
     ).is_dir()
 
 
+def test_status_reads_installed_plist_interval(tmp_path: Path) -> None:
+    project, python = _runtime(tmp_path)
+    launch_agents = tmp_path / "LaunchAgents"
+    runner = LaunchctlRunner()
+    install_launch_agent(
+        project_root=project,
+        python_executable=python,
+        confirmation=INSTALL_CONFIRMATION,
+        interval_seconds=120,
+        launch_agents_directory=launch_agents,
+        runner=runner,
+    )
+
+    status = scheduler_status(
+        launch_agents_directory=launch_agents,
+        runner=runner,
+    )
+
+    assert status.interval_seconds == 120
+
+
 def test_install_and_uninstall_require_exact_confirmation(
     tmp_path: Path,
 ) -> None:

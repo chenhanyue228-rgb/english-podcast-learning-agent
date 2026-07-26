@@ -37,6 +37,10 @@ from src.agent.automatic_vocabulary_runtime import (
     run_bounded_automatic_vocabulary_cycle,
 )
 from src.agent.automatic_vocabulary_state import STATUS_PUBLISHED
+from src.enrichment.automatic_vocabulary_schema import (
+    AutomaticVocabularyArtifactError,
+    validate_automatic_vocabulary_artifact,
+)
 from src.notion.schema import (
     EXPRESSION_DATABASE,
     PODCAST_LIBRARY,
@@ -137,6 +141,66 @@ def _tree_fingerprint(blocks: Any) -> str:
             sort_keys=True,
         ).encode("utf-8")
     ).hexdigest()
+
+
+def _block_text(block: Mapping[str, Any]) -> str:
+    block_type = str(block.get("type", "")).strip()
+    payload = block.get(block_type)
+    rich_text = (
+        payload.get("rich_text")
+        if isinstance(payload, Mapping)
+        else None
+    )
+    if not isinstance(rich_text, list):
+        return ""
+    return "".join(
+        str(
+            item.get("plain_text")
+            or (
+                item.get("text", {}).get("content", "")
+                if isinstance(item.get("text"), Mapping)
+                else ""
+            )
+        )
+        for item in rich_text
+        if isinstance(item, Mapping)
+    )
+
+
+def _expected_body_structure(
+    artifact: Mapping[str, Any],
+) -> list[tuple[str, str]]:
+    expected = [
+        ("heading_1", ACCEPTANCE_WORD),
+        ("heading_2", "Context"),
+        ("paragraph", ACCEPTANCE_CONTEXT),
+        ("heading_2", "Meaning"),
+        ("paragraph", str(artifact["meaning"])),
+        ("heading_2", "Chinese Meaning"),
+        ("paragraph", str(artifact["chinese_meaning"])),
+        ("heading_2", "Part of Speech"),
+        ("paragraph", str(artifact["part_of_speech"])),
+        ("heading_2", "Professional Context"),
+        ("paragraph", str(artifact["professional_category"])),
+        ("heading_2", "Usage Example"),
+        ("paragraph", str(artifact["usage_example"])),
+        ("heading_2", "Common Collocations"),
+    ]
+    expected.extend(
+        ("bulleted_list_item", str(value))
+        for value in artifact["common_collocations"]
+    )
+    expected.extend(
+        [
+            ("heading_2", "Personal Note"),
+            ("paragraph", ""),
+            ("heading_2", "Source"),
+            ("paragraph", "Podcast Library source linked."),
+            ("heading_2", "Review Status"),
+            ("paragraph", "New"),
+        ]
+    )
+    return expected
 
 
 @dataclass(repr=False)
@@ -799,6 +863,7 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
         notion: AutomaticVocabularyAcceptanceGuard,
         snapshot: VocabularyWorkspaceSnapshot,
         policy: AutomaticVocabularyAcceptancePolicy,
+        artifact: Mapping[str, Any],
     ) -> tuple[VocabularyRecordSnapshot, str]:
         record = self._vocabulary_record(snapshot)
         properties = record.properties
@@ -837,52 +902,19 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
         )
         if not isinstance(blocks, list) or not blocks:
             raise AcceptanceFailure("automatic_vocabulary_body_incomplete")
-        headings: set[str] = set()
-        for block in blocks:
-            if not isinstance(block, Mapping):
-                continue
-            block_type = str(block.get("type", ""))
-            if not block_type.startswith("heading_"):
-                continue
-            payload = block.get(block_type)
-            rich_text = (
-                payload.get("rich_text")
-                if isinstance(payload, Mapping)
-                else None
-            )
-            if not isinstance(rich_text, list):
-                continue
-            headings.add(
-                "".join(
-                    str(
-                        item.get("plain_text")
-                        or item.get("text", {}).get("content", "")
-                    )
-                    for item in rich_text
-                    if isinstance(item, Mapping)
-                )
-            )
-        required_headings = {
-            ACCEPTANCE_WORD,
-            "Context",
-            "Meaning",
-            "Chinese Meaning",
-            "Part of Speech",
-            "Professional Context",
-            "Usage Example",
-            "Common Collocations",
-            "Personal Note",
-            "Source",
-            "Review Status",
-        }
-        if not required_headings.issubset(headings):
+        actual_structure = [
+            (str(block.get("type", "")).strip(), _block_text(block))
+            for block in blocks
+            if isinstance(block, Mapping)
+        ]
+        if actual_structure != _expected_body_structure(artifact):
             raise AcceptanceFailure("automatic_vocabulary_body_incomplete")
         return record, _tree_fingerprint(blocks)
 
     def _verify_occurrence_state(
         self,
         policy: AutomaticVocabularyAcceptancePolicy,
-    ) -> None:
+    ) -> dict[str, Any]:
         try:
             with sqlite3.connect(self.state_path) as connection:
                 rows = connection.execute(
@@ -915,6 +947,72 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
             raise AcceptanceFailure(
                 "occurrence_state_verification_failed"
             )
+        artifact_path = (
+            self.artifact_root
+            / "outputs"
+            / f"{rows[0][0]}.json"
+        )
+        try:
+            payload = json.loads(
+                artifact_path.read_text(encoding="utf-8")
+            )
+            if not isinstance(payload, Mapping):
+                raise ValueError
+            return validate_automatic_vocabulary_artifact(
+                payload,
+                exact_word=ACCEPTANCE_WORD,
+                exact_context=ACCEPTANCE_CONTEXT,
+            )
+        except (
+            OSError,
+            json.JSONDecodeError,
+            ValueError,
+            AutomaticVocabularyArtifactError,
+        ):
+            raise AcceptanceFailure(
+                "occurrence_artifact_verification_failed"
+            ) from None
+
+    def _verify_runtime_logs(
+        self,
+        policy: AutomaticVocabularyAcceptancePolicy,
+    ) -> None:
+        try:
+            rendered = self.log_path.read_text(encoding="utf-8")
+            lines = [
+                json.loads(line)
+                for line in rendered.splitlines()
+                if line.strip()
+            ]
+        except (OSError, json.JSONDecodeError):
+            raise AcceptanceFailure(
+                "runtime_log_verification_failed"
+            ) from None
+        if len(lines) != 4 or any(
+            not isinstance(line, Mapping) for line in lines
+        ):
+            raise AcceptanceFailure(
+                "runtime_log_verification_failed"
+            )
+        private_values = (
+            self.config.token,
+            self.config.target_parent_page_id,
+            *self.config.data_source_ids.values(),
+            policy.controlled_title,
+            policy.controlled_url,
+            policy.controlled_podcast_page_id,
+            policy.vocabulary_page_id,
+            ACCEPTANCE_WORD,
+            ACCEPTANCE_CONTEXT,
+        )
+        if any(
+            value and value in rendered for value in private_values
+        ):
+            raise AcceptanceFailure("runtime_log_not_redacted")
+        if _NOTION_URL_PATTERN.search(rendered) or (
+            _NOTION_ID_PATTERN.search(rendered)
+        ):
+            raise AcceptanceFailure("runtime_log_not_redacted")
 
     @staticmethod
     def _assert_non_target_unchanged(
@@ -956,6 +1054,7 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
         retry_created: int = 0,
         retry_updated: int = 0,
         codex_calls: int = 0,
+        logs_redacted: bool = False,
     ) -> AutomaticVocabularyAcceptanceReport:
         counts = dict(policy.counts)
         counts.update(
@@ -980,7 +1079,7 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
             source_relation_verified=relation_verified,
             occurrence_fingerprint_verified=fingerprint_verified,
             exact_retry_verified=retry_verified,
-            logs_redacted=True,
+            logs_redacted=logs_redacted,
             target_parent_fingerprint=(
                 binding.target_parent_fingerprint
             ),
@@ -1003,6 +1102,7 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
             mode="dry-run",
             binding=binding,
             policy=policy,
+            logs_redacted=True,
         )
         return AutomaticVocabularyAcceptanceResult(report=report)
 
@@ -1074,13 +1174,14 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
             len(before.pages(VOCABULARY_DATABASE)) + 1
         ):
             raise AcceptanceFailure("vocabulary_write_count_invalid")
+        artifact = self._verify_occurrence_state(policy)
         record, first_body_fingerprint = self._verify_vocabulary(
             notion,
             after_first,
             policy,
+            artifact,
         )
         policy.vocabulary_page_id = record.page_id
-        self._verify_occurrence_state(policy)
 
         retry = self._runtime(notion, at=self.clock())
         if (
@@ -1101,6 +1202,7 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
             notion,
             after_retry,
             policy,
+            artifact,
         )
         if retry_body_fingerprint != first_body_fingerprint:
             raise AcceptanceFailure("exact_retry_duplicated_body")
@@ -1118,6 +1220,7 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
             )
         ):
             raise AcceptanceFailure("acceptance_write_budget_exceeded")
+        self._verify_runtime_logs(policy)
         report = self._report(
             mode="live",
             binding=binding,
@@ -1133,6 +1236,7 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
             retry_created=retry.created,
             retry_updated=retry.updated,
             codex_calls=first.codex_calls,
+            logs_redacted=True,
         )
         return AutomaticVocabularyAcceptanceResult(
             report=report,
@@ -1185,12 +1289,15 @@ _PUBLIC_FAILURE_CODES = frozenset(
         "live_confirmation_missing",
         "non_target_database_changed",
         "occurrence_state_verification_failed",
+        "occurrence_artifact_verification_failed",
         "page_create_response_invalid",
         "page_create_shape_invalid",
         "page_operation_blocked",
         "podcast_write_count_invalid",
         "podcast_write_limit_exceeded",
         "quiet_period_write_detected",
+        "runtime_log_not_redacted",
+        "runtime_log_verification_failed",
         "schema_mutation_blocked",
         "setup_state_not_complete",
         "source_relation_mismatch",

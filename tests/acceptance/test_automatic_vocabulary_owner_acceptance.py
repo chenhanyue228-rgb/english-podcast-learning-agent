@@ -65,7 +65,12 @@ def _runner(
     clock = AcceptanceClock()
 
     def codex_generator(**_kwargs):
-        return _artifact()
+        artifact = _artifact()
+        Path(_kwargs["output_path"]).write_text(
+            json.dumps(artifact, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return artifact
 
     return AutomaticVocabularyOwnerAcceptanceRunner(
         workspace,
@@ -217,6 +222,41 @@ def test_reports_and_failures_are_redacted(tmp_path: Path) -> None:
     assert result.controlled_podcast_page_id not in rendered
     assert "private raw exception" not in failure
     assert json.loads(failure)["failure"] == "acceptance_failed"
+
+
+@pytest.mark.parametrize("corruption", ["empty", "duplicate"])
+def test_body_validation_rejects_empty_or_duplicate_sections(
+    tmp_path: Path,
+    corruption: str,
+) -> None:
+    workspace = FakeNotion()
+    original_create = workspace.pages.create
+
+    def corrupting_create(**kwargs):
+        response = original_create(**kwargs)
+        if (
+            kwargs["parent"]["data_source_id"]
+            == workspace.config.vocabulary_data_source_id
+        ):
+            page = workspace.pages_by_id[response["id"]]
+            if corruption == "empty":
+                for block in page.children:
+                    if block.get("type") == "paragraph":
+                        block["paragraph"]["rich_text"] = []
+            else:
+                page.children.extend(
+                    json.loads(json.dumps(page.children))
+                )
+        return response
+
+    workspace.pages.create = corrupting_create
+
+    with pytest.raises(AcceptanceFailure) as raised:
+        _runner(tmp_path, workspace).run(
+            confirmation=LIVE_CONFIRMATION
+        )
+
+    assert raised.value.code == "automatic_vocabulary_body_incomplete"
 
 
 def test_cli_rejects_live_run_before_loading_config(

@@ -142,13 +142,34 @@ def scheduler_status(
     runner: Runner = subprocess.run,
 ) -> LaunchAgentStatus:
     _validate_interval(interval_seconds)
+    path = launch_agent_path(launch_agents_directory)
+    installed_interval = interval_seconds
+    if path.is_file():
+        try:
+            payload = plistlib.loads(path.read_bytes())
+            if (
+                not isinstance(payload, dict)
+                or payload.get("Label") != LAUNCH_AGENT_LABEL
+            ):
+                raise ValueError
+            candidate = payload.get("StartInterval")
+            _validate_interval(candidate)
+            installed_interval = candidate
+        except (
+            OSError,
+            plistlib.InvalidFileException,
+            ValueError,
+            TypeError,
+            AutomaticVocabularySchedulerError,
+        ):
+            raise AutomaticVocabularySchedulerError(
+                "launch_agent_plist_invalid"
+            ) from None
     return LaunchAgentStatus(
         action="status",
-        installed=launch_agent_path(
-            launch_agents_directory
-        ).is_file(),
+        installed=path.is_file(),
         loaded=_is_loaded(runner=runner),
-        interval_seconds=interval_seconds,
+        interval_seconds=installed_interval,
     )
 
 
