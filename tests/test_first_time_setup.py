@@ -184,6 +184,8 @@ def test_main_does_not_print_token(monkeypatch, tmp_path: Path, capsys) -> None:
     assert FAKE_TOKEN not in captured.err
     assert PARENT_URL not in captured.out
     assert PARENT_URL not in captured.err
+    assert "请返回 Codex 继续设置 Weekly Review 自动生成时间。" in captured.out
+    assert "请发送一个苹果播客" not in captured.out
 
 
 def test_error_output_redacts_token(monkeypatch, tmp_path: Path, capsys) -> None:
