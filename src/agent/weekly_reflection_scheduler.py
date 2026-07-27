@@ -311,8 +311,14 @@ def build_launch_agent_payload(
     validated = validate_schedule(schedule)
     root = _validate_project_root(project_root)
     python = Path(python_executable).expanduser().absolute()
+    expected_python = (root / ".venv" / "bin" / "python").absolute()
     worker = root / "scripts" / "run_automatic_weekly_reflection_once.py"
-    if not root.is_dir() or not python.is_file() or not worker.is_file():
+    if (
+        not root.is_dir()
+        or python != expected_python
+        or not python.is_file()
+        or not worker.is_file()
+    ):
         raise WeeklyReflectionSchedulerError(
             "weekly_scheduler_runtime_missing"
         )
@@ -422,14 +428,18 @@ def scheduler_status(
             ):
                 raise ValueError
             root = _validate_project_root(Path(working_directory))
-            python = Path(arguments[0]).expanduser().resolve()
+            python = Path(arguments[0]).expanduser().absolute()
             worker = Path(arguments[1]).expanduser().resolve()
+            expected_python = (
+                root / ".venv" / "bin" / "python"
+            ).absolute()
             if (
                 root != Path(working_directory).expanduser().resolve()
                 or worker
                 != root
                 / "scripts"
                 / "run_automatic_weekly_reflection_once.py"
+                or python != expected_python
                 or not python.is_file()
                 or not worker.is_file()
             ):

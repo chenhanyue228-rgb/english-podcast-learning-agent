@@ -34,6 +34,10 @@ from src.notion.target_binding import (
     validate_notion_target_binding,
 )
 from src.notion.uploader import create_notion_client
+from src.notion.weekly_reflection_writer import (
+    WeeklyReflectionPublishPayload,
+    weekly_reflection_body_blocks,
+)
 from src.skill_runtime.artifacts import (
     CodexArtifactPendingError,
     load_codex_artifact,
@@ -135,6 +139,7 @@ class AutomaticWeeklyReflectionReport:
 class WeeklyIdentityInspection:
     same_period_count: int
     exact_identity_count: int
+    generated_identity_count: int = 0
     exact_page_id: str = ""
 
 
@@ -447,6 +452,128 @@ def _publish_artifact_fingerprint(paths: Mapping[str, Path]) -> str:
     return digest.hexdigest()
 
 
+def _canonical_block(
+    block: Mapping[str, Any],
+    children: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    block_type = str(block.get("type", "")).strip()
+    payload = block.get(block_type, {})
+    if not block_type or not isinstance(payload, Mapping):
+        raise AutomaticWeeklyReflectionError(
+            "weekly_body_read_failed"
+        )
+    canonical: dict[str, Any] = {"type": block_type}
+    rich_text = payload.get("rich_text")
+    if isinstance(rich_text, list):
+        canonical["text"] = _plain_text(rich_text)
+    cells = payload.get("cells")
+    if isinstance(cells, list):
+        canonical["cells"] = [
+            _plain_text(cell) if isinstance(cell, list) else ""
+            for cell in cells
+        ]
+    if block_type == "to_do":
+        canonical["checked"] = bool(payload.get("checked", False))
+    if block_type == "table":
+        canonical.update(
+            {
+                "table_width": int(payload.get("table_width", 0) or 0),
+                "has_column_header": bool(
+                    payload.get("has_column_header", False)
+                ),
+                "has_row_header": bool(
+                    payload.get("has_row_header", False)
+                ),
+            }
+        )
+    canonical["children"] = [
+        _canonical_block(
+            child,
+            _embedded_block_children(child),
+        )
+        for child in children
+    ]
+    return canonical
+
+
+def _embedded_block_children(
+    block: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    block_type = str(block.get("type", "")).strip()
+    payload = block.get(block_type, {})
+    if not isinstance(payload, Mapping):
+        return []
+    children = payload.get("children", [])
+    if not isinstance(children, list):
+        return []
+    return [
+        child for child in children if isinstance(child, Mapping)
+    ]
+
+
+def _block_tree_fingerprint(
+    blocks: Sequence[Mapping[str, Any]],
+) -> str:
+    canonical = [
+        _canonical_block(block, _embedded_block_children(block))
+        for block in blocks
+    ]
+    return _canonical_tree_fingerprint(canonical)
+
+
+def _canonical_tree_fingerprint(
+    canonical: Sequence[Mapping[str, Any]],
+) -> str:
+    serialized = json.dumps(
+        list(canonical),
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _expected_weekly_body_fingerprint(
+    paths: Mapping[str, Path],
+) -> str:
+    try:
+        reflection = json.loads(
+            paths["reflection_output"].read_text(encoding="utf-8")
+        )
+        weekly_review = json.loads(
+            paths["weekly_codex_output"].read_text(encoding="utf-8")
+        )
+        weekly_context = json.loads(
+            paths["weekly_context"].read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        raise AutomaticWeeklyReflectionError(
+            "weekly_publish_artifact_missing"
+        ) from None
+    if (
+        not isinstance(reflection, Mapping)
+        or not isinstance(weekly_review, Mapping)
+        or not isinstance(weekly_context, Mapping)
+    ):
+        raise AutomaticWeeklyReflectionError(
+            "weekly_publish_artifact_invalid"
+        )
+    validated_reflection = validate_strict_reflection_artifact(
+        reflection
+    )
+    validated_weekly = validate_strict_weekly_artifact(
+        weekly_review,
+        weekly_context,
+    )
+    payload = WeeklyReflectionPublishPayload(
+        weekly_review=validated_weekly,
+        reflection_context=validated_reflection,
+    )
+    return _block_tree_fingerprint(
+        weekly_reflection_body_blocks(payload)
+    )
+
+
 def _has_matching_publish_intent(
     state: Mapping[str, Any],
     period: str,
@@ -465,7 +592,30 @@ def _has_matching_publish_intent(
         actual = _publish_artifact_fingerprint(paths)
     except AutomaticWeeklyReflectionError:
         return False
-    return actual == expected
+    body_fingerprint = str(
+        intent.get("body_fingerprint", "")
+    ).strip()
+    if not body_fingerprint:
+        return False
+    try:
+        expected_body = _expected_weekly_body_fingerprint(paths)
+    except AutomaticWeeklyReflectionError:
+        return False
+    return actual == expected and expected_body == body_fingerprint
+
+
+def _matching_publish_intent_body_fingerprint(
+    state: Mapping[str, Any],
+    period: str,
+    paths: Mapping[str, Path],
+) -> str:
+    if not _has_matching_publish_intent(state, period, paths):
+        return ""
+    intents = state.get("publish_intents", {})
+    intent = intents.get(period, {}) if isinstance(intents, Mapping) else {}
+    if not isinstance(intent, Mapping):
+        return ""
+    return str(intent.get("body_fingerprint", "")).strip()
 
 
 def _record_publish_intent(
@@ -478,6 +628,7 @@ def _record_publish_intent(
     intents = dict(state.get("publish_intents", {}))
     intents[period] = {
         "artifact_fingerprint": _publish_artifact_fingerprint(paths),
+        "body_fingerprint": _expected_weekly_body_fingerprint(paths),
         "started_at": started_at,
     }
     state["publish_intents"] = intents
@@ -1220,6 +1371,59 @@ def _list_page_blocks(notion: Any, page_id: str) -> list[dict[str, Any]]:
             return blocks
 
 
+def _canonical_actual_block(
+    notion: Any,
+    block: Mapping[str, Any],
+    *,
+    visited: set[str],
+    depth: int,
+) -> dict[str, Any]:
+    if depth > 16:
+        raise AutomaticWeeklyReflectionError(
+            "weekly_body_read_failed"
+        )
+    canonical = _canonical_block(
+        block,
+        [] if bool(block.get("has_children", False)) else (
+            _embedded_block_children(block)
+        ),
+    )
+    block_id = str(block.get("id", "")).strip()
+    if bool(block.get("has_children", False)):
+        if not block_id or block_id in visited:
+            raise AutomaticWeeklyReflectionError(
+                "weekly_body_read_failed"
+            )
+        visited.add(block_id)
+        children = _list_page_blocks(notion, block_id)
+        canonical["children"] = [
+            _canonical_actual_block(
+                notion,
+                child,
+                visited=visited,
+                depth=depth + 1,
+            )
+            for child in children
+        ]
+    return canonical
+
+
+def _actual_weekly_body_fingerprint(
+    notion: Any,
+    page_id: str,
+) -> str:
+    canonical = [
+        _canonical_actual_block(
+            notion,
+            block,
+            visited=set(),
+            depth=0,
+        )
+        for block in _list_page_blocks(notion, page_id)
+    ]
+    return _canonical_tree_fingerprint(canonical)
+
+
 def verify_weekly_page_integrity(notion: Any, page_id: str) -> None:
     blocks = _list_page_blocks(notion, page_id)
     toc_indexes = [
@@ -1257,11 +1461,13 @@ def inspect_weekly_identity(
     start_date: str,
     end_date: str,
     source_page_ids: Sequence[str],
+    expected_body_fingerprint: str = "",
 ) -> WeeklyIdentityInspection:
     cursor: Optional[str] = None
     visited: set[str] = set()
     same_period_count = 0
     exact_pages: list[str] = []
+    generated_pages = 0
     while True:
         kwargs: dict[str, Any] = {
             "data_source_id": weekly_data_source_id,
@@ -1303,6 +1509,15 @@ def inspect_weekly_identity(
                     "weekly_identity_query_invalid"
                 )
             exact_pages.append(page_id)
+            if (
+                expected_body_fingerprint
+                and _actual_weekly_body_fingerprint(
+                    notion,
+                    page_id,
+                )
+                == expected_body_fingerprint
+            ):
+                generated_pages += 1
         cursor = next_notion_cursor(
             response,
             current_cursor=cursor,
@@ -1312,6 +1527,7 @@ def inspect_weekly_identity(
             return WeeklyIdentityInspection(
                 same_period_count=same_period_count,
                 exact_identity_count=len(exact_pages),
+                generated_identity_count=generated_pages,
                 exact_page_id=(
                     exact_pages[0] if len(exact_pages) == 1 else ""
                 ),
@@ -1345,6 +1561,7 @@ def _coerce_identity_inspection(
         return WeeklyIdentityInspection(
             same_period_count=value,
             exact_identity_count=value,
+            generated_identity_count=value,
         )
     raise AutomaticWeeklyReflectionError(
         "weekly_identity_query_invalid"
@@ -1530,6 +1747,7 @@ def run_bounded_automatic_weekly_reflection(
 
     reflection_provider: Optional[AutomaticCodexReflectionProvider] = None
     weekly_provider: Optional[AutomaticCodexWeeklyReviewProvider] = None
+    guarded_notion: Optional[_WeeklyOnlyNotionProxy] = None
     podcasts = 0
     learning_assets = 0
     quality_score = 0
@@ -1586,6 +1804,13 @@ def run_bounded_automatic_weekly_reflection(
 
             metadata = context["metadata"]
             source_ids = _source_page_ids(context)
+            expected_body_fingerprint = (
+                _matching_publish_intent_body_fingerprint(
+                    state,
+                    due.key,
+                    paths,
+                )
+            )
             existing = _coerce_identity_inspection(
                 identity_counter(
                     active_notion,
@@ -1593,6 +1818,9 @@ def run_bounded_automatic_weekly_reflection(
                     start_date=str(metadata["period_start"]),
                     end_date=str(metadata["period_end"]),
                     source_page_ids=source_ids,
+                    expected_body_fingerprint=(
+                        expected_body_fingerprint
+                    ),
                 )
             )
             if (
@@ -1610,10 +1838,9 @@ def run_bounded_automatic_weekly_reflection(
                     "weekly_identity_conflict"
                 )
             if existing.exact_identity_count == 1:
-                if not _has_matching_publish_intent(
-                    state,
-                    due.key,
-                    paths,
+                if (
+                    not expected_body_fingerprint
+                    or existing.generated_identity_count != 1
                 ):
                     raise AutomaticWeeklyReflectionError(
                         "weekly_existing_page_unmanaged"
@@ -1721,6 +1948,17 @@ def run_bounded_automatic_weekly_reflection(
                 ).isoformat(),
             )
             _atomic_json_write(resolved_state_path, state)
+            expected_body_fingerprint = (
+                _matching_publish_intent_body_fingerprint(
+                    state,
+                    due.key,
+                    paths,
+                )
+            )
+            if not expected_body_fingerprint:
+                raise AutomaticWeeklyReflectionError(
+                    "weekly_publish_intent_invalid"
+                )
             pipeline_result = pipeline_runner(
                 **pipeline_kwargs,
                 dry_run=False,
@@ -1743,11 +1981,15 @@ def run_bounded_automatic_weekly_reflection(
                     start_date=str(metadata["period_start"]),
                     end_date=str(metadata["period_end"]),
                     source_page_ids=source_ids,
+                    expected_body_fingerprint=(
+                        expected_body_fingerprint
+                    ),
                 )
             )
             if (
                 verified.same_period_count != 1
                 or verified.exact_identity_count != 1
+                or verified.generated_identity_count != 1
             ):
                 raise AutomaticWeeklyReflectionError(
                     "weekly_publish_reconciliation_failed"
@@ -1848,6 +2090,11 @@ def run_bounded_automatic_weekly_reflection(
                     else 0
                 ),
                 "quality_score": quality_score,
+                "weekly_created": (
+                    guarded_notion.pages.create_count
+                    if guarded_notion is not None
+                    else 0
+                ),
             }
         )
     except WeeklyReflectionPipelineError as exc:
@@ -1876,6 +2123,11 @@ def run_bounded_automatic_weekly_reflection(
                     if weekly_provider is not None
                     else 0
                 ),
+                "weekly_created": (
+                    guarded_notion.pages.create_count
+                    if guarded_notion is not None
+                    else 0
+                ),
             }
         )
     except Exception as exc:
@@ -1888,6 +2140,29 @@ def run_bounded_automatic_weekly_reflection(
             process_lock_acquired=True,
             last_success_period=last_success,
             error_code=_error_code(exc),
+        )
+        report = AutomaticWeeklyReflectionReport(
+            **{
+                **report.to_dict(),
+                "podcasts": podcasts,
+                "learning_assets": learning_assets,
+                "reflection_codex_calls": (
+                    reflection_provider.calls
+                    if reflection_provider is not None
+                    else 0
+                ),
+                "weekly_review_codex_calls": (
+                    weekly_provider.calls
+                    if weekly_provider is not None
+                    else 0
+                ),
+                "quality_score": quality_score,
+                "weekly_created": (
+                    guarded_notion.pages.create_count
+                    if guarded_notion is not None
+                    else 0
+                ),
+            }
         )
 
     return _persist_report(
