@@ -1019,6 +1019,40 @@ def test_single_source_runtime_accepts_empty_cross_content_patterns(
     assert report.weekly_created == 1
 
 
+def test_single_source_runtime_accepts_empty_mindset_shifts(
+    tmp_path: Path,
+) -> None:
+    class SingleSourceCodex(CodexFixture):
+        def __call__(self, **kwargs):
+            if "reflection analysis" not in kwargs["stage"]:
+                return super().__call__(**kwargs)
+            self.calls.append(kwargs["stage"])
+            self.private_env_seen.append(kwargs.get("env"))
+            payload = _reflection()
+            payload["mindset_shifts"] = []
+            payload["cross_content_patterns"] = []
+            validated = kwargs["validator"](payload)
+            kwargs["output_path"].parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            kwargs["output_path"].write_text(
+                json.dumps(validated),
+                encoding="utf-8",
+            )
+            return validated
+
+    report = _run(
+        tmp_path,
+        codex_generator=SingleSourceCodex(),
+    )
+
+    assert report.status == "PASS", report.to_dict()
+    assert report.reflection_codex_calls == 1
+    assert report.weekly_review_codex_calls == 1
+    assert report.weekly_created == 1
+
+
 def test_multi_source_provider_rejects_empty_cross_content_patterns(
     tmp_path: Path,
 ) -> None:

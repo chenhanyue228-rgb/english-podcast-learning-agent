@@ -907,10 +907,6 @@ def validate_strict_reflection_artifact(
             raise AutomaticWeeklyReflectionError(
                 "reflection_artifact_incomplete"
             )
-    if not validated["mindset_shifts"]:
-        raise AutomaticWeeklyReflectionError(
-            "reflection_artifact_incomplete"
-        )
     if (
         require_cross_content_patterns
         and not validated["cross_content_patterns"]
