@@ -186,8 +186,9 @@ Development validation uses Fake/Mock Notion only.
 
 Allowed production mutation after later Owner Acceptance:
 
-- at most one create/update in the configured Weekly Review Data Source for
-  the due period, through the frozen Weekly writer.
+- at most one create in the configured Weekly Review Data Source for the due
+  period, through the frozen Weekly writer; exact existing identities are
+  reconciled read-only and unattended updates remain blocked.
 
 Forbidden:
 
