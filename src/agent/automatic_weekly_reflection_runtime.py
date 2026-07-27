@@ -915,6 +915,13 @@ def validate_strict_reflection_artifact(
         raise AutomaticWeeklyReflectionError(
             "reflection_artifact_incomplete"
         )
+    if (
+        not require_cross_content_patterns
+        and validated["cross_content_patterns"]
+    ):
+        raise AutomaticWeeklyReflectionError(
+            "reflection_artifact_incomplete"
+        )
     if not validated["professional_actions"]:
         raise AutomaticWeeklyReflectionError(
             "reflection_artifact_incomplete"

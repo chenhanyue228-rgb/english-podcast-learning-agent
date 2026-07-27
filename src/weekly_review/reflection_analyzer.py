@@ -156,11 +156,19 @@ def _build_reflection_payload(weekly_context: Mapping[str, Any]) -> dict[str, An
         cross_content_patterns.append(
             f"{theme} shows up as a repeated pattern across the week's learning rather than a one-off topic."
         )
-    if expressions:
-        top_expression = str(expressions[0].get("expression", "")).strip()
+        top_expression = (
+            str(expressions[0].get("expression", "")).strip()
+            if expressions
+            else ""
+        )
         if top_expression:
             cross_content_patterns.append(
                 f"Expressions like '{top_expression}' turn learning ideas into reusable language for work conversations."
+            )
+        else:
+            cross_content_patterns.append(
+                f"{first_topic or theme} and {second_topic or theme} both "
+                "reinforce a transferable professional learning pattern."
             )
     professional_actions = [
         "In one stakeholder conversation, restate the shared outcome before discussing constraints and note whether the exchange moves from positions to options."
@@ -384,9 +392,13 @@ class ReflectionAnalyzer:
         generated = self.provider.generate(self.prompt, context)
         validated = _validate_reflection_payload(generated)
         podcasts = [item for item in weekly_learning_context.get("podcasts", []) if isinstance(item, Mapping)]
-        if len(podcasts) > 1 and len(
-            validated.get("cross_content_patterns", [])
-        ) < 2:
+        patterns = validated.get("cross_content_patterns", [])
+        if len(podcasts) <= 1 and patterns:
+            raise ReflectionGenerationError(
+                "Reflection cross_content_patterns must be empty for "
+                "single-podcast weeks."
+            )
+        if len(podcasts) > 1 and len(patterns) < 2:
             raise ReflectionGenerationError(
                 "Reflection cross_content_patterns must contain 2-4 items "
                 "for multi-podcast weeks."

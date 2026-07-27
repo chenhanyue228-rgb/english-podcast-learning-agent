@@ -34,6 +34,7 @@ from src.notion.weekly_reflection_writer import (
 )
 from src.skill_runtime.codex_cli import CodexRuntimeError
 from src.weekly_review.reflection_analyzer import (
+    PlaceholderReflectionProvider,
     ReflectionAnalyzer,
     ReflectionGenerationError,
     load_reflection_prompt,
@@ -276,15 +277,16 @@ class CodexFixture:
         stage = kwargs["stage"]
         self.calls.append(stage)
         self.private_env_seen.append(kwargs.get("env"))
-        payload = (
-            _reflection()
-            if "reflection analysis" in stage
-            else _weekly_review(
-                json.loads(
-                    kwargs["request_path"].read_text(encoding="utf-8")
-                )["input"]["weekly_learning_context"]
-            )
+        request = json.loads(
+            kwargs["request_path"].read_text(encoding="utf-8")
         )
+        weekly_context = request["input"]["weekly_learning_context"]
+        if "reflection analysis" in stage:
+            payload = _reflection()
+            if len(weekly_context["podcasts"]) <= 1:
+                payload["cross_content_patterns"] = []
+        else:
+            payload = _weekly_review(weekly_context)
         validated = kwargs["validator"](payload)
         kwargs["output_path"].parent.mkdir(parents=True, exist_ok=True)
         kwargs["output_path"].write_text(
@@ -1091,6 +1093,12 @@ def test_single_source_runtime_accepts_empty_mindset_shifts(
             True,
         ),
         (
+            "single_with_cross_content",
+            1,
+            lambda payload: None,
+            False,
+        ),
+        (
             "multiple_without_mindset_shift",
             2,
             lambda payload: payload.update(
@@ -1267,6 +1275,36 @@ def test_reflection_schema_and_prompt_contract_are_aligned() -> None:
     assert patterns["items"]["minLength"] == 1
     assert actions["minItems"] == 1
     assert actions["maxItems"] == 1
+
+
+def test_placeholder_single_source_keeps_cross_content_empty() -> None:
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+    )
+
+    reflection = ReflectionAnalyzer(
+        provider=PlaceholderReflectionProvider(),
+    ).generate(context)
+
+    assert reflection["cross_content_patterns"] == []
+
+
+def test_placeholder_multi_source_minimal_week_generates_two_patterns() -> None:
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+        include_assets=False,
+    )
+    second = deepcopy(context["podcasts"][0])
+    second["topic"] = "Leadership"
+    context["podcasts"].append(second)
+
+    reflection = ReflectionAnalyzer(
+        provider=PlaceholderReflectionProvider(),
+    ).generate(context)
+
+    assert len(reflection["cross_content_patterns"]) == 2
 
 
 def test_weekly_artifact_cannot_invent_mindset_shift() -> None:
@@ -1488,7 +1526,9 @@ def test_provider_passes_bounded_isolated_codex_contract(tmp_path: Path) -> None
 
     def generator(**kwargs):
         captured.update(kwargs)
-        return kwargs["validator"](_reflection())
+        payload = _reflection()
+        payload["cross_content_patterns"] = []
+        return kwargs["validator"](payload)
 
     provider = AutomaticCodexReflectionProvider(
         request_path=tmp_path / "request.json",
