@@ -6,8 +6,8 @@ is implemented after the v1.1 runtime migration, not a future target design.
 ## 1. Architecture Status
 
 - Stable baseline: v1.2.0
-- Phase 3 runtime baseline:
-  `156b37f08290aa9b985112269d2a373de51c48d2`
+- Production baseline:
+  `bea7eb2cc5bbf38d955b82342b7c8b2a4f230155`
 - Product phase: Phase 4.2 — External User Validation
 - Execution state: External User Session #1 preparation
 - Owner Acceptance: `OWNER_ACCEPTANCE_PASS`
@@ -278,20 +278,21 @@ Weekly Reflection is a compounding learning note. It turns weekly learning into
 mindset shifts, cross-content patterns, language growth, and professional
 actions. It is not a podcast recap or a raw data aggregation page.
 
-The scheduler implementation under review uses an independent macOS
-LaunchAgent and a local owner-only schedule file. The default is Saturday at
-10:00 in the current Mac local timezone. Each invocation is finite, validates
-due time and target-scoped completion state, extracts a fresh context using
-the existing accepted Weekly period contract, invokes the existing isolated
-Codex runtime twice, applies strict Python validation and the existing Quality
-Gate, and delegates the only permitted write to the frozen Weekly writer. A
-15-minute recovery wake-up allows one latest-period catch-up after sleep or a
-transient failure; it does not backfill multiple historical periods.
+The accepted production scheduler uses an independent macOS LaunchAgent and a
+local owner-only schedule file. The default is Saturday at 10:00 in the
+current Mac local timezone. Each invocation is finite, validates due time and
+target-scoped completion state, extracts a fresh context using the existing
+accepted Weekly period contract, invokes the existing isolated Codex runtime,
+applies strict Python validation and the existing Quality Gate, and delegates
+the only permitted write to the frozen Weekly writer. A 15-minute recovery
+wake-up allows one latest-period catch-up after sleep or a transient failure;
+it does not backfill multiple historical periods.
 
 The Weekly scheduler is separate from Automatic Vocabulary. It has an
 independent label, configuration, state, lock, artifacts, and lifecycle.
-Implementation in a feature branch is not evidence of production installation
-or Owner Acceptance.
+Protected production Owner Acceptance passed, including one first publish,
+an exact retry with zero additional Codex calls or writes, natural-language
+schedule customization, and pause/resume.
 
 Protected Weekly Reflection Acceptance passed. The first publish created 1
 Weekly page and the exact retry created 0. Non-target databases and the

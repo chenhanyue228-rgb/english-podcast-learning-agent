@@ -421,8 +421,9 @@ Codex 负责解析、复述并执行对应的本地操作。安装、更改、�
 ./.venv/bin/python scripts/run_automatic_weekly_reflection_once.py
 ```
 
-当前分支中的 Weekly 自动调度实现仍待独立审查、合并、安装和 Owner
-Acceptance；本节不表示它已经在生产环境启用。
+Weekly 自动调度已经合并并通过受保护的 Owner Acceptance。默认时间仍为
+当前 Mac 本地时区的每周六上午 10:00；每位用户可以在第一次设置时确认默认
+时间、选择自定义星期和时间，或暂时不开启。
 
 ## 11. 故障排查
 

@@ -761,7 +761,7 @@ credentials in the LaunchAgent plist.
 ## DEC-032: Add an Independent Bounded Weekly Reflection Schedule
 
 - Date: 2026-07-27
-- Status: Product Requirement Accepted; Implementation Pending Review
+- Status: Accepted and Owner-Validated
 
 ### Decision
 
@@ -789,6 +789,9 @@ weekly prompt. A separate bounded local scheduler meets that product behavior
 while preserving the accepted Codex/Python/Notion boundaries and keeping
 Automatic Vocabulary independent.
 
-Feature-branch implementation, tests, and documentation do not constitute
-production installation or Owner Acceptance. Those gates remain required
-after independent review and merge.
+The implementation was merged through PR #27, followed by Reflection contract
+compatibility fixes in PRs #28, #29, and #30. Protected production Owner
+Acceptance passed with one Weekly create, an exact retry with zero creates and
+zero Codex calls, complete page structure and relations, schedule
+customization, and pause/resume. This acceptance supports external-user
+testing readiness; it does not claim `EXTERNAL_USER_VALIDATION_PASS`.

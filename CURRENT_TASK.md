@@ -7,31 +7,24 @@ Phase 4.2 - External User Validation
 ## Stable Baseline
 
 - Release: v1.2.0
-- Phase 3 runtime baseline:
-  `156b37f08290aa9b985112269d2a373de51c48d2`
+- Production baseline:
+  `bea7eb2cc5bbf38d955b82342b7c8b2a4f230155`
 - PR #23 Phase 1 read-only detection: merged
 - PR #24 Phase 2 enrichment and protected publishing: merged
 - PR #25 Phase 3A bounded runtime and scheduler: merged
+- PR #27 Weekly Scheduler: merged
+- PR #28 Reflection cross-content compatibility: merged
+- PR #29 optional mindset compatibility: merged
+- PR #30 nullable Reflection contract stabilization: merged
 - Architecture: Stable
 - Architecture Review: not required
 
 ## Current Sprint
 
-**Execution state:** External User Session #1 preparation
+**Execution state:** Product readiness alignment before External User Session #1
 
 **Engineering status:**
 `ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`
-
-Parallel implementation work:
-
-- Weekly Reflection automatic scheduling is implemented on
-  `feat/weekly-reflection-scheduler`.
-- Status: pending independent review, merge, installation, and Owner
-  Acceptance.
-- Production LaunchAgent changes: 0.
-- Real Notion calls/writes during development: 0/0.
-- This work does not change the current Phase 4.2 session count or readiness
-  token.
 
 Current facts:
 
@@ -47,6 +40,12 @@ Current facts:
 - Scheduler interval: 60 seconds
 - First scheduler cycle: BASELINED
 - Second scheduler cycle: NO_WORK
+- Weekly scheduler: installed and loaded
+- Weekly default schedule contract: Saturday 10:00 local
+- Weekly Scheduler Owner Acceptance: PASS
+- Weekly first publish: created 1
+- Weekly exact retry: created 0 with 0 additional Codex calls
+- Weekly custom schedule and pause/resume: PASS
 - Expression / Weekly / schema / historical writes during automatic
   acceptance: 0
 - External-user sessions: 0
