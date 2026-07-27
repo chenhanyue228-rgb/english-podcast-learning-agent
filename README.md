@@ -116,6 +116,12 @@ macOS 自动词汇同步要求完整项目位于系统保护目录之外。默�
 `~/EnglishAudioLearningAgent`；不要把正式运行目录放在 `Documents`、
 `Desktop` 或 `Downloads` 中。
 
+首次设置会先确认用户是否已有可登录的 Notion 工作空间。没有 Notion 的用户
+可以直接从 [Notion 官方网站](https://www.notion.com/) 注册并使用网页版，
+不需要安装桌面应用；桌面应用仅为可选项，可从
+[Notion 官方下载页面](https://www.notion.com/desktop) 获取。Codex 会等待
+用户确认“Notion 已准备好”，再继续连接和页面设置。
+
 Notion 设置使用一条统一路径，一次只显示一个操作，用户完成并确认后才进入
 下一步。开发者后台中的入口名称是“连接”，普通 Notion 页面中的授权入口名称是
 “集成”。用户依次打开或创建连接、确认内容权限、保存访问令牌、创建

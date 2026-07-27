@@ -67,6 +67,13 @@ def test_notion_official_entry_is_documented() -> None:
     assert "https://www.notion.so/developers" in CONTRACT_TEXT
 
 
+def test_new_notion_user_gets_official_web_and_optional_desktop_paths() -> None:
+    assert "https://www.notion.com/" in CONTRACT_TEXT
+    assert "https://www.notion.com/desktop" in CONTRACT_TEXT
+    assert "不需要安装桌面应用" in CONTRACT_TEXT
+    assert "桌面应用不是必需条件" in USER_GUIDE
+
+
 def test_token_must_not_be_sent_to_chat() -> None:
     assert "不要发送到聊天" in CONTRACT_TEXT
 

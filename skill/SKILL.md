@@ -193,6 +193,50 @@ Codex must show exactly one action at a time and wait for the specified reply
 before showing the next action. Codex must not combine these steps into a
 single authorization request.
 
+#### Step 0: Confirm Notion Availability
+
+Codex must display:
+
+```text
+开始设置前，请确认你是否已经有一个可以登录的 Notion 工作空间。
+
+是否安装 Notion 桌面应用不影响设置，也可以直接使用网页版。
+
+如果已经有，请回复：
+
+已有 Notion
+
+如果还没有，请回复：
+
+还没有 Notion
+```
+
+Codex must wait for either `已有 Notion` or `还没有 Notion`.
+
+If the user replies `已有 Notion`, continue to Step 1.
+
+If the user replies `还没有 Notion`, Codex must display:
+
+```text
+可以直接使用 Notion 网页版，不需要安装桌面应用。
+
+Notion 官方网站：
+
+https://www.notion.com/
+
+如果希望安装桌面应用，可以使用官方下载页面：
+
+https://www.notion.com/desktop
+
+请先完成注册或登录，直到能看到自己的 Notion 工作空间。
+
+完成后，请回复：
+
+Notion 已准备好
+```
+
+Codex must wait for `Notion 已准备好`, then continue to Step 1.
+
 #### Step 1: Open the Developer Dashboard
 
 Codex must display:
