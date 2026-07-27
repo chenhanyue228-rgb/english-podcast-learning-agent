@@ -23,6 +23,11 @@ VISIBLE_CONTRACT = _between(
     "### User-Visible Notion Conversation Contract",
     "### First-Time Setup Responsibilities",
 )
+NOTION_AVAILABILITY_STEP = _between(
+    VISIBLE_CONTRACT,
+    "#### Step 0: Confirm Notion Availability",
+    "#### Step 1: Open the Developer Dashboard",
+)
 DEVELOPER_CONNECTION_STEPS = _between(
     VISIBLE_CONTRACT,
     "#### Step 1: Open the Developer Dashboard",
@@ -54,6 +59,20 @@ def _assert_in_order(text: str, phrases: tuple[str, ...]) -> None:
 
 def test_unified_notion_reply_nodes_are_in_order() -> None:
     _assert_in_order(VISIBLE_CONTRACT, REPLY_SEQUENCE)
+
+
+def test_notion_availability_branch_waits_before_developer_setup() -> None:
+    for reply in ("已有 Notion", "还没有 Notion", "Notion 已准备好"):
+        assert reply in NOTION_AVAILABILITY_STEP
+    assert "must wait for either `已有 Notion` or `还没有 Notion`" in (
+        NOTION_AVAILABILITY_STEP
+    )
+    assert "must wait for `Notion 已准备好`" in NOTION_AVAILABILITY_STEP
+    assert "https://www.notion.com/" in NOTION_AVAILABILITY_STEP
+    assert "https://www.notion.com/desktop" in NOTION_AVAILABILITY_STEP
+    assert VISIBLE_CONTRACT.index("#### Step 0") < VISIBLE_CONTRACT.index(
+        "#### Step 1"
+    )
 
 
 def test_each_unified_step_requires_waiting() -> None:
