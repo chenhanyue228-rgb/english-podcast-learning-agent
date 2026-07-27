@@ -757,3 +757,38 @@ while preserving the Codex/Python/Notion responsibility boundary, target
 isolation, restart safety, and fail-closed publishing. The production-location
 constraint records an observed macOS launchd behavior and avoids embedding
 credentials in the LaunchAgent plist.
+
+## DEC-032: Add an Independent Bounded Weekly Reflection Schedule
+
+- Date: 2026-07-27
+- Status: Product Requirement Accepted; Implementation Pending Review
+
+### Decision
+
+Weekly Reflection should run automatically at Saturday 10:00 in the current
+Mac local timezone after the user explicitly confirms installation. The user
+may choose another weekly weekday/time, pause, resume, or inspect the schedule
+through natural language.
+
+The implementation must use an independent macOS LaunchAgent and one finite
+Python process per invocation. It reuses the frozen Weekly Reflection
+pipeline, existing isolated Codex runtime, strict artifact validation, Quality
+Gate, Target Binding, and Notion writer. It must not introduce a cloud
+scheduler, daemon, new AI provider, schema change, historical backfill, or a
+second Notion write path.
+
+The latest due period may run once after sleep or a transient failure.
+Completed periods reconcile without additional Codex calls or duplicate
+Notion content. Insufficient real learning data is skipped without creating a
+blank page.
+
+### Reason
+
+Weekly Reflection should compound learning without requiring a repeated
+weekly prompt. A separate bounded local scheduler meets that product behavior
+while preserving the accepted Codex/Python/Notion boundaries and keeping
+Automatic Vocabulary independent.
+
+Feature-branch implementation, tests, and documentation do not constitute
+production installation or Owner Acceptance. Those gates remain required
+after independent review and merge.

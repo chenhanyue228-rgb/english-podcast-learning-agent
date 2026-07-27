@@ -38,6 +38,9 @@ Current state:
 - new highlights wait for a 90-second quiet period before Codex enrichment
 - exact occurrence state, Target Binding, strict validation, and idempotent
   publishing are active
+- Weekly Reflection scheduling is implemented on the current development
+  branch and is pending independent review, merge, installation, and Owner
+  Acceptance
 - the engineering status is
   `ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`
 - external-user sessions remain 0
@@ -205,7 +208,9 @@ highlights are baselined on first enablement and are not backfilled.
 ### Weekly Reflection
 
 ```text
-WeeklyLearningContext.json
+Confirmed local schedule
+↓
+Fresh WeeklyLearningContext.json
 ↓
 ReflectionContext.json
 ↓
@@ -215,6 +220,28 @@ Quality Gate
 ↓
 Notion
 ```
+
+The product default is Saturday at 10:00 in the Mac's current local timezone.
+After first-time setup, Codex asks whether to use that default. The user may
+choose another weekday/time or leave automation disabled. Installation and
+schedule changes happen only after explicit confirmation.
+
+After configuration, normal users can say:
+
+- “把 Weekly Review 改到每周日上午 9 点”
+- “暂停 Weekly Review”
+- “恢复 Weekly Review”
+- “Weekly Review 现在什么时候生成？”
+
+Codex performs the corresponding local operation. The user does not open a
+terminal, edit `.env`, manage LaunchAgents, or repeat a weekly generation
+request. A missed scheduled run may catch up once after the Mac wakes; an
+already completed period is not generated again. If the current period lacks
+real learning data, the run is skipped without creating a blank page.
+
+This documentation describes the product contract and the implementation
+under review. It does not claim that the Weekly scheduler is installed or
+accepted in any production environment.
 
 ## Basic Troubleshooting
 
@@ -228,6 +255,11 @@ Notion
   denial, use the supported project location `~/EnglishAudioLearningAgent`.
   Do not run the production scheduler from `Documents`, `Desktop`, or
   `Downloads`.
+- If an automatic Weekly Reflection is missing, Codex should inspect the
+  independent Weekly scheduler status and its redacted bounded-run result.
+  `SKIPPED_INSUFFICIENT_DATA` means there was not enough real learning data;
+  it is not a publishing failure. Schedule changes and reinstalls require
+  explicit confirmation.
 - If an artifact is missing, rerun the previous stage rather than manually
   editing generated files.
 - If you are unsure which command to use, start with the Skill manifest:
@@ -267,6 +299,8 @@ Workflow commands:
 - `./.venv/bin/python src/main.py --weekly-reflection --dry-run`
 - `./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py status`
 - `./.venv/bin/python scripts/run_automatic_vocabulary_once.py`
+- `./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py status`
+- `./.venv/bin/python scripts/run_automatic_weekly_reflection_once.py`
 - `./.venv/bin/python -m pytest`
 
 Install the bounded scheduler:
@@ -282,6 +316,30 @@ Stop the scheduler without deleting state or learning data:
 ./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py uninstall \
   --confirmation UNINSTALL_AUTOMATIC_VOCABULARY_LAUNCH_AGENT
 ```
+
+Weekly Reflection scheduler lifecycle commands are also Developer/Codex-only:
+
+```bash
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py install \
+  --confirmation INSTALL_WEEKLY_REFLECTION_LAUNCH_AGENT
+
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py configure \
+  --weekday sunday --hour 20 --minute 0 \
+  --confirmation CONFIGURE_WEEKLY_REFLECTION_LAUNCH_AGENT
+
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py pause \
+  --confirmation PAUSE_WEEKLY_REFLECTION_LAUNCH_AGENT
+
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py resume \
+  --confirmation RESUME_WEEKLY_REFLECTION_LAUNCH_AGENT
+
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py uninstall \
+  --confirmation UNINSTALL_WEEKLY_REFLECTION_LAUNCH_AGENT
+```
+
+The Weekly scheduler uses a separate LaunchAgent and does not replace the
+Automatic Vocabulary scheduler. Uninstall preserves the local schedule,
+runtime state, and learning artifacts.
 
 Read-only Notion target diagnosis:
 

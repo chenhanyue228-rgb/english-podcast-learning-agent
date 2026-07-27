@@ -295,9 +295,13 @@ def test_build_weekly_learning_context_extracts_real_sections(monkeypatch, tmp_p
         notion=notion,
         podcast_database_id="podcast_db",
         today=date(2026, 7, 20),
+        generated_at="2026-07-20T02:00:00+00:00",
     )
 
     assert context["metadata"]["period_start"] == "2026-07-13"
+    assert context["metadata"]["generated_at"] == (
+        "2026-07-20T02:00:00+00:00"
+    )
     assert context["metadata"]["period_end"] == "2026-07-20"
     assert len(context["podcasts"]) == 1
     assert context["podcasts"][0]["title"] == "Episode One"

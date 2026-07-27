@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 import scripts.test_weekly_reflection_writer as weekly_reflection_script
 from src.notion.weekly_reflection_writer import (
     WeeklyReflectionWriterError,
@@ -198,6 +200,28 @@ def test_publish_weekly_reflection_creates_page_with_expected_payload() -> None:
         block["type"] == "heading_2" and block["heading_2"]["rich_text"][0]["text"]["content"] == "1. This Week's Core Idea"
         for block in call["children"]
     )
+
+
+def test_identity_query_failure_stops_before_page_create() -> None:
+    notion = FakeNotion()
+    notion.data_sources.query = lambda **_kwargs: (_ for _ in ()).throw(
+        RuntimeError("private query failure")
+    )
+
+    with pytest.raises(
+        WeeklyReflectionWriterError,
+        match="Failed to query existing Weekly Reflection identity",
+    ):
+        publish_weekly_reflection(
+            sample_weekly_review(),
+            sample_reflection_context(),
+            notion=notion,
+            weekly_reflection_database_id="weekly_reflection_db",
+            podcast_database_id="podcast_db",
+        )
+
+    assert notion.pages.create_calls == []
+    assert notion.pages.update_calls == []
 
 
 def test_publish_weekly_reflection_updates_existing_page_when_same_period_and_sources() -> None:

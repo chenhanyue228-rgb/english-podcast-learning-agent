@@ -176,6 +176,8 @@ def test_guide_contains_complete_required_content_and_version() -> None:
         "隐私与安全",
         "targeted Vocabulary",
         "粉色高亮",
+        "每周六上午 10:00",
+        "明确确认后启用",
     ):
         assert required in text
     assert "Notion AI-assisted workflow" not in text

@@ -3,6 +3,31 @@
 All notable product and architecture changes are recorded here. Historical
 entries must be appended or clarified, not removed.
 
+## [Unreleased]
+
+### Weekly Reflection Automatic Scheduling (Under Review)
+
+- Added a separate bounded macOS Weekly Reflection scheduler with a Saturday
+  10:00 local-time default and explicit-confirmation lifecycle management.
+- Added owner-only atomic local schedule configuration with custom weekday and
+  time, pause/resume, status, and uninstall support.
+- Added a one-shot runtime that extracts a fresh context using the existing
+  accepted Weekly period contract, skips insufficient data, generates strict Reflection and
+  Weekly artifacts through the existing isolated Codex runtime, applies the
+  existing Quality Gate, and delegates publishing to the frozen Weekly
+  pipeline.
+- Added target-scoped completion state, overlap protection, exact identity
+  reconciliation, page-integrity checks, trusted artifact reuse, missed-run
+  catch-up, and redacted bounded-run reports.
+- Updated onboarding and user guidance so persistent schedule changes require
+  explicit user confirmation and ordinary users do not manage terminals,
+  `.env`, project paths, or LaunchAgents.
+- Development safety: real Notion calls/writes 0/0, production LaunchAgent
+  changes 0, `.env` changes 0, and schema changes 0.
+- Status remains pending independent review, merge, installation, and Owner
+  Acceptance. This entry does not claim production activation or external-user
+  validation.
+
 ## [v1.2.0] - 2026-07-27
 
 ### Automatic Vocabulary Sync Production Runtime

@@ -907,8 +907,10 @@ def find_existing_weekly_reflection_page(
             weekly_reflection_database_id,
             filter={"property": "Date", "date": {"equals": start_date}},
         )
-    except Exception:
-        return None
+    except Exception as exc:
+        raise WeeklyReflectionWriterError(
+            "Failed to query existing Weekly Reflection identity."
+        ) from exc
 
     for page in response.get("results", []):
         if isinstance(page, Mapping) and _page_matches_reflection_identity(page, period, source_page_ids):

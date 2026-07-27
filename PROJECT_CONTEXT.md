@@ -21,6 +21,13 @@ feeds, and local audio files into reusable English learning assets:
 **Engineering status:**
 `ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`
 
+An independent Weekly Reflection scheduler is being implemented on a feature
+branch. Its product default is Saturday at 10:00 in the current Mac local
+timezone, with explicit-confirmation install/configure/pause/resume controls.
+This implementation is pending independent review, merge, installation, and
+Owner Acceptance. It does not change the current production release or
+external-user readiness.
+
 **Release:** v1.2.0
 
 The Phase 3 runtime baseline is production `main`
@@ -69,7 +76,9 @@ Review generation.
 
 Python performs source processing, transcription, artifact validation,
 deterministic workflow execution, exact occurrence state management, bounded
-scheduling, and Notion synchronization.
+scheduling, and Notion synchronization. The proposed Weekly scheduler invokes
+one finite due-check process and reuses the accepted Weekly pipeline; it does
+not introduce a daemon, cloud service, or new reasoning provider.
 
 ### Notion: Long-Term Knowledge Memory
 

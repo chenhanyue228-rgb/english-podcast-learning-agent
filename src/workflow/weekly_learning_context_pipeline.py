@@ -45,14 +45,15 @@ def _date_range(today: Optional[date] = None) -> tuple[str, str]:
     return start.isoformat(), current.isoformat()
 
 
-def _generated_at() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def _generated_at(value: Optional[str] = None) -> str:
+    return value or datetime.now(timezone.utc).isoformat()
 
 
 def build_weekly_learning_context(
     notion: Any,
     podcast_database_id: str,
     today: Optional[date] = None,
+    generated_at: Optional[str] = None,
 ) -> tuple[dict[str, Any], WeeklyLearningExtractionReport]:
     start_date, end_date = _date_range(today)
     pages = query_podcast_pages(
@@ -88,7 +89,7 @@ def build_weekly_learning_context(
         "metadata": {
             "period_start": start_date,
             "period_end": end_date,
-            "generated_at": _generated_at(),
+            "generated_at": _generated_at(generated_at),
             "source": "Podcast Library",
         },
         "podcasts": podcasts,
@@ -124,6 +125,7 @@ def run_weekly_learning_extraction(
     notion: Any = None,
     output_path: Path = Path("output/weekly_learning_context.json"),
     today: Optional[date] = None,
+    generated_at: Optional[str] = None,
 ) -> tuple[dict[str, Any], WeeklyLearningExtractionReport, Path]:
     settings = load_settings()
     if not settings.notion_token:
@@ -140,6 +142,7 @@ def run_weekly_learning_extraction(
         notion=active_notion,
         podcast_database_id=settings.notion_podcast_database_id,
         today=today,
+        generated_at=generated_at,
     )
     saved_path = save_weekly_learning_context(context, output_path)
     return context, report, saved_path

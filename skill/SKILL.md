@@ -97,6 +97,19 @@ enrichment context only.
 The first scheduler cycle baselines existing highlights and does not backfill
 them. The explicit targeted command remains Developer/recovery only.
 
+### Automatic Weekly Reflection Runtime
+
+Use this Skill when the user asks to enable, change, pause, resume, or inspect
+the Weekly Review schedule.
+
+The product default is Saturday at 10:00 in the current Mac local timezone.
+Codex must parse natural-language weekday/time requests, restate the proposed
+schedule, and wait for explicit confirmation before installing or changing
+the persistent local schedule.
+
+Normal users must not be shown LaunchAgent commands, internal confirmation
+tokens, project paths, `.env`, or Notion identifiers.
+
 ## 3. Guided Onboarding Contract
 
 ### Installation Request
@@ -417,8 +430,51 @@ If that also fails, open the project directory in Finder and ask the user only
 to double-click `start_setup.command`. Terminal instructions are the final
 fallback.
 
-After success, actively prompt the user for an Apple Podcasts episode URL,
-podcast RSS feed, or local audio file.
+After the four databases pass validation, Codex must display:
+
+```text
+Weekly Review 默认每周六上午 10:00 自动生成。
+
+是否使用默认时间？
+
+你也可以回复：
+
+- 使用默认时间
+- 每周日晚上 8 点
+- 每周五上午 9:30
+- 暂时不开启
+```
+
+Codex must wait for one reply. If the user selects a schedule, Codex must
+restate exactly one proposed weekday and time and ask:
+
+```text
+将按这个时间自动生成 Weekly Review：
+
+<星期和时间>
+
+是否确认启用？
+```
+
+Codex must wait for `确认启用`. Only then may Codex call the scheduler manager
+with the matching internal confirmation. After installation succeeds, Codex
+must report only the non-sensitive installed/loaded state and then prompt for
+an Apple Podcasts episode URL, podcast RSS feed, or local audio file.
+
+If the user replies `暂时不开启`, Codex must confirm that no Weekly scheduler
+was installed and continue to the supported audio prompt. This is not a setup
+failure.
+
+For an existing installation:
+
+- “把 Weekly Review 改到每周日上午 9 点” routes to `configure`;
+- “暂停 Weekly Review” routes to `pause`;
+- “恢复 Weekly Review” routes to `resume`;
+- “Weekly Review 现在什么时候生成？” routes to `status`.
+
+Configure, pause, resume, install, and uninstall are persistent local changes.
+Codex must restate the action and wait for user confirmation before invoking
+them. Status is read-only and does not require confirmation.
 
 ### Owner Acceptance Prompt Boundary
 
@@ -532,6 +588,8 @@ reference. Normal users are not expected to run them manually.
 | `./.venv/bin/python src/main.py --publish-highlight-vocab PAGE_ID` | Developer/recovery only: publish exact user-selected pink-highlight vocabulary from one Notion page | Notion page ID | Vocabulary preview / publish artifacts | Updated Vocabulary Database entries | Do not present this as the default user trigger |
 | `./.venv/bin/python scripts/manage_automatic_vocabulary_scheduler.py status` | Inspect the bounded automatic Vocabulary scheduler | Installed local runtime | None | Installed/loaded state and interval | Diagnose before changing scheduler state |
 | `./.venv/bin/python scripts/run_automatic_vocabulary_once.py` | Developer/recovery only: run one finite automatic Vocabulary cycle | Configured target group | Target-scoped state and enrichment artifacts | Redacted bounded-cycle report | Do not loop this command |
+| `./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py status` | Inspect the independent Weekly Reflection scheduler | Installed local runtime | None | Non-sensitive schedule and last-run state | Route natural-language schedule questions here |
+| `./.venv/bin/python scripts/run_automatic_weekly_reflection_once.py` | Developer/recovery only: run one finite due-check cycle | Confirmed local schedule and target group | Target-scoped Weekly artifacts and redacted status | Due, pass, completed, skip, retry, or safe-stop status | Do not loop this command |
 | `./.venv/bin/python src/main.py --sync-vocab-comments` | Legacy compatibility: sync comment-triggered vocabulary captures | Podcast Library pages with historical comment triggers | Sync state + vocabulary records | Vocabulary sync summary | Prefer the pink-highlight workflow for v1 use |
 | `./.venv/bin/python -m pytest` | Run the full test suite | None | Test reports | Pass/fail summary | Fix issues before publishing |
 
@@ -549,6 +607,31 @@ Automatic Vocabulary scheduler lifecycle:
 
 Install and uninstall are Developer/Codex operations. Normal users only add a
 pink highlight. Uninstall preserves synchronization state and learning data.
+
+Weekly Reflection scheduler lifecycle:
+
+```bash
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py install \
+  --confirmation INSTALL_WEEKLY_REFLECTION_LAUNCH_AGENT
+
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py configure \
+  --weekday sunday --hour 20 --minute 0 \
+  --confirmation CONFIGURE_WEEKLY_REFLECTION_LAUNCH_AGENT
+
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py pause \
+  --confirmation PAUSE_WEEKLY_REFLECTION_LAUNCH_AGENT
+
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py resume \
+  --confirmation RESUME_WEEKLY_REFLECTION_LAUNCH_AGENT
+
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py status
+
+./.venv/bin/python scripts/manage_weekly_reflection_scheduler.py uninstall \
+  --confirmation UNINSTALL_WEEKLY_REFLECTION_LAUNCH_AGENT
+```
+
+These are Codex/Developer operations, not normal-user instructions. The
+Weekly scheduler has its own label and does not replace Automatic Vocabulary.
 
 ## 7. Workflow Contracts
 
@@ -668,7 +751,9 @@ Python:
 #### Flow
 
 ```text
-WeeklyLearningContext.json
+Confirmed local weekly schedule
+↓
+Fresh WeeklyLearningContext.json
 ↓
 ReflectionContext.json
 ↓
@@ -681,17 +766,16 @@ Notion
 
 #### Inputs
 
-- `output/weekly_learning_context.json`
+- Podcast Library data for the existing accepted Weekly period contract
+- local schedule configuration
 
 #### Artifacts
 
 Intermediate:
 
-- `output/reflection_context_request.json`
-- `output/reflection_context.json`
-- `output/weekly_review_request.json`
-- `output/weekly_review.json`
-- `output/pipeline_run.json`
+- target-scoped `data/weekly_reflection/artifacts/` request/output files
+- target-scoped completion state
+- redacted runtime status and logs
 
 Final:
 
@@ -709,9 +793,12 @@ Codex:
 Python:
 
 - build the weekly learning context
+- enforce due, missed-run, process-lock, and data-sufficiency gates
 - validate reflection and review artifacts
 - run quality checks
+- reconcile an existing period before generation
 - publish to Notion
+- mark the target-scoped period complete
 
 ## 8. Artifact Contract
 
@@ -868,6 +955,30 @@ Recovery:
   directory
 - inspect status, then reinstall only with the exact install confirmation
 - preserve target-scoped state and never delete learning data during recovery
+
+### Automatic Weekly Reflection Scheduler Failure
+
+Detect:
+
+- Weekly scheduler is missing, paused, or has a stale plist/runtime path
+- a bounded run returns `RETRYABLE_FAILURE` or `SAFE_STOP`
+- the current period is skipped for insufficient learning data
+
+Report:
+
+- installed/loaded/enabled state
+- configured local weekday and time
+- last run status and last successful period
+- stable error code
+- Codex call and Weekly create/update counts
+
+Recovery:
+
+- do not edit `.env` or show Notion identifiers
+- preserve schedule, target-scoped state, and trusted artifacts
+- allow the 15-minute bounded recovery wake-up to retry transient failures
+- reinstall or reconfigure only after the user confirms the persistent change
+- never create a blank Weekly page or bypass the Quality Gate
 
 ## 10. Quality Rules
 

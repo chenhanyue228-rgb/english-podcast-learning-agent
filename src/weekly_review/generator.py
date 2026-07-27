@@ -167,16 +167,30 @@ class WeeklyReviewGenerator:
         except WeeklyReviewSchemaError as exc:
             raise WeeklyReviewGenerationError(str(exc)) from exc
 
-    def generate(self, weekly_learning_context: Mapping[str, Any]) -> dict[str, Any]:
-        reflection_context = ReflectionAnalyzer().generate(weekly_learning_context)
-        save_reflection_context(reflection_context, Path("output/reflection_context.json"))
+    def generate(
+        self,
+        weekly_learning_context: Mapping[str, Any],
+        reflection_context: Optional[Mapping[str, Any]] = None,
+        reflection_context_output_path: Path = Path(
+            "output/reflection_context.json"
+        ),
+    ) -> dict[str, Any]:
+        active_reflection_context = (
+            dict(reflection_context)
+            if isinstance(reflection_context, Mapping)
+            else ReflectionAnalyzer().generate(weekly_learning_context)
+        )
+        save_reflection_context(
+            active_reflection_context,
+            reflection_context_output_path,
+        )
         source_page_ids = [
             str(item.get("page_id", "")).strip()
             for item in weekly_learning_context.get("podcasts", [])
             if isinstance(item, Mapping) and str(item.get("page_id", "")).strip()
         ]
         context = {
-            "reflection_context": reflection_context,
+            "reflection_context": active_reflection_context,
             "weekly_learning_context": weekly_learning_context,
             "schema": self.schema,
         }
@@ -192,12 +206,20 @@ def run_weekly_review_generation(
     input_path: Path,
     output_path: Path = Path("output/weekly_review.json"),
     provider: Optional[object] = None,
+    reflection_context: Optional[Mapping[str, Any]] = None,
+    reflection_context_output_path: Path = Path(
+        "output/reflection_context.json"
+    ),
 ) -> WeeklyReviewGenerationResult:
     load_env_file()
 
     weekly_learning_context = load_weekly_learning_context(input_path)
     generator = WeeklyReviewGenerator(provider=provider)
-    payload = generator.generate(weekly_learning_context)
+    payload = generator.generate(
+        weekly_learning_context,
+        reflection_context=reflection_context,
+        reflection_context_output_path=reflection_context_output_path,
+    )
     quality_report = check_weekly_review_quality(payload)
     if not quality_report.passed:
         raise WeeklyReviewGenerationError(
@@ -208,7 +230,7 @@ def run_weekly_review_generation(
     return WeeklyReviewGenerationResult(
         input_path=input_path.resolve(),
         output_path=saved_path,
-        reflection_context_path=Path("output/reflection_context.json").resolve(),
+        reflection_context_path=reflection_context_output_path.resolve(),
         payload=payload,
         quality_report=quality_report.to_dict(),
     )

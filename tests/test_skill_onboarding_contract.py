@@ -110,6 +110,38 @@ def test_terminal_commands_are_fallback_only() -> None:
     assert "手动终端命令只属于最终备用方案" in CONTRACT_TEXT
 
 
-def test_user_guide_has_all_30_path_stages() -> None:
-    for stage_number in range(1, 31):
+def test_user_guide_has_complete_path_stages() -> None:
+    for stage_number in range(1, 37):
         assert f"| {stage_number}." in USER_GUIDE
+
+
+def test_weekly_scheduler_onboarding_requires_explicit_confirmation() -> None:
+    for phrase in (
+        "Weekly Review 默认每周六上午 10:00 自动生成。",
+        "每周日晚上 8 点",
+        "每周五上午 9:30",
+        "暂时不开启",
+        "确认启用",
+    ):
+        assert phrase in CONTRACT_TEXT
+
+
+def test_weekly_scheduler_supports_natural_language_lifecycle() -> None:
+    for phrase in (
+        "把 Weekly Review 改到每周日上午 9 点",
+        "暂停 Weekly Review",
+        "恢复 Weekly Review",
+        "Weekly Review 现在什么时候生成？",
+    ):
+        assert phrase in CONTRACT_TEXT
+
+
+def test_weekly_scheduler_is_not_a_normal_user_terminal_task() -> None:
+    weekly_user_section = USER_GUIDE.split(
+        "## 10. Weekly Review 自动生成",
+        1,
+    )[1].split("## 11. 故障排查", 1)[0]
+
+    assert "不需要打开终端" in weekly_user_section
+    assert "编辑 `.env`" in weekly_user_section
+    assert "管理 LaunchAgent" in weekly_user_section

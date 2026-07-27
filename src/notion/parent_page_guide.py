@@ -168,6 +168,11 @@ def build_parent_page_guide_blocks() -> list[dict[str, Any]]:
         ),
         _text_block(
             "paragraph",
+            "本地自动计划在用户明确确认后启用；默认时间为每周六上午 10:00，"
+            "也可以通过 Agent 修改、暂停或恢复。",
+        ),
+        _text_block(
+            "paragraph",
             "单次使用后没有 Weekly Reflection，不代表系统故障。",
         ),
         _text_block("heading_2", "隐私与安全"),
