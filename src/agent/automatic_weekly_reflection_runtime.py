@@ -559,7 +559,15 @@ def _expected_weekly_body_fingerprint(
             "weekly_publish_artifact_invalid"
         )
     validated_reflection = validate_strict_reflection_artifact(
-        reflection
+        reflection,
+        require_cross_content_patterns=(
+            sum(
+                1
+                for item in weekly_context.get("podcasts", [])
+                if isinstance(item, Mapping)
+            )
+            > 1
+        ),
     )
     validated_weekly = validate_strict_weekly_artifact(
         weekly_review,
@@ -834,6 +842,8 @@ def _exact_keys(
 
 def validate_strict_reflection_artifact(
     payload: Mapping[str, Any],
+    *,
+    require_cross_content_patterns: bool = True,
 ) -> dict[str, Any]:
     _validate_schema_value(
         payload,
@@ -901,7 +911,10 @@ def validate_strict_reflection_artifact(
         raise AutomaticWeeklyReflectionError(
             "reflection_artifact_incomplete"
         )
-    if not validated["cross_content_patterns"]:
+    if (
+        require_cross_content_patterns
+        and not validated["cross_content_patterns"]
+    ):
         raise AutomaticWeeklyReflectionError(
             "reflection_artifact_incomplete"
         )
@@ -1131,6 +1144,20 @@ class AutomaticCodexReflectionProvider:
             raise AutomaticWeeklyReflectionError(
                 "weekly_learning_context_invalid"
             )
+        podcast_count = sum(
+            1
+            for item in weekly_context.get("podcasts", [])
+            if isinstance(item, Mapping)
+        )
+
+        def validate_artifact(
+            payload: Mapping[str, Any],
+        ) -> dict[str, Any]:
+            return validate_strict_reflection_artifact(
+                payload,
+                require_cross_content_patterns=podcast_count > 1,
+            )
+
         schema = _strict_schema(load_reflection_schema())
         prepare_codex_request(
             stage="automatic_weekly_reflection_analysis",
@@ -1147,7 +1174,7 @@ class AutomaticCodexReflectionProvider:
                 output_path=self.output_path,
                 stage="automatic weekly reflection analysis",
             )
-            return validate_strict_reflection_artifact(existing)
+            return validate_artifact(existing)
         except (CodexArtifactPendingError, OSError):
             pass
         self.calls += 1
@@ -1165,10 +1192,10 @@ class AutomaticCodexReflectionProvider:
             timeout_seconds=self.timeout_seconds,
             env=self.env,
             runner=self.runner,
-            validator=validate_strict_reflection_artifact,
+            validator=validate_artifact,
             stage="automatic weekly reflection analysis",
         )
-        return validate_strict_reflection_artifact(generated)
+        return validate_artifact(generated)
 
 
 class AutomaticCodexWeeklyReviewProvider:
