@@ -986,6 +986,67 @@ def test_strict_artifacts_reject_empty_core_content() -> None:
     assert weekly_error.value.code == "weekly_artifact_incomplete"
 
 
+def test_single_source_runtime_accepts_empty_cross_content_patterns(
+    tmp_path: Path,
+) -> None:
+    class SingleSourceCodex(CodexFixture):
+        def __call__(self, **kwargs):
+            if "reflection analysis" not in kwargs["stage"]:
+                return super().__call__(**kwargs)
+            self.calls.append(kwargs["stage"])
+            self.private_env_seen.append(kwargs.get("env"))
+            payload = _reflection()
+            payload["cross_content_patterns"] = []
+            validated = kwargs["validator"](payload)
+            kwargs["output_path"].parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            kwargs["output_path"].write_text(
+                json.dumps(validated),
+                encoding="utf-8",
+            )
+            return validated
+
+    report = _run(
+        tmp_path,
+        codex_generator=SingleSourceCodex(),
+    )
+
+    assert report.status == "PASS", report.to_dict()
+    assert report.reflection_codex_calls == 1
+    assert report.weekly_review_codex_calls == 1
+    assert report.weekly_created == 1
+
+
+def test_multi_source_provider_rejects_empty_cross_content_patterns(
+    tmp_path: Path,
+) -> None:
+    def generator(**kwargs):
+        payload = _reflection()
+        payload["cross_content_patterns"] = []
+        return kwargs["validator"](payload)
+
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+    )
+    context["podcasts"].append(dict(context["podcasts"][0]))
+    provider = AutomaticCodexReflectionProvider(
+        request_path=tmp_path / "request.json",
+        output_path=tmp_path / "output.json",
+        generator=generator,
+    )
+
+    with pytest.raises(AutomaticWeeklyReflectionError) as error:
+        provider.generate(
+            "prompt",
+            {"weekly_learning_context": context},
+        )
+
+    assert error.value.code == "reflection_artifact_incomplete"
+
+
 def test_malformed_codex_output_never_reaches_pipeline(tmp_path: Path) -> None:
     def malformed_generator(**kwargs):
         payload = _reflection()
