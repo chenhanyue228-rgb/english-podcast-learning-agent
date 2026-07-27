@@ -546,7 +546,11 @@ def main(
     print(format_chinese_validation(result.validation_results), flush=True)
     print("", flush=True)
     print(
-        "现在请发送一个苹果播客单集链接、播客订阅源链接或本地音频文件。",
+        "请返回 Codex 继续设置 Weekly Review 自动生成时间。",
+        flush=True,
+    )
+    print(
+        "默认时间是每周六上午 10:00；只有在你确认后才会安装本地自动计划。",
         flush=True,
     )
     return 0
