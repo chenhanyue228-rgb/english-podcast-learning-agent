@@ -1344,6 +1344,60 @@ def test_weekly_artifact_allows_null_mindset_without_reflection_shift() -> None:
     assert validated["mindset_shift"] is None
 
 
+def test_weekly_codex_schema_uses_supported_nullable_object(
+    tmp_path: Path,
+) -> None:
+    captured = {}
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+    )
+    reflection = _reflection()
+    reflection["mindset_shifts"] = []
+
+    def generator(**kwargs):
+        captured.update(kwargs)
+        review = _weekly_review(context)
+        review["mindset_shift"] = None
+        return kwargs["validator"](review)
+
+    provider = AutomaticCodexWeeklyReviewProvider(
+        request_path=tmp_path / "request.json",
+        output_path=tmp_path / "output.json",
+        generator=generator,
+    )
+
+    result = provider.generate(
+        "prompt",
+        {
+            "weekly_learning_context": context,
+            "reflection_context": reflection,
+        },
+    )
+    mindset_schema = captured["schema"]["properties"]["mindset_shift"]
+
+    assert result["mindset_shift"] is None
+    assert "oneOf" not in mindset_schema
+    assert mindset_schema["type"] == ["object", "null"]
+    assert mindset_schema["required"] == ["before", "now"]
+    assert mindset_schema["additionalProperties"] is False
+    assert set(mindset_schema["properties"]) == {"before", "now"}
+
+
+def test_weekly_nullable_mindset_schema_still_rejects_primitive() -> None:
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+    )
+    review = _weekly_review(context)
+    review["mindset_shift"] = "unsupported"
+
+    with pytest.raises(AutomaticWeeklyReflectionError) as error:
+        validate_strict_weekly_artifact(review, context)
+
+    assert error.value.code == "weekly_artifact_schema_invalid"
+
+
 def test_runtime_blocks_weekly_mindset_shift_without_reflection_evidence(
     tmp_path: Path,
 ) -> None:

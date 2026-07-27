@@ -688,9 +688,12 @@ def _strict_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
 
     def visit(node: Any) -> None:
         if isinstance(node, dict):
-            if node.get("type") == "object" and isinstance(
-                node.get("properties"), dict
-            ):
+            node_type = node.get("type")
+            includes_object = node_type == "object" or (
+                isinstance(node_type, list)
+                and "object" in node_type
+            )
+            if includes_object and isinstance(node.get("properties"), dict):
                 node["additionalProperties"] = False
             for value in node.values():
                 visit(value)
@@ -742,8 +745,16 @@ def _validate_schema_value(
         return
 
     expected = schema.get("type")
-    if isinstance(expected, str) and not _schema_matches_type(value, expected):
-        raise AutomaticWeeklyReflectionError(code)
+    if isinstance(expected, str):
+        if not _schema_matches_type(value, expected):
+            raise AutomaticWeeklyReflectionError(code)
+    elif isinstance(expected, list):
+        if not any(
+            isinstance(item, str)
+            and _schema_matches_type(value, item)
+            for item in expected
+        ):
+            raise AutomaticWeeklyReflectionError(code)
 
     allowed = schema.get("enum")
     if isinstance(allowed, list) and value not in allowed:
@@ -824,8 +835,6 @@ def _strict_weekly_schema() -> dict[str, Any]:
         target = prop
         if name in {"ideas_worth_compounding", "expressions_worth_reusing", "sources"}:
             target = prop["items"]
-        elif name == "mindset_shift":
-            target = prop["oneOf"][1]
         target["properties"] = {
             field: {"type": "string"} for field in fields
         }
