@@ -572,6 +572,7 @@ def _expected_weekly_body_fingerprint(
     validated_weekly = validate_strict_weekly_artifact(
         weekly_review,
         weekly_context,
+        validated_reflection,
     )
     payload = WeeklyReflectionPublishPayload(
         weekly_review=validated_weekly,
@@ -909,7 +910,7 @@ def validate_strict_reflection_artifact(
             )
     if (
         require_cross_content_patterns
-        and not validated["cross_content_patterns"]
+        and len(validated["cross_content_patterns"]) < 2
     ):
         raise AutomaticWeeklyReflectionError(
             "reflection_artifact_incomplete"
@@ -934,6 +935,7 @@ def validate_strict_reflection_artifact(
 def validate_strict_weekly_artifact(
     payload: Mapping[str, Any],
     weekly_context: Mapping[str, Any],
+    reflection_context: Optional[Mapping[str, Any]] = None,
 ) -> dict[str, Any]:
     _validate_schema_value(
         payload,
@@ -1106,6 +1108,14 @@ def validate_strict_weekly_artifact(
         raise AutomaticWeeklyReflectionError(
             "weekly_artifact_source_mismatch"
         )
+    if (
+        reflection_context is not None
+        and not reflection_context.get("mindset_shifts", [])
+        and validated["mindset_shift"] is not None
+    ):
+        raise AutomaticWeeklyReflectionError(
+            "weekly_artifact_mindset_mismatch"
+        )
     return validated
 
 
@@ -1246,6 +1256,7 @@ class AutomaticCodexWeeklyReviewProvider:
         validator = lambda payload: validate_strict_weekly_artifact(
             payload,
             weekly_context,
+            reflection_context,
         )
         try:
             existing = load_codex_artifact(

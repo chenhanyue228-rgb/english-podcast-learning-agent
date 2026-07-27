@@ -17,7 +17,7 @@ Return `ReflectionContext.json` matching the existing reflection context schema.
 1. Identify one coherent weekly theme.
 2. Generate at most one mindset shift, and only when source evidence supports a genuine before-to-now change.
 3. Keep evidence compact and traceable through `source` and `supporting_concept`.
-4. Extract only 2-4 high-value transferable patterns.
+4. For a multi-source week, extract 2-4 high-value transferable patterns.
 5. Produce one concrete professional action candidate.
 6. Do not treat podcast titles, guest names, counts, or metadata as insight.
 7. Do not turn all expressions or vocabulary into reflection content.
