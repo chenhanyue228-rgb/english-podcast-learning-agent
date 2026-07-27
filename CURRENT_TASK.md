@@ -22,6 +22,17 @@ Phase 4.2 - External User Validation
 **Engineering status:**
 `ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`
 
+Parallel implementation work:
+
+- Weekly Reflection automatic scheduling is implemented on
+  `feat/weekly-reflection-scheduler`.
+- Status: pending independent review, merge, installation, and Owner
+  Acceptance.
+- Production LaunchAgent changes: 0.
+- Real Notion calls/writes during development: 0/0.
+- This work does not change the current Phase 4.2 session count or readiness
+  token.
+
 Current facts:
 
 - Setup / Notion workspace recovery: PASS
