@@ -101,6 +101,8 @@ def run_weekly_reflection_pipeline(
     dry_run: bool = False,
     pipeline_run_output_path: Path = Path("output/pipeline_run.json"),
     logs_dir: Path = Path("logs"),
+    reflection_provider: Optional[Any] = None,
+    weekly_review_provider: Optional[Any] = None,
 ) -> WeeklyReflectionPipelineResult:
     weekly_learning_context_path = weekly_learning_context_path.resolve()
     weekly_review_output_path = weekly_review_output_path.resolve()
@@ -130,9 +132,14 @@ def run_weekly_reflection_pipeline(
 
     try:
         step_started_at = perf_counter()
+        reflection_kwargs: dict[str, Any] = {
+            "output_path": reflection_context_output_path,
+        }
+        if reflection_provider is not None:
+            reflection_kwargs["provider"] = reflection_provider
         reflection_result = run_reflection_analysis(
             weekly_learning_context_path,
-            output_path=reflection_context_output_path,
+            **reflection_kwargs,
         )
         _set_step_status(run_record, logger, run_record.run_id, "reflection", "success", perf_counter() - step_started_at)
     except (ReflectionGenerationError, Exception) as exc:
@@ -145,9 +152,23 @@ def run_weekly_reflection_pipeline(
 
     try:
         step_started_at = perf_counter()
+        generation_kwargs: dict[str, Any] = {
+            "output_path": weekly_review_output_path,
+        }
+        if reflection_provider is not None or weekly_review_provider is not None:
+            generation_kwargs.update(
+                {
+                    "reflection_context": reflection_result.payload,
+                    "reflection_context_output_path": (
+                        reflection_context_output_path
+                    ),
+                }
+            )
+        if weekly_review_provider is not None:
+            generation_kwargs["provider"] = weekly_review_provider
         weekly_review_result = run_weekly_review_generation(
             weekly_learning_context_path,
-            output_path=weekly_review_output_path,
+            **generation_kwargs,
         )
         _set_step_status(run_record, logger, run_record.run_id, "generation", "success", perf_counter() - step_started_at)
         quality_status = "passed" if weekly_review_result.quality_report.get("passed", False) else "failed"

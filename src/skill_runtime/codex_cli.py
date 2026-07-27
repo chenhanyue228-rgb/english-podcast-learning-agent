@@ -264,6 +264,7 @@ def generate_codex_json_artifact(
     env: Mapping[str, str] | None = None,
     runner: Runner = subprocess.run,
     validator: ArtifactValidator,
+    stage: str = "automatic vocabulary enrichment",
 ) -> dict[str, Any]:
     """Run Codex once and load the current JSON object it generated."""
     if timeout_seconds <= 0:
@@ -315,7 +316,7 @@ def generate_codex_json_artifact(
             candidate = load_codex_artifact(
                 request_path=request_path,
                 output_path=candidate_path,
-                stage="automatic vocabulary enrichment",
+                stage=stage,
             )
         except (CodexArtifactPendingError, OSError) as exc:
             raise CodexRuntimeError("codex_output_invalid") from exc
