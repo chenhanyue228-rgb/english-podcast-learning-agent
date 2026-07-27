@@ -156,11 +156,19 @@ def _build_reflection_payload(weekly_context: Mapping[str, Any]) -> dict[str, An
         cross_content_patterns.append(
             f"{theme} shows up as a repeated pattern across the week's learning rather than a one-off topic."
         )
-    if expressions:
-        top_expression = str(expressions[0].get("expression", "")).strip()
+        top_expression = (
+            str(expressions[0].get("expression", "")).strip()
+            if expressions
+            else ""
+        )
         if top_expression:
             cross_content_patterns.append(
                 f"Expressions like '{top_expression}' turn learning ideas into reusable language for work conversations."
+            )
+        else:
+            cross_content_patterns.append(
+                f"{first_topic or theme} and {second_topic or theme} both "
+                "reinforce a transferable professional learning pattern."
             )
     professional_actions = [
         "In one stakeholder conversation, restate the shared outcome before discussing constraints and note whether the exchange moves from positions to options."
@@ -276,29 +284,93 @@ def _validate_reflection_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         raise ReflectionGenerationError(
             f"Reflection context is missing required fields: {', '.join(missing)}"
         )
+    if set(payload) != set(required_keys):
+        raise ReflectionGenerationError(
+            "Reflection context contains unsupported fields."
+        )
     weekly_theme = payload.get("weekly_theme")
     if not isinstance(weekly_theme, Mapping):
         raise ReflectionGenerationError("Reflection weekly_theme must be an object.")
-    if not isinstance(weekly_theme.get("category"), str) or not isinstance(weekly_theme.get("theme"), str):
+    if set(weekly_theme) != {"category", "theme"}:
+        raise ReflectionGenerationError(
+            "Reflection weekly_theme contains unsupported fields."
+        )
+    if (
+        not isinstance(weekly_theme.get("category"), str)
+        or not weekly_theme.get("category", "").strip()
+        or not isinstance(weekly_theme.get("theme"), str)
+        or not weekly_theme.get("theme", "").strip()
+    ):
         raise ReflectionGenerationError("Reflection weekly_theme must contain category and theme strings.")
     if not isinstance(payload.get("mindset_shifts"), list):
         raise ReflectionGenerationError("Reflection mindset_shifts must be an array.")
+    if len(payload.get("mindset_shifts", [])) > 1:
+        raise ReflectionGenerationError(
+            "Reflection mindset_shifts must contain at most one item."
+        )
     for shift in payload.get("mindset_shifts", []):
         if not isinstance(shift, Mapping):
             raise ReflectionGenerationError("Each mindset_shift must be an object.")
-        if not isinstance(shift.get("before"), str) or not isinstance(shift.get("after"), str):
+        if set(shift) != {"before", "after", "evidence", "confidence"}:
+            raise ReflectionGenerationError(
+                "Each mindset_shift contains unsupported fields."
+            )
+        if (
+            not isinstance(shift.get("before"), str)
+            or not shift.get("before", "").strip()
+            or not isinstance(shift.get("after"), str)
+            or not shift.get("after", "").strip()
+        ):
             raise ReflectionGenerationError("Each mindset_shift must contain before and after strings.")
         if not isinstance(shift.get("evidence"), list) or not shift.get("evidence"):
             raise ReflectionGenerationError("Each mindset_shift must include non-empty evidence references.")
-        if not isinstance(shift.get("confidence"), (int, float)):
+        for evidence in shift.get("evidence", []):
+            if not isinstance(evidence, Mapping):
+                raise ReflectionGenerationError(
+                    "Each mindset_shift evidence item must be an object."
+                )
+            if set(evidence) != {"source", "supporting_concept"}:
+                raise ReflectionGenerationError(
+                    "Each mindset_shift evidence item contains unsupported fields."
+                )
+            if (
+                not isinstance(evidence.get("source"), str)
+                or not evidence.get("source", "").strip()
+                or not isinstance(evidence.get("supporting_concept"), str)
+                or not evidence.get("supporting_concept", "").strip()
+            ):
+                raise ReflectionGenerationError(
+                    "Each mindset_shift evidence item must contain non-empty source and supporting_concept strings."
+                )
+        if isinstance(shift.get("confidence"), bool) or not isinstance(
+            shift.get("confidence"),
+            (int, float),
+        ):
             raise ReflectionGenerationError("Each mindset_shift must include a confidence score.")
         confidence = float(shift.get("confidence"))
         if confidence < 0 or confidence > 1:
             raise ReflectionGenerationError("Each mindset_shift confidence must be between 0 and 1.")
     if not isinstance(payload.get("cross_content_patterns"), list):
         raise ReflectionGenerationError("Reflection cross_content_patterns must be an array.")
-    if not isinstance(payload.get("professional_actions"), list) or not payload.get("professional_actions"):
-        raise ReflectionGenerationError("Reflection professional_actions must be a non-empty array.")
+    if len(payload.get("cross_content_patterns", [])) > 4 or any(
+        not isinstance(item, str) or not item.strip()
+        for item in payload.get("cross_content_patterns", [])
+    ):
+        raise ReflectionGenerationError(
+            "Reflection cross_content_patterns must contain at most four non-empty strings."
+        )
+    professional_actions = payload.get("professional_actions")
+    if (
+        not isinstance(professional_actions, list)
+        or len(professional_actions) != 1
+        or any(
+            not isinstance(item, str) or not item.strip()
+            for item in professional_actions
+        )
+    ):
+        raise ReflectionGenerationError(
+            "Reflection professional_actions must contain exactly one non-empty string."
+        )
     return dict(payload)
 
 
@@ -320,8 +392,17 @@ class ReflectionAnalyzer:
         generated = self.provider.generate(self.prompt, context)
         validated = _validate_reflection_payload(generated)
         podcasts = [item for item in weekly_learning_context.get("podcasts", []) if isinstance(item, Mapping)]
-        if len(podcasts) > 1 and not validated.get("cross_content_patterns"):
-            raise ReflectionGenerationError("Reflection cross_content_patterns must be non-empty for multi-podcast weeks.")
+        patterns = validated.get("cross_content_patterns", [])
+        if len(podcasts) <= 1 and patterns:
+            raise ReflectionGenerationError(
+                "Reflection cross_content_patterns must be empty for "
+                "single-podcast weeks."
+            )
+        if len(podcasts) > 1 and len(patterns) < 2:
+            raise ReflectionGenerationError(
+                "Reflection cross_content_patterns must contain 2-4 items "
+                "for multi-podcast weeks."
+            )
         return validated
 
 

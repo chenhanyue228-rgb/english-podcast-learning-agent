@@ -33,6 +33,13 @@ from src.notion.weekly_reflection_writer import (
     weekly_reflection_body_blocks,
 )
 from src.skill_runtime.codex_cli import CodexRuntimeError
+from src.weekly_review.reflection_analyzer import (
+    PlaceholderReflectionProvider,
+    ReflectionAnalyzer,
+    ReflectionGenerationError,
+    load_reflection_prompt,
+    load_reflection_schema,
+)
 from src.workflow.weekly_reflection_pipeline import WeeklyReflectionPipelineError
 
 
@@ -132,7 +139,8 @@ def _reflection() -> dict:
             }
         ],
         "cross_content_patterns": [
-            "Careful framing turns disagreement into joint inquiry."
+            "Careful framing turns disagreement into joint inquiry.",
+            "Shared outcomes make constraints easier to discuss.",
         ],
         "professional_actions": [
             "Restate the shared outcome before discussing constraints."
@@ -269,15 +277,16 @@ class CodexFixture:
         stage = kwargs["stage"]
         self.calls.append(stage)
         self.private_env_seen.append(kwargs.get("env"))
-        payload = (
-            _reflection()
-            if "reflection analysis" in stage
-            else _weekly_review(
-                json.loads(
-                    kwargs["request_path"].read_text(encoding="utf-8")
-                )["input"]["weekly_learning_context"]
-            )
+        request = json.loads(
+            kwargs["request_path"].read_text(encoding="utf-8")
         )
+        weekly_context = request["input"]["weekly_learning_context"]
+        if "reflection analysis" in stage:
+            payload = _reflection()
+            if len(weekly_context["podcasts"]) <= 1:
+                payload["cross_content_patterns"] = []
+        else:
+            payload = _weekly_review(weekly_context)
         validated = kwargs["validator"](payload)
         kwargs["output_path"].parent.mkdir(parents=True, exist_ok=True)
         kwargs["output_path"].write_text(
@@ -972,7 +981,10 @@ def test_strict_artifacts_reject_empty_core_content() -> None:
     reflection["mindset_shifts"][0]["evidence"] = []
     with pytest.raises(AutomaticWeeklyReflectionError) as reflection_error:
         validate_strict_reflection_artifact(reflection)
-    assert reflection_error.value.code == "reflection_artifact_incomplete"
+    assert (
+        reflection_error.value.code
+        == "reflection_artifact_schema_invalid"
+    )
 
     context = _weekly_context(
         today=DUE.date(),
@@ -1017,6 +1029,358 @@ def test_single_source_runtime_accepts_empty_cross_content_patterns(
     assert report.reflection_codex_calls == 1
     assert report.weekly_review_codex_calls == 1
     assert report.weekly_created == 1
+
+
+def test_single_source_runtime_accepts_empty_mindset_shifts(
+    tmp_path: Path,
+) -> None:
+    class SingleSourceCodex(CodexFixture):
+        def __call__(self, **kwargs):
+            self.calls.append(kwargs["stage"])
+            self.private_env_seen.append(kwargs.get("env"))
+            if "reflection analysis" in kwargs["stage"]:
+                payload = _reflection()
+                payload["mindset_shifts"] = []
+                payload["cross_content_patterns"] = []
+            else:
+                request = json.loads(
+                    kwargs["request_path"].read_text(encoding="utf-8")
+                )
+                payload = _weekly_review(
+                    request["input"]["weekly_learning_context"]
+                )
+                payload["mindset_shift"] = None
+            validated = kwargs["validator"](payload)
+            kwargs["output_path"].parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            kwargs["output_path"].write_text(
+                json.dumps(validated),
+                encoding="utf-8",
+            )
+            return validated
+
+    report = _run(
+        tmp_path,
+        codex_generator=SingleSourceCodex(),
+    )
+
+    assert report.status == "PASS", report.to_dict()
+    assert report.reflection_codex_calls == 1
+    assert report.weekly_review_codex_calls == 1
+    assert report.weekly_created == 1
+
+
+@pytest.mark.parametrize(
+    ("case_name", "podcast_count", "payload_mutator", "expected_pass"),
+    (
+        (
+            "single_minimal",
+            1,
+            lambda payload: payload.update(
+                mindset_shifts=[],
+                cross_content_patterns=[],
+            ),
+            True,
+        ),
+        (
+            "single_rich",
+            1,
+            lambda payload: payload.update(
+                cross_content_patterns=[],
+            ),
+            True,
+        ),
+        (
+            "single_with_cross_content",
+            1,
+            lambda payload: None,
+            False,
+        ),
+        (
+            "multiple_without_mindset_shift",
+            2,
+            lambda payload: payload.update(
+                mindset_shifts=[],
+            ),
+            True,
+        ),
+        (
+            "multiple_rich",
+            2,
+            lambda payload: None,
+            True,
+        ),
+        (
+            "multiple_without_cross_content",
+            2,
+            lambda payload: payload.update(
+                cross_content_patterns=[],
+            ),
+            False,
+        ),
+        (
+            "multiple_with_one_cross_content_pattern",
+            2,
+            lambda payload: payload.update(
+                cross_content_patterns=["one pattern"],
+            ),
+            False,
+        ),
+        (
+            "missing_professional_action",
+            1,
+            lambda payload: payload.update(
+                professional_actions=[],
+            ),
+            False,
+        ),
+        (
+            "mindset_shift_without_evidence",
+            1,
+            lambda payload: payload["mindset_shifts"][0].update(
+                evidence=[],
+            ),
+            False,
+        ),
+        (
+            "empty_weekly_theme",
+            1,
+            lambda payload: payload["weekly_theme"].update(theme=""),
+            False,
+        ),
+        (
+            "empty_mindset_transition",
+            1,
+            lambda payload: payload["mindset_shifts"][0].update(before=""),
+            False,
+        ),
+        (
+            "empty_evidence_reference",
+            1,
+            lambda payload: payload["mindset_shifts"][0]["evidence"][0].update(
+                source="",
+            ),
+            False,
+        ),
+        (
+            "empty_cross_content_item",
+            2,
+            lambda payload: payload.update(
+                cross_content_patterns=[""],
+            ),
+            False,
+        ),
+        (
+            "empty_professional_action",
+            1,
+            lambda payload: payload.update(
+                professional_actions=[""],
+            ),
+            False,
+        ),
+        (
+            "multiple_professional_actions",
+            1,
+            lambda payload: payload.update(
+                professional_actions=["first", "second"],
+            ),
+            False,
+        ),
+        (
+            "multiple_mindset_shifts",
+            1,
+            lambda payload: payload["mindset_shifts"].append(
+                deepcopy(payload["mindset_shifts"][0]),
+            ),
+            False,
+        ),
+        (
+            "unsupported_root_field",
+            1,
+            lambda payload: payload.update(unexpected="value"),
+            False,
+        ),
+    ),
+)
+def test_reflection_validation_compatibility_matrix(
+    case_name: str,
+    podcast_count: int,
+    payload_mutator,
+    expected_pass: bool,
+) -> None:
+    class StaticProvider:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def generate(self, _prompt, _context):
+            return deepcopy(self.payload)
+
+    payload = _reflection()
+    payload_mutator(payload)
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+    )
+    while len(context["podcasts"]) < podcast_count:
+        context["podcasts"].append(deepcopy(context["podcasts"][0]))
+
+    base_passed = True
+    try:
+        ReflectionAnalyzer(
+            provider=StaticProvider(payload),
+        ).generate(context)
+    except ReflectionGenerationError:
+        base_passed = False
+
+    automatic_passed = True
+    try:
+        validate_strict_reflection_artifact(
+            payload,
+            require_cross_content_patterns=podcast_count > 1,
+        )
+    except AutomaticWeeklyReflectionError:
+        automatic_passed = False
+
+    assert base_passed is expected_pass, case_name
+    assert automatic_passed is expected_pass, case_name
+
+
+def test_reflection_schema_and_prompt_contract_are_aligned() -> None:
+    prompt = load_reflection_prompt()
+    schema = load_reflection_schema()
+    properties = schema["properties"]
+    theme = properties["weekly_theme"]
+    shift = properties["mindset_shifts"]
+    evidence = shift["items"]["properties"]["evidence"]
+    confidence = shift["items"]["properties"]["confidence"]
+    patterns = properties["cross_content_patterns"]
+    actions = properties["professional_actions"]
+
+    assert "at most one mindset shift" in prompt
+    assert "only when source evidence supports" in prompt
+    assert "For a multi-source week, extract 2-4" in prompt
+    assert "For a single-source week, leave cross-content patterns empty" in prompt
+    assert "Produce one concrete professional action" in prompt
+    assert schema["additionalProperties"] is False
+    assert theme["additionalProperties"] is False
+    assert theme["properties"]["category"]["minLength"] == 1
+    assert theme["properties"]["theme"]["minLength"] == 1
+    assert shift["maxItems"] == 1
+    assert evidence["minItems"] == 1
+    assert confidence["minimum"] == 0
+    assert confidence["maximum"] == 1
+    assert patterns["maxItems"] == 4
+    assert patterns["items"]["minLength"] == 1
+    assert actions["minItems"] == 1
+    assert actions["maxItems"] == 1
+
+
+def test_placeholder_single_source_keeps_cross_content_empty() -> None:
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+    )
+
+    reflection = ReflectionAnalyzer(
+        provider=PlaceholderReflectionProvider(),
+    ).generate(context)
+
+    assert reflection["cross_content_patterns"] == []
+
+
+def test_placeholder_multi_source_minimal_week_generates_two_patterns() -> None:
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+        include_assets=False,
+    )
+    second = deepcopy(context["podcasts"][0])
+    second["topic"] = "Leadership"
+    context["podcasts"].append(second)
+
+    reflection = ReflectionAnalyzer(
+        provider=PlaceholderReflectionProvider(),
+    ).generate(context)
+
+    assert len(reflection["cross_content_patterns"]) == 2
+
+
+def test_weekly_artifact_cannot_invent_mindset_shift() -> None:
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+    )
+    reflection = _reflection()
+    reflection["mindset_shifts"] = []
+
+    with pytest.raises(AutomaticWeeklyReflectionError) as error:
+        validate_strict_weekly_artifact(
+            _weekly_review(context),
+            context,
+            reflection,
+        )
+
+    assert error.value.code == "weekly_artifact_mindset_mismatch"
+
+
+def test_weekly_artifact_allows_null_mindset_without_reflection_shift() -> None:
+    context = _weekly_context(
+        today=DUE.date(),
+        generated_at=DUE.isoformat(),
+    )
+    reflection = _reflection()
+    reflection["mindset_shifts"] = []
+    review = _weekly_review(context)
+    review["mindset_shift"] = None
+
+    validated = validate_strict_weekly_artifact(
+        review,
+        context,
+        reflection,
+    )
+
+    assert validated["mindset_shift"] is None
+
+
+def test_runtime_blocks_weekly_mindset_shift_without_reflection_evidence(
+    tmp_path: Path,
+) -> None:
+    class MismatchedCodex(CodexFixture):
+        def __call__(self, **kwargs):
+            self.calls.append(kwargs["stage"])
+            self.private_env_seen.append(kwargs.get("env"))
+            if "reflection analysis" in kwargs["stage"]:
+                payload = _reflection()
+                payload["mindset_shifts"] = []
+                payload["cross_content_patterns"] = []
+            else:
+                request = json.loads(
+                    kwargs["request_path"].read_text(encoding="utf-8")
+                )
+                payload = _weekly_review(
+                    request["input"]["weekly_learning_context"]
+                )
+            validated = kwargs["validator"](payload)
+            kwargs["output_path"].parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            kwargs["output_path"].write_text(
+                json.dumps(validated),
+                encoding="utf-8",
+            )
+            return validated
+
+    report = _run(
+        tmp_path,
+        codex_generator=MismatchedCodex(),
+    )
+
+    assert report.status == "SAFE_STOP"
+    assert report.error_code == "weekly_artifact_mindset_mismatch"
+    assert report.weekly_created == 0
 
 
 def test_multi_source_provider_rejects_empty_cross_content_patterns(
@@ -1162,7 +1526,9 @@ def test_provider_passes_bounded_isolated_codex_contract(tmp_path: Path) -> None
 
     def generator(**kwargs):
         captured.update(kwargs)
-        return kwargs["validator"](_reflection())
+        payload = _reflection()
+        payload["cross_content_patterns"] = []
+        return kwargs["validator"](payload)
 
     provider = AutomaticCodexReflectionProvider(
         request_path=tmp_path / "request.json",
