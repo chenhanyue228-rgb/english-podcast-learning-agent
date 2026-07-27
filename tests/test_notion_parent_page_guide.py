@@ -171,17 +171,53 @@ def test_guide_contains_complete_required_content_and_version() -> None:
         "Expression Database",
         "Vocabulary Database",
         "Weekly Review",
+        "数据库入口",
         "推荐日常流程",
         "Weekly Reflection 说明",
         "隐私与安全",
-        "targeted Vocabulary",
-        "粉色高亮",
+        "粉色文字或粉色背景",
+        "自动检测、丰富并写入 Vocabulary Database",
         "每周六上午 10:00",
         "明确确认后启用",
+        "自定义星期和时间",
+        "查询时间、修改时间、暂停或恢复",
     ):
         assert required in text
+    assert "同步生词" not in text
     assert "Notion AI-assisted workflow" not in text
     assert "Podcast-page Expression synchronization" not in text
+
+
+def test_database_entries_precede_instructions_with_icons_and_names_unchanged() -> None:
+    blocks = parent_page_guide.build_parent_page_guide_blocks()
+    entry_names = (
+        "Podcast Library",
+        "Expression Database",
+        "Vocabulary Database",
+        "Weekly Review",
+    )
+    entry_icons = ("🎧", "💬", "📚", "📝")
+
+    assert parent_page_guide._block_text(blocks[1]) == "数据库入口"
+    start_index = next(
+        index
+        for index, block in enumerate(blocks)
+        if parent_page_guide._block_text(block) == "从这里开始"
+    )
+    entries = [
+        block
+        for block in blocks[:start_index]
+        if block.get("type") == "callout"
+    ]
+
+    assert len(entries) == 4
+    assert tuple(
+        parent_page_guide._block_text(block).splitlines()[0]
+        for block in entries
+    ) == entry_names
+    assert tuple(block["callout"]["icon"]["emoji"] for block in entries) == (
+        entry_icons
+    )
 
 
 def test_dry_run_plans_parent_write_and_performs_zero_writes() -> None:

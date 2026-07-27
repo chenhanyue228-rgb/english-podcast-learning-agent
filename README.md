@@ -38,9 +38,8 @@ Current state:
 - new highlights wait for a 90-second quiet period before Codex enrichment
 - exact occurrence state, Target Binding, strict validation, and idempotent
   publishing are active
-- Weekly Reflection scheduling is implemented on the current development
-  branch and is pending independent review, merge, installation, and Owner
-  Acceptance
+- Weekly Reflection scheduling is merged, installed, and has passed protected
+  Owner Acceptance
 - the engineering status is
   `ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`
 - external-user sessions remain 0
@@ -239,9 +238,9 @@ request. A missed scheduled run may catch up once after the Mac wakes; an
 already completed period is not generated again. If the current period lacks
 real learning data, the run is skipped without creating a blank page.
 
-This documentation describes the product contract and the implementation
-under review. It does not claim that the Weekly scheduler is installed or
-accepted in any production environment.
+The independent Weekly scheduler is part of the accepted production runtime.
+Its default remains Saturday at 10:00 local time, while each user may confirm
+a different weekday/time or leave it disabled during setup.
 
 ## Basic Troubleshooting
 

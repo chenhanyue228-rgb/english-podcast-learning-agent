@@ -16,22 +16,21 @@ feeds, and local audio files into reusable English learning assets:
 
 **Phase:** Phase 4.2 - External User Validation
 
-**Execution stage:** Automatic Vocabulary engineering complete
+**Execution stage:** Product readiness alignment after Weekly Scheduler Owner
+Acceptance
 
 **Engineering status:**
 `ENGINEERING_COMPLETE_READY_FOR_EXTERNAL_USER_TESTING`
 
-An independent Weekly Reflection scheduler is being implemented on a feature
-branch. Its product default is Saturday at 10:00 in the current Mac local
-timezone, with explicit-confirmation install/configure/pause/resume controls.
-This implementation is pending independent review, merge, installation, and
-Owner Acceptance. It does not change the current production release or
-external-user readiness.
+The independent Weekly Reflection scheduler is merged, installed, and has
+passed protected Owner Acceptance. Its product default is Saturday at 10:00
+in the current Mac local timezone, with explicit-confirmation
+install/configure/pause/resume controls.
 
 **Release:** v1.2.0
 
-The Phase 3 runtime baseline is production `main`
-`156b37f08290aa9b985112269d2a373de51c48d2`.
+The current production baseline is `main`
+`bea7eb2cc5bbf38d955b82342b7c8b2a4f230155`.
 
 Current release and acceptance evidence:
 
@@ -55,6 +54,12 @@ Current release and acceptance evidence:
 - Automatic scheduler: installed and loaded at a 60-second interval.
 - Scheduler activation: first cycle BASELINED; next cycle NO_WORK; Vocabulary
   publisher calls 0.
+- Weekly scheduler: installed and loaded; protected Owner Acceptance PASS.
+- Weekly scheduler first publish: created 1; exact retry created 0 with 0
+  additional Codex calls.
+- Weekly page TOC, required sections, source relation, period, and Quality
+  Gate: PASS.
+- Weekly schedule customization and pause/resume lifecycle: PASS.
 - Notion AI dependency: none.
 - External-user sessions: 0.
 - External-user validation: NOT RUN.
@@ -76,9 +81,9 @@ Review generation.
 
 Python performs source processing, transcription, artifact validation,
 deterministic workflow execution, exact occurrence state management, bounded
-scheduling, and Notion synchronization. The proposed Weekly scheduler invokes
-one finite due-check process and reuses the accepted Weekly pipeline; it does
-not introduce a daemon, cloud service, or new reasoning provider.
+scheduling, and Notion synchronization. The Weekly scheduler invokes one
+finite due-check process and reuses the accepted Weekly pipeline; it does not
+introduce a daemon, cloud service, or new reasoning provider.
 
 ### Notion: Long-Term Knowledge Memory
 

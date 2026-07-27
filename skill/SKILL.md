@@ -1,6 +1,6 @@
 ---
 name: english-audio-learning-agent
-description: Install and set up English Audio Learning Agent; configure and validate its Notion workspace; analyze Apple Podcasts episodes, podcast RSS feeds, and local English audio; generate learning artifacts; sync highlighted vocabulary; and publish learning notes and weekly reflections.
+description: Install and set up English Audio Learning Agent; configure and validate its Notion workspace; analyze Apple Podcasts episodes, podcast RSS feeds, and local English audio; generate learning artifacts; automatically enrich exact pink-highlighted vocabulary; and publish learning notes and weekly reflections.
 ---
 
 # English Audio Learning Agent Skill
@@ -27,7 +27,7 @@ results into Notion with minimal manual work.
 - Apple Podcasts episode URL
 - Podcast RSS feed
 - Local audio file
-- Highlight vocabulary input
+- Exact pink text or pink background highlight in a Podcast learning page
 
 ### Out of Scope for v1
 

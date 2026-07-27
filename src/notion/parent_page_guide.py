@@ -99,10 +99,49 @@ def _text_block(
     }
 
 
+def _database_entry(
+    name: str,
+    description: str,
+    *,
+    emoji: str,
+) -> dict[str, Any]:
+    """Return a visual database entry without changing the database name."""
+    return {
+        "object": "block",
+        "type": "callout",
+        "callout": {
+            "rich_text": _rich_text(f"{name}\n{description}"),
+            "icon": {"type": "emoji", "emoji": emoji},
+            "color": "default_background",
+        },
+    }
+
+
 def build_parent_page_guide_blocks() -> list[dict[str, Any]]:
     """Return the complete deterministic V1 parent-page guide."""
     blocks = [
         _text_block("heading_1", "English Audio Learning Agent"),
+        _text_block("heading_2", "数据库入口"),
+        _database_entry(
+            "Podcast Library",
+            "保存每期音频、摘要、重点内容和学习材料。",
+            emoji="🎧",
+        ),
+        _database_entry(
+            "Expression Database",
+            "保存值得复用的地道表达、商务短语、行业术语、搭配和句型。",
+            emoji="💬",
+        ),
+        _database_entry(
+            "Vocabulary Database",
+            "保存用户用粉色文字或粉色背景主动选择、并由系统自动处理的生词。",
+            emoji="📚",
+        ),
+        _database_entry(
+            "Weekly Review",
+            "保存自动生成的 Weekly Reflection 学习复盘。",
+            emoji="📝",
+        ),
         _text_block(
             "paragraph",
             "把英语 Podcast、RSS 或本地音频整理成可持续复习的 Notion 学习系统。",
@@ -122,44 +161,21 @@ def build_parent_page_guide_blocks() -> list[dict[str, Any]]:
         ),
         _text_block(
             "numbered_list_item",
-            "将不熟悉的单词用粉色高亮。",
+            "将不熟悉的单词设置为粉色文字或粉色背景。",
         ),
         _text_block(
             "numbered_list_item",
-            "使用正式的 targeted Vocabulary 流程同步生词。",
+            "系统自动检测、丰富并写入 Vocabulary Database。",
         ),
         _text_block(
             "numbered_list_item",
             "学习数据充分后生成 Weekly Reflection。",
         ),
-        _text_block("heading_2", "四个数据库"),
-        _text_block("heading_3", "Podcast Library"),
-        _text_block(
-            "paragraph",
-            "保存每期音频、摘要、重点内容和学习材料。",
-        ),
-        _text_block("heading_3", "Expression Database"),
-        _text_block(
-            "paragraph",
-            "保存值得复用的地道表达、商务短语、行业术语、搭配和句型。",
-        ),
-        _text_block("heading_3", "Vocabulary Database"),
-        _text_block(
-            "paragraph",
-            "保存用户主动用粉色高亮并确认同步的生词。",
-        ),
-        _text_block("heading_3", "Weekly Review"),
-        _text_block("paragraph", "保存 Weekly Reflection，包括："),
-        _text_block("bulleted_list_item", "知识总结"),
-        _text_block("bulleted_list_item", "表达提升"),
-        _text_block("bulleted_list_item", "生词复习"),
-        _text_block("bulleted_list_item", "职业思考"),
-        _text_block("bulleted_list_item", "下一步学习方向"),
         _text_block("heading_2", "推荐日常流程"),
         _text_block(
             "paragraph",
             "听音频 → 阅读 Podcast 学习页 → 复习 Expression → "
-            "粉色高亮生词 → 同步 Vocabulary → 每周生成 Weekly Reflection",
+            "粉色高亮生词 → 自动写入 Vocabulary → 每周生成 Weekly Reflection",
         ),
         _text_block("heading_2", "Weekly Reflection 说明"),
         _text_block(
@@ -170,6 +186,12 @@ def build_parent_page_guide_blocks() -> list[dict[str, Any]]:
             "paragraph",
             "本地自动计划在用户明确确认后启用；默认时间为每周六上午 10:00，"
             "也可以通过 Agent 修改、暂停或恢复。",
+        ),
+        _text_block(
+            "paragraph",
+            "第一次设置时可以使用默认时间、自定义星期和时间，或暂不开启。"
+            "之后可以直接用自然语言查询时间、修改时间、暂停或恢复，无需打开"
+            "终端、编辑配置文件或管理 LaunchAgent。",
         ),
         _text_block(
             "paragraph",
