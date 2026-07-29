@@ -35,6 +35,38 @@ from src.notion.target_binding import (
 GUIDE_VERSION = "EPLA_PARENT_GUIDE_V1"
 WRITE_CONFIRMATION = "PARENT_PAGE_GUIDE_WRITES_TO_NOTION"
 
+PODCAST_PRACTICE_PROMPT = """请读取下面的 Notion Podcast 学习页面：
+<粘贴 Podcast 页面链接>
+
+如果你无法访问该页面，请直接告诉我，不要猜测内容，也不要修改 Notion 页面。
+
+请把页面作为本次英语训练素材，并按教练式对话带我练习：
+
+1. 先用中文概括主题、难度，以及最值得掌握的 5 个表达。
+2. 用英语一次问我一个理解问题，共 5 个；等我回答后再继续。
+3. 每次反馈先给更自然的英文改写，再用中文简要说明原因。
+4. 基于页面内容设计一个与工作、面试或日常生活相关的 6 轮角色扮演。
+5. 主动引导我使用页面中的重点表达和粉色词汇。
+6. 最后总结我的主要错误、可复用表达，并给出一个 10 分钟复习任务。
+
+请根据我的回答动态调整难度；我卡住时先给英文提示，仍无法回答再给中文提示。"""
+
+WEEKLY_REVIEW_PRACTICE_PROMPT = """请读取下面的 Notion Weekly Review 页面：
+<粘贴 Weekly Review 页面链接>
+
+如果你无法访问该页面，请直接告诉我，不要猜测内容，也不要修改 Notion 页面。
+
+请把它作为我本周的学习档案，带我完成一次 20 分钟复盘训练：
+
+1. 先用中文提炼本周核心观点、重点表达、词汇、思维变化和下周行动。
+2. 选出 3 个最值得复用的表达和 3 个最需要加强的词汇。
+3. 用英语一次问我一个问题，测试我能否解释核心观点并举例应用。
+4. 设计 2 个与我的真实工作、面试或生活场景相关的角色扮演。
+5. 对我的回答分别从准确性、自然度和清晰度评分，并给出更自然的英文改写。
+6. 最后生成下一周练习计划：1 个主题、3 个表达、3 个词汇、2 个口语任务和 1 个真实应用任务。
+
+不要一次给出全部答案，请逐步提问并等待我回答。"""
+
 CONFIRMATION_REQUIRED = "parent_guide_confirmation_required"
 CONFIRMATION_INVALID = "parent_guide_confirmation_invalid"
 PARENT_READ_FAILED = "parent_guide_parent_read_failed"
@@ -96,6 +128,20 @@ def _text_block(
         "object": "block",
         "type": block_type,
         block_type: {"rich_text": _rich_text(content, code=code)},
+    }
+
+
+def _code_block(
+    content: str,
+    language: str = "plain text",
+) -> dict[str, Any]:
+    return {
+        "object": "block",
+        "type": "code",
+        "code": {
+            "rich_text": _rich_text(content),
+            "language": language,
+        },
     }
 
 
@@ -197,6 +243,37 @@ def build_parent_page_guide_blocks() -> list[dict[str, Any]]:
             "paragraph",
             "单次使用后没有 Weekly Reflection，不代表系统故障。",
         ),
+        _text_block("heading_2", "用 ChatGPT 继续练习"),
+        _text_block(
+            "paragraph",
+            "可以把 Podcast 学习页面链接发送给 ChatGPT，继续做阅读理解、"
+            "英语口语、表达复用、词汇复习和场景角色扮演。",
+        ),
+        _text_block(
+            "paragraph",
+            "可以把 Weekly Review 页面链接发送给 ChatGPT，完成每周复盘和"
+            "下一周学习计划。",
+        ),
+        _text_block(
+            "paragraph",
+            "ChatGPT 必须已经连接你自己的 Notion，并有权限读取对应页面。"
+            "如果无法读取，必须直接说明，不能猜测页面内容；你可以改为粘贴"
+            "页面内容或上传不含敏感信息的 Notion 导出文件。",
+        ),
+        _text_block(
+            "paragraph",
+            "ChatGPT 不得修改对应的 Notion 页面，也不要为了让 ChatGPT 读取而"
+            "把私人页面公开到互联网。",
+        ),
+        _text_block(
+            "paragraph",
+            "这是当前对话中的个性化练习，不是训练、微调或永久修改 ChatGPT"
+            " 模型。",
+        ),
+        _text_block("heading_3", "Podcast 页面练习 Prompt"),
+        _code_block(PODCAST_PRACTICE_PROMPT),
+        _text_block("heading_3", "Weekly Review 页面练习 Prompt"),
+        _code_block(WEEKLY_REVIEW_PRACTICE_PROMPT),
         _text_block("heading_2", "隐私与安全"),
         _text_block(
             "bulleted_list_item",
@@ -212,7 +289,16 @@ def build_parent_page_guide_blocks() -> list[dict[str, Any]]:
         ),
         _text_block(
             "bulleted_list_item",
-            "不要分享私人 Notion 页面链接。",
+            "只在 ChatGPT 已连接你自己的 Notion 且有页面读取权限时，在当前"
+            "对话中提供页面链接；不要把私人页面公开到互联网。",
+        ),
+        _text_block(
+            "bulleted_list_item",
+            "不要使用包含公司机密、客户信息或个人隐私的页面。",
+        ),
+        _text_block(
+            "bulleted_list_item",
+            "不要在练习内容中提供 Notion Token、数据库 ID 或其他访问密钥。",
         ),
         _text_block(
             "bulleted_list_item",

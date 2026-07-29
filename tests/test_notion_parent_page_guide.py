@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +13,9 @@ from src.notion.target_binding import NotionTargetBindingError
 
 
 PARENT_ID = "target-parent"
+USER_GUIDE_PATH = (
+    Path(__file__).resolve().parents[1] / "docs" / "USER_GUIDE_ZH.md"
+)
 CONFIG = NotionConfig(
     token="test-token",
     podcast_database_id="podcast-db",
@@ -19,6 +24,17 @@ CONFIG = NotionConfig(
     vocabulary_database_id="vocabulary-db",
     target_parent_page_id=PARENT_ID,
 )
+
+
+def _canonical_prompt(heading: str) -> str:
+    guide = USER_GUIDE_PATH.read_text(encoding="utf-8")
+    match = re.search(
+        rf"^### {re.escape(heading)}\n\n```text\n(.*?)\n```$",
+        guide,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    assert match is not None
+    return match.group(1)
 
 
 def _api_block(
@@ -181,11 +197,93 @@ def test_guide_contains_complete_required_content_and_version() -> None:
         "明确确认后启用",
         "自定义星期和时间",
         "查询时间、修改时间、暂停或恢复",
+        "用 ChatGPT 继续练习",
+        "阅读理解、英语口语、表达复用、词汇复习和场景角色扮演",
+        "每周复盘和下一周学习计划",
+        "ChatGPT 必须已经连接你自己的 Notion",
+        "如果无法读取，必须直接说明，不能猜测页面内容",
+        "ChatGPT 不得修改对应的 Notion 页面",
+        "不要为了让 ChatGPT 读取而把私人页面公开到互联网",
+        "不是训练、微调或永久修改 ChatGPT 模型",
+        "公司机密、客户信息或个人隐私",
+        "Notion Token、数据库 ID 或其他访问密钥",
     ):
         assert required in text
     assert "同步生词" not in text
     assert "Notion AI-assisted workflow" not in text
     assert "Podcast-page Expression synchronization" not in text
+
+
+def test_chatgpt_practice_guidance_follows_weekly_and_precedes_privacy() -> None:
+    blocks = parent_page_guide.build_parent_page_guide_blocks()
+    headings = [
+        parent_page_guide._block_text(block)
+        for block in blocks
+        if block.get("type") == "heading_2"
+    ]
+
+    assert headings.index("Weekly Reflection 说明") < headings.index(
+        "用 ChatGPT 继续练习"
+    )
+    assert headings.index("用 ChatGPT 继续练习") < headings.index("隐私与安全")
+
+
+def test_parent_guide_contains_canonical_practice_prompts_as_code_blocks() -> None:
+    blocks = parent_page_guide.build_parent_page_guide_blocks()
+    block_text = [
+        parent_page_guide._block_text(block)
+        for block in blocks
+    ]
+    chatgpt_index = block_text.index("用 ChatGPT 继续练习")
+    podcast_index = block_text.index("Podcast 页面练习 Prompt")
+    weekly_index = block_text.index("Weekly Review 页面练习 Prompt")
+    privacy_index = block_text.index("隐私与安全")
+
+    assert chatgpt_index < podcast_index < weekly_index < privacy_index
+    code_blocks = [block for block in blocks if block.get("type") == "code"]
+    assert len(code_blocks) == 2
+
+    podcast_block = blocks[podcast_index + 1]
+    weekly_block = blocks[weekly_index + 1]
+    assert podcast_block["type"] == "code"
+    assert weekly_block["type"] == "code"
+    assert podcast_block["code"]["language"] == "plain text"
+    assert weekly_block["code"]["language"] == "plain text"
+
+    podcast_prompt = parent_page_guide._block_text(podcast_block)
+    weekly_prompt = parent_page_guide._block_text(weekly_block)
+    assert podcast_prompt == _canonical_prompt("Podcast 页面练习 Prompt")
+    assert weekly_prompt == _canonical_prompt("Weekly Review 页面练习 Prompt")
+
+    for required in (
+        "<粘贴 Podcast 页面链接>",
+        "不要猜测内容，也不要修改 Notion 页面",
+        "最值得掌握的 5 个表达",
+        "共 5 个；等我回答后再继续",
+        "更自然的英文改写",
+        "6 轮角色扮演",
+        "重点表达和粉色词汇",
+        "10 分钟复习任务",
+        "动态调整难度",
+        "英文提示",
+        "中文提示",
+    ):
+        assert required in podcast_prompt
+
+    for required in (
+        "<粘贴 Weekly Review 页面链接>",
+        "不要猜测内容，也不要修改 Notion 页面",
+        "20 分钟复盘训练",
+        "核心观点、重点表达、词汇、思维变化和下周行动",
+        "3 个最值得复用的表达",
+        "3 个最需要加强的词汇",
+        "一次问我一个问题",
+        "2 个与我的真实工作、面试或生活场景相关的角色扮演",
+        "准确性、自然度和清晰度评分",
+        "1 个主题、3 个表达、3 个词汇、2 个口语任务和 1 个真实应用任务",
+        "不要一次给出全部答案",
+    ):
+        assert required in weekly_prompt
 
 
 def test_database_entries_precede_instructions_with_icons_and_names_unchanged() -> None:
