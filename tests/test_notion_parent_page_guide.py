@@ -181,11 +181,35 @@ def test_guide_contains_complete_required_content_and_version() -> None:
         "明确确认后启用",
         "自定义星期和时间",
         "查询时间、修改时间、暂停或恢复",
+        "用 ChatGPT 继续练习",
+        "阅读理解、英语口语、表达复用、词汇复习和场景角色扮演",
+        "每周复盘和下一周学习计划",
+        "ChatGPT 必须已经连接你自己的 Notion",
+        "如果无法读取，必须直接说明，不能猜测页面内容",
+        "ChatGPT 不得修改对应的 Notion 页面",
+        "不要为了让 ChatGPT 读取而把私人页面公开到互联网",
+        "不是训练、微调或永久修改 ChatGPT 模型",
+        "公司机密、客户信息或个人隐私",
+        "Notion Token、数据库 ID 或其他访问密钥",
     ):
         assert required in text
     assert "同步生词" not in text
     assert "Notion AI-assisted workflow" not in text
     assert "Podcast-page Expression synchronization" not in text
+
+
+def test_chatgpt_practice_guidance_follows_weekly_and_precedes_privacy() -> None:
+    blocks = parent_page_guide.build_parent_page_guide_blocks()
+    headings = [
+        parent_page_guide._block_text(block)
+        for block in blocks
+        if block.get("type") == "heading_2"
+    ]
+
+    assert headings.index("Weekly Reflection 说明") < headings.index(
+        "用 ChatGPT 继续练习"
+    )
+    assert headings.index("用 ChatGPT 继续练习") < headings.index("隐私与安全")
 
 
 def test_database_entries_precede_instructions_with_icons_and_names_unchanged() -> None:

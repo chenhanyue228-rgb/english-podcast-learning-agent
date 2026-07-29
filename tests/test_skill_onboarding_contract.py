@@ -147,8 +147,49 @@ def test_weekly_scheduler_is_not_a_normal_user_terminal_task() -> None:
     weekly_user_section = USER_GUIDE.split(
         "## 10. Weekly Review 自动生成",
         1,
-    )[1].split("## 11. 故障排查", 1)[0]
+    )[1].split("## 11. 用 ChatGPT 做针对性练习", 1)[0]
 
     assert "不需要打开终端" in weekly_user_section
     assert "编辑 `.env`" in weekly_user_section
     assert "管理 LaunchAgent" in weekly_user_section
+
+
+def test_chatgpt_practice_guidance_has_access_and_privacy_contract() -> None:
+    practice_section = USER_GUIDE.split(
+        "## 11. 用 ChatGPT 做针对性练习",
+        1,
+    )[1].split("## 12. 故障排查", 1)[0]
+
+    for required in (
+        "Podcast 页面练习 Prompt",
+        "Weekly Review 页面练习 Prompt",
+        "ChatGPT 已经连接用户自己的 Notion",
+        "必须直接说明无法访问，不得猜测页面内容",
+        "粘贴页面内容",
+        "Notion 导出文件",
+        "ChatGPT 不得修改对应的 Notion 页面",
+        "不要为了让 ChatGPT 读取而把私人 Notion 页面公开到互联网",
+        "公司机密、客户信息或个人隐私",
+        "Notion Token、数据库 ID 或其他",
+        "不是训练、微调或永久修改 ChatGPT 模型",
+    ):
+        assert required in practice_section
+
+
+def test_chatgpt_practice_prompts_are_complete_and_incremental() -> None:
+    for required in (
+        "请读取下面的 Notion Podcast 学习页面",
+        "用英语一次问我一个理解问题，共 5 个",
+        "设计一个与工作、面试或日常生活相关的 6 轮角色扮演",
+        "给出一个 10 分钟复习任务",
+        "请读取下面的 Notion Weekly Review 页面",
+        "带我完成一次 20 分钟复盘训练",
+        "3 个最值得复用的表达和 3 个最需要加强的词汇",
+        "1 个主题、3 个表达、3 个词汇、2 个口语任务和 1 个真实应用任务",
+        "不要一次给出全部答案，请逐步提问并等待我回答",
+    ):
+        assert required in USER_GUIDE
+
+    assert "## Continue Practicing in ChatGPT" in README
+    assert "docs/USER_GUIDE_ZH.md#11-用-chatgpt-做针对性练习" in README
+    assert "### ChatGPT Practice Guidance" in SKILL

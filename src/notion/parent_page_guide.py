@@ -197,6 +197,33 @@ def build_parent_page_guide_blocks() -> list[dict[str, Any]]:
             "paragraph",
             "单次使用后没有 Weekly Reflection，不代表系统故障。",
         ),
+        _text_block("heading_2", "用 ChatGPT 继续练习"),
+        _text_block(
+            "paragraph",
+            "可以把 Podcast 学习页面链接发送给 ChatGPT，继续做阅读理解、"
+            "英语口语、表达复用、词汇复习和场景角色扮演。",
+        ),
+        _text_block(
+            "paragraph",
+            "可以把 Weekly Review 页面链接发送给 ChatGPT，完成每周复盘和"
+            "下一周学习计划。",
+        ),
+        _text_block(
+            "paragraph",
+            "ChatGPT 必须已经连接你自己的 Notion，并有权限读取对应页面。"
+            "如果无法读取，必须直接说明，不能猜测页面内容；你可以改为粘贴"
+            "页面内容或上传不含敏感信息的 Notion 导出文件。",
+        ),
+        _text_block(
+            "paragraph",
+            "ChatGPT 不得修改对应的 Notion 页面，也不要为了让 ChatGPT 读取而"
+            "把私人页面公开到互联网。",
+        ),
+        _text_block(
+            "paragraph",
+            "这是当前对话中的个性化练习，不是训练、微调或永久修改 ChatGPT"
+            " 模型。",
+        ),
         _text_block("heading_2", "隐私与安全"),
         _text_block(
             "bulleted_list_item",
@@ -212,7 +239,16 @@ def build_parent_page_guide_blocks() -> list[dict[str, Any]]:
         ),
         _text_block(
             "bulleted_list_item",
-            "不要分享私人 Notion 页面链接。",
+            "只在 ChatGPT 已连接你自己的 Notion 且有页面读取权限时，在当前"
+            "对话中提供页面链接；不要把私人页面公开到互联网。",
+        ),
+        _text_block(
+            "bulleted_list_item",
+            "不要使用包含公司机密、客户信息或个人隐私的页面。",
+        ),
+        _text_block(
+            "bulleted_list_item",
+            "不要在练习内容中提供 Notion Token、数据库 ID 或其他访问密钥。",
         ),
         _text_block(
             "bulleted_list_item",

@@ -50,6 +50,8 @@ Use this Skill when the user asks to:
 - "Create English learning notes"
 - "Extract useful expressions"
 - "Generate weekly reflection"
+- practice English from a Podcast learning page
+- review a Weekly Review page and plan the next learning week
 - publish a learning page
 
 Use this Skill when the user provides:
@@ -539,6 +541,33 @@ and must not be shown as user instructions.
 Codex must check the input, run the local transcript/request flow, generate the
 analysis artifact, rerun Python validation and publishing, and return the final
 Notion page URL. Do not ask the user to copy the internal command sequence.
+
+### ChatGPT Practice Guidance
+
+Use this guidance when the user wants to continue practicing from a Podcast
+learning page or Weekly Review page in ChatGPT.
+
+- ChatGPT must already be connected to the user's own Notion and have
+  permission to read the page.
+- If ChatGPT cannot access the page, it must state that directly and must not
+  guess or invent page content.
+- When access is unavailable, offer to work from content pasted by the user or
+  a Notion export file that does not contain sensitive information.
+- ChatGPT must not modify the source Notion page.
+- Never suggest making a private Notion page public so ChatGPT can read it.
+- Do not use pages containing company secrets, customer information, or
+  personal information.
+- Never request or accept a Notion token, database ID, or any other access
+  credential as practice material.
+
+Podcast pages can support reading comprehension, spoken English, expression
+reuse, vocabulary review, and scenario role-play. Weekly Review pages can
+support weekly reflection and planning for the next learning week.
+
+This is personalized practice within the current conversation. It is not model
+training, fine-tuning, or a permanent modification of ChatGPT. The complete
+copyable Chinese prompts are in `docs/USER_GUIDE_ZH.md`, section
+`用 ChatGPT 做针对性练习`.
 
 ## 4. Runtime Architecture
 

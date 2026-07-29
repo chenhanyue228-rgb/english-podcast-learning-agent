@@ -248,6 +248,24 @@ The independent Weekly scheduler is part of the accepted production runtime.
 Its default remains Saturday at 10:00 local time, while each user may confirm
 a different weekday/time or leave it disabled during setup.
 
+## Continue Practicing in ChatGPT
+
+Users can send a Podcast learning page link to ChatGPT for reading
+comprehension, speaking, expression reuse, vocabulary review, and role-play.
+A Weekly Review page can support a guided weekly reflection and next-week
+learning plan.
+
+ChatGPT must already be connected to the user's own Notion and have permission
+to read the page. If it cannot access the link, it must say so without guessing;
+the user can instead paste the relevant content or upload a Notion export.
+ChatGPT must not modify the source page or suggest publishing a private page to
+the internet.
+
+This is personalized practice in the current conversation. It does not train,
+fine-tune, or permanently modify the ChatGPT model. Complete Chinese prompts
+and privacy guidance are available in
+[用 ChatGPT 做针对性练习](docs/USER_GUIDE_ZH.md#11-用-chatgpt-做针对性练习).
+
 ## Basic Troubleshooting
 
 - If a command fails, check the error message first. The pipeline stages are
