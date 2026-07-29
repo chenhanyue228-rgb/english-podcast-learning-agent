@@ -202,7 +202,24 @@ def test_expression_database_select_options_have_semantic_colors() -> None:
     ]
 
 
-def test_reconcile_does_not_rewrite_existing_expression_option_colors() -> None:
+def test_vocabulary_database_has_lean_schema_and_semantic_status_colors() -> None:
+    properties = setup_workspace.vocabulary_database_properties("podcast_db")
+
+    assert set(properties) == {
+        "Name",
+        "First Seen",
+        "Last Review",
+        "Review Status",
+        "Source",
+    }
+    assert properties["Review Status"]["select"]["options"] == [
+        {"name": "New", "color": "blue"},
+        {"name": "Reviewing", "color": "yellow"},
+        {"name": "Mastered", "color": "green"},
+    ]
+
+
+def test_reconcile_does_not_rewrite_existing_select_option_colors() -> None:
     expected_schemas = {
         "podcast_db": setup_workspace.podcast_library_properties(),
         "expression_db": setup_workspace.expression_database_properties(
@@ -229,6 +246,10 @@ def test_reconcile_does_not_rewrite_existing_expression_option_colors() -> None:
         ]["options"]
         for option in options:
             option["color"] = "default"
+    for option in schemas["vocabulary_db"]["properties"]["Review Status"][
+        "select"
+    ]["options"]:
+        option["color"] = "default"
 
     notion = FakeNotion(schemas)
     setup_workspace.reconcile_workspace_schema(notion, DATABASE_IDS)

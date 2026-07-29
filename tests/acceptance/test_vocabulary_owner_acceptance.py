@@ -436,7 +436,7 @@ def test_duplicate_vocabulary_identity_stops_before_write(
     assert workspace.pages.update_calls == []
 
 
-def test_manual_fields_stop_existing_target_update(
+def test_manual_review_fields_stop_existing_target_update(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -446,6 +446,7 @@ def test_manual_fields_stop_existing_target_update(
         word="fundraising",
         source_page_id=page_id,
         personal_note="Keep this private note.",
+        last_review="2026-07-29",
     )
     workspace.add_page(
         workspace.config.vocabulary_data_source_id,

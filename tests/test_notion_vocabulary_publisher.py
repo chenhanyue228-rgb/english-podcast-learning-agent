@@ -59,9 +59,15 @@ def sample_payload() -> VocabularyPublishPayload:
 def test_vocabulary_page_properties_include_source_relation() -> None:
     properties = vocabulary_page_properties(sample_payload())
 
+    assert set(properties) == {
+        "Name",
+        "First Seen",
+        "Last Review",
+        "Review Status",
+        "Source",
+    }
     assert properties["Name"]["title"][0]["text"]["content"] == "leverage"
     assert properties["Source"] == {"relation": [{"id": "podcast_page_1"}]}
-    assert properties["Source Page ID"]["rich_text"][0]["text"]["content"] == "podcast_page_1"
     assert properties["Review Status"] == {"select": {"name": "New"}}
 
 
@@ -96,10 +102,13 @@ def test_create_vocabulary_page_allows_empty_optional_fields() -> None:
 
     assert result.page_id == "vocab_page_1"
     call = notion.pages.create_calls[0]
-    assert call["properties"]["Original Context"] == {"rich_text": []}
-    assert call["properties"]["Meaning"] == {"rich_text": []}
-    assert call["properties"]["Usage Example"] == {"rich_text": []}
-    assert call["properties"]["Personal Note"] == {"rich_text": []}
+    assert set(call["properties"]) == {
+        "Name",
+        "First Seen",
+        "Last Review",
+        "Review Status",
+        "Source",
+    }
 
 
 def test_upsert_vocabulary_page_updates_existing_record() -> None:

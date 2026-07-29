@@ -241,13 +241,14 @@ def test_first_publish_populates_properties_body_and_relation(
         == workspace.config.vocabulary_data_source_id
     )
     properties = create["properties"]
-    assert properties["Name"]["title"][0]["text"]["content"] == WORD
-    assert properties["Original Context"]["rich_text"][0]["text"][
-        "content"
-    ] == CONTEXT
-    assert properties["Professional Category"] == {
-        "select": {"name": "Phrase"}
+    assert set(properties) == {
+        "Name",
+        "First Seen",
+        "Last Review",
+        "Review Status",
+        "Source",
     }
+    assert properties["Name"]["title"][0]["text"]["content"] == WORD
     assert properties["Source"] == {
         "relation": [{"id": "target-source-podcast"}]
     }
@@ -449,7 +450,7 @@ def test_target_binding_failure_happens_before_codex_or_write(
     )
     workspace.schemas[
         workspace.config.vocabulary_data_source_id
-    ].pop("Meaning")
+    ].pop("First Seen")
     runner = CodexRunner()
 
     with pytest.raises(AutomaticVocabularyProcessingError):

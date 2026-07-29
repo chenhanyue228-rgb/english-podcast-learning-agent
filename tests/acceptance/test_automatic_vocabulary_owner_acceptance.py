@@ -160,7 +160,7 @@ def test_target_binding_failure_stops_before_write(
     workspace = FakeNotion()
     workspace.schemas[
         workspace.config.vocabulary_data_source_id
-    ].pop("Meaning")
+    ].pop("First Seen")
 
     with pytest.raises(AcceptanceFailure):
         _runner(tmp_path, workspace).dry_run()

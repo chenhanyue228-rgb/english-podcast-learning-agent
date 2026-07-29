@@ -378,12 +378,16 @@ class AutomaticVocabularyAcceptancePolicy:
         properties = _normalized_properties(kwargs.get("properties"))
         if (
             properties.get("Name") != self.expected_word
-            or properties.get("Original Context")
-            != self.expected_context
             or properties.get("Source")
             != (self.controlled_podcast_page_id,)
-            or properties.get("Source Page ID")
-            != self.controlled_podcast_page_id
+            or set(properties)
+            != {
+                "Name",
+                "First Seen",
+                "Last Review",
+                "Review Status",
+                "Source",
+            }
         ):
             raise GuardViolation("automatic_vocabulary_identity_invalid")
         children = kwargs.get("children")
@@ -869,14 +873,9 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
         properties = record.properties
         required_nonempty = (
             "Name",
-            "Original Context",
-            "Meaning",
-            "Professional Category",
             "Source",
-            "Source Page ID",
             "First Seen",
             "Review Status",
-            "Usage Example",
         )
         if any(not properties.get(name) for name in required_nonempty):
             raise AcceptanceFailure(
@@ -884,8 +883,6 @@ class AutomaticVocabularyOwnerAcceptanceRunner:
             )
         if properties.get("Name") != ACCEPTANCE_WORD:
             raise AcceptanceFailure("exact_word_mismatch")
-        if properties.get("Original Context") != ACCEPTANCE_CONTEXT:
-            raise AcceptanceFailure("exact_context_mismatch")
         if properties.get("Source") != (
             policy.controlled_podcast_page_id,
         ):

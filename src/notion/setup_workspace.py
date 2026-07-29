@@ -36,7 +36,7 @@ from src.notion.schema import (
     EXPRESSION_REVIEW_STATUS_SELECT_COLORS,
     REVIEW_STATUSES,
     SOURCE_TYPES,
-    VOCABULARY_CATEGORIES,
+    VOCABULARY_REVIEW_STATUS_SELECT_COLORS,
     WORKSPACE_DATABASE_ORDER,
 )
 
@@ -159,16 +159,13 @@ def expression_database_properties(podcast_library_id: str) -> dict[str, Any]:
 def vocabulary_database_properties(podcast_library_id: str) -> dict[str, Any]:
     return {
         "Name": title_property(),
-        "Original Context": rich_text_property(),
-        "Meaning": rich_text_property(),
-        "Professional Category": select_property(VOCABULARY_CATEGORIES),
         "Source": relation_property(podcast_library_id),
-        "Source Page ID": rich_text_property(),
         "First Seen": {"date": {}},
-        "Review Status": select_property(REVIEW_STATUSES),
+        "Review Status": select_property(
+            REVIEW_STATUSES,
+            option_colors=VOCABULARY_REVIEW_STATUS_SELECT_COLORS,
+        ),
         "Last Review": {"date": {}},
-        "Usage Example": rich_text_property(),
-        "Personal Note": rich_text_property(),
     }
 
 
