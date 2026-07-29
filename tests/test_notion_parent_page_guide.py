@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +13,9 @@ from src.notion.target_binding import NotionTargetBindingError
 
 
 PARENT_ID = "target-parent"
+USER_GUIDE_PATH = (
+    Path(__file__).resolve().parents[1] / "docs" / "USER_GUIDE_ZH.md"
+)
 CONFIG = NotionConfig(
     token="test-token",
     podcast_database_id="podcast-db",
@@ -19,6 +24,17 @@ CONFIG = NotionConfig(
     vocabulary_database_id="vocabulary-db",
     target_parent_page_id=PARENT_ID,
 )
+
+
+def _canonical_prompt(heading: str) -> str:
+    guide = USER_GUIDE_PATH.read_text(encoding="utf-8")
+    match = re.search(
+        rf"^### {re.escape(heading)}\n\n```text\n(.*?)\n```$",
+        guide,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    assert match is not None
+    return match.group(1)
 
 
 def _api_block(
@@ -210,6 +226,64 @@ def test_chatgpt_practice_guidance_follows_weekly_and_precedes_privacy() -> None
         "用 ChatGPT 继续练习"
     )
     assert headings.index("用 ChatGPT 继续练习") < headings.index("隐私与安全")
+
+
+def test_parent_guide_contains_canonical_practice_prompts_as_code_blocks() -> None:
+    blocks = parent_page_guide.build_parent_page_guide_blocks()
+    block_text = [
+        parent_page_guide._block_text(block)
+        for block in blocks
+    ]
+    chatgpt_index = block_text.index("用 ChatGPT 继续练习")
+    podcast_index = block_text.index("Podcast 页面练习 Prompt")
+    weekly_index = block_text.index("Weekly Review 页面练习 Prompt")
+    privacy_index = block_text.index("隐私与安全")
+
+    assert chatgpt_index < podcast_index < weekly_index < privacy_index
+    code_blocks = [block for block in blocks if block.get("type") == "code"]
+    assert len(code_blocks) == 2
+
+    podcast_block = blocks[podcast_index + 1]
+    weekly_block = blocks[weekly_index + 1]
+    assert podcast_block["type"] == "code"
+    assert weekly_block["type"] == "code"
+    assert podcast_block["code"]["language"] == "plain text"
+    assert weekly_block["code"]["language"] == "plain text"
+
+    podcast_prompt = parent_page_guide._block_text(podcast_block)
+    weekly_prompt = parent_page_guide._block_text(weekly_block)
+    assert podcast_prompt == _canonical_prompt("Podcast 页面练习 Prompt")
+    assert weekly_prompt == _canonical_prompt("Weekly Review 页面练习 Prompt")
+
+    for required in (
+        "<粘贴 Podcast 页面链接>",
+        "不要猜测内容，也不要修改 Notion 页面",
+        "最值得掌握的 5 个表达",
+        "共 5 个；等我回答后再继续",
+        "更自然的英文改写",
+        "6 轮角色扮演",
+        "重点表达和粉色词汇",
+        "10 分钟复习任务",
+        "动态调整难度",
+        "英文提示",
+        "中文提示",
+    ):
+        assert required in podcast_prompt
+
+    for required in (
+        "<粘贴 Weekly Review 页面链接>",
+        "不要猜测内容，也不要修改 Notion 页面",
+        "20 分钟复盘训练",
+        "核心观点、重点表达、词汇、思维变化和下周行动",
+        "3 个最值得复用的表达",
+        "3 个最需要加强的词汇",
+        "一次问我一个问题",
+        "2 个与我的真实工作、面试或生活场景相关的角色扮演",
+        "准确性、自然度和清晰度评分",
+        "1 个主题、3 个表达、3 个词汇、2 个口语任务和 1 个真实应用任务",
+        "不要一次给出全部答案",
+    ):
+        assert required in weekly_prompt
 
 
 def test_database_entries_precede_instructions_with_icons_and_names_unchanged() -> None:
