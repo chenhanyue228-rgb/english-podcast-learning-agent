@@ -609,7 +609,10 @@ def update_env_file(values: dict[str, str], path: Path = ENV_PATH) -> None:
 
 
 def setup_workspace(parent_page_id: str, notion: Optional[Client] = None) -> dict[str, str]:
-    from src.notion.parent_page_guide import ensure_parent_page_guide_for_setup
+    from src.notion.parent_page_guide import (
+        ensure_parent_page_database_links,
+        ensure_parent_page_guide_for_setup,
+    )
 
     if os.getenv(SETUP_STATE_ENV, "").strip() == SETUP_STATE_COMPLETE:
         raise WorkspaceSetupError(
@@ -633,6 +636,11 @@ def setup_workspace(parent_page_id: str, notion: Optional[Client] = None) -> dic
     database_ids = create_base_databases(notion_client, normalized_parent_page_id)
     reconcile_workspace_schema(notion_client, database_ids)
     wire_database_relations(notion_client, database_ids)
+    ensure_parent_page_database_links(
+        notion_client,
+        normalized_parent_page_id,
+        database_ids,
+    )
     update_env_file(database_ids)
     return database_ids
 

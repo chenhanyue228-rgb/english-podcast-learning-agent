@@ -39,6 +39,11 @@ def mock_schema_reconciler(monkeypatch) -> None:
         "ensure_parent_page_guide_for_setup",
         lambda _notion, _parent: False,
     )
+    monkeypatch.setattr(
+        first_time_setup,
+        "ensure_parent_page_database_links",
+        lambda _notion, _parent, _ids: 0,
+    )
 
 
 def create_missing_database_ids(
@@ -433,7 +438,7 @@ def test_empty_database_configuration_creates_databases(
     assert calls == ["create", "wire"]
 
 
-def test_new_workspace_creates_parent_guide_before_databases(
+def test_new_workspace_creates_parent_guide_then_links_database_entries(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -443,6 +448,11 @@ def test_new_workspace_creates_parent_guide_before_databases(
         first_time_setup,
         "ensure_parent_page_guide_for_setup",
         lambda _notion, _parent: calls.append("guide") or True,
+    )
+    monkeypatch.setattr(
+        first_time_setup,
+        "ensure_parent_page_database_links",
+        lambda _notion, _parent, _ids: calls.append("links") or 4,
     )
     monkeypatch.setattr(
         first_time_setup,
@@ -464,7 +474,7 @@ def test_new_workspace_creates_parent_guide_before_databases(
         validator=valid_results,
     )
 
-    assert calls == ["guide", "create", "wire"]
+    assert calls == ["guide", "create", "wire", "links"]
 
 
 def test_complete_workspace_does_not_implicitly_publish_parent_guide(

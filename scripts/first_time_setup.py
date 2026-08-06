@@ -43,6 +43,7 @@ from src.notion.setup_workspace import (  # noqa: E402
 )
 from src.notion.parent_page_guide import (  # noqa: E402
     ParentPageGuideError,
+    ensure_parent_page_database_links,
     ensure_parent_page_guide_for_setup,
 )
 
@@ -435,6 +436,18 @@ def run_first_time_setup(
             ) from exc
 
     _ensure_validation_passed(validation_results)
+    if state != SETUP_STATE_COMPLETE:
+        try:
+            ensure_parent_page_database_links(
+                notion_client,
+                normalized_parent_id,
+                database_ids,
+            )
+        except ParentPageGuideError as exc:
+            raise FirstTimeSetupError(
+                "Notion 父页面数据库入口链接未完成。数据库和已有内容均已保留；"
+                "请检查页面权限和网络后重新运行，系统只会补齐缺失链接。"
+            ) from exc
     secure_update_env(
         env_path,
         example_path,

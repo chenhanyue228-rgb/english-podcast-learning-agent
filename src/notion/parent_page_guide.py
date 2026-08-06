@@ -7,7 +7,8 @@ The standalone command is intentionally protected:
         --confirmation PARENT_PAGE_GUIDE_WRITES_TO_NOTION
 
 First-time workspace setup uses the same deterministic guide builder before it
-creates databases. Existing workspaces must use the protected command.
+creates databases, then links the four visual entries to the created database
+containers. Existing workspaces must use the protected command.
 """
 
 from __future__ import annotations
@@ -15,9 +16,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Optional, Sequence
+from urllib.parse import urlparse
 
 from src.notion.config import (
     NotionConfig,
@@ -75,6 +78,37 @@ DUPLICATE_VERSION = "parent_guide_duplicate_version"
 PARENT_STATE_CHANGED = "parent_guide_parent_state_changed"
 WRITE_FAILED = "parent_guide_write_failed"
 POST_WRITE_VALIDATION_FAILED = "parent_guide_post_write_validation_failed"
+DATABASE_LINK_TARGET_READ_FAILED = "parent_guide_database_link_target_read_failed"
+DATABASE_LINK_TARGET_INVALID = "parent_guide_database_link_target_invalid"
+DATABASE_ENTRY_INVALID = "parent_guide_database_entry_invalid"
+
+
+DATABASE_ENTRY_SPECS = (
+    (
+        "Podcast Library",
+        "保存每期音频、摘要、重点内容和学习材料。",
+        "🎧",
+        "NOTION_PODCAST_LIBRARY_DATABASE_ID",
+    ),
+    (
+        "Expression Database",
+        "保存值得复用的地道表达、商务短语、行业术语、搭配和句型。",
+        "💬",
+        "NOTION_EXPRESSION_DATABASE_ID",
+    ),
+    (
+        "Vocabulary Database",
+        "保存用户用粉色文字或粉色背景主动选择、并由系统自动处理的生词。",
+        "📚",
+        "NOTION_VOCABULARY_DATABASE_ID",
+    ),
+    (
+        "Weekly Review",
+        "保存自动生成的 Weekly Reflection 学习复盘。",
+        "📝",
+        "NOTION_WEEKLY_REFLECTION_DATABASE_ID",
+    ),
+)
 
 
 class ParentPageGuideError(RuntimeError):
@@ -107,12 +141,20 @@ class ParentPageGuideReport:
     manual_move_to_top: bool
 
 
-def _rich_text(content: str, *, code: bool = False) -> list[dict[str, Any]]:
+def _rich_text(
+    content: str,
+    *,
+    code: bool = False,
+    link_url: str = "",
+) -> list[dict[str, Any]]:
     annotations = {"code": True} if code else {}
+    text: dict[str, Any] = {"content": content}
+    if link_url:
+        text["link"] = {"url": link_url}
     return [
         {
             "type": "text",
-            "text": {"content": content},
+            "text": text,
             "annotations": annotations,
         }
     ]
@@ -150,43 +192,60 @@ def _database_entry(
     description: str,
     *,
     emoji: str,
+    database_id: str = "",
 ) -> dict[str, Any]:
-    """Return a visual database entry without changing the database name."""
+    """Return a visual database entry, linked when a container ID is known."""
+    link_url = _database_page_url(database_id) if database_id else ""
     return {
         "object": "block",
         "type": "callout",
         "callout": {
-            "rich_text": _rich_text(f"{name}\n{description}"),
+            "rich_text": _rich_text(
+                f"{name}\n{description}",
+                link_url=link_url,
+            ),
             "icon": {"type": "emoji", "emoji": emoji},
             "color": "default_background",
         },
     }
 
 
-def build_parent_page_guide_blocks() -> list[dict[str, Any]]:
+def _database_page_url(database_id: str) -> str:
+    normalized = str(database_id or "").strip().replace("-", "").casefold()
+    if not re.fullmatch(r"[0-9a-f]{32}", normalized):
+        raise ParentPageGuideError(DATABASE_LINK_TARGET_INVALID)
+    return f"https://app.notion.com/p/{normalized}"
+
+
+def _database_id_from_page_url(value: object) -> str:
+    parsed = urlparse(str(value or ""))
+    if parsed.scheme != "https" or parsed.hostname not in {
+        "app.notion.com",
+        "notion.so",
+        "www.notion.so",
+    }:
+        return ""
+    compact = parsed.path.replace("-", "").casefold()
+    match = re.search(r"[0-9a-f]{32}", compact)
+    return match.group(0) if match else ""
+
+
+def build_parent_page_guide_blocks(
+    database_container_ids: Optional[Mapping[str, str]] = None,
+) -> list[dict[str, Any]]:
     """Return the complete deterministic V1 parent-page guide."""
+    container_ids = database_container_ids or {}
     blocks = [
         _text_block("heading_1", "English Audio Learning Agent"),
         _text_block("heading_2", "数据库入口"),
-        _database_entry(
-            "Podcast Library",
-            "保存每期音频、摘要、重点内容和学习材料。",
-            emoji="🎧",
-        ),
-        _database_entry(
-            "Expression Database",
-            "保存值得复用的地道表达、商务短语、行业术语、搭配和句型。",
-            emoji="💬",
-        ),
-        _database_entry(
-            "Vocabulary Database",
-            "保存用户用粉色文字或粉色背景主动选择、并由系统自动处理的生词。",
-            emoji="📚",
-        ),
-        _database_entry(
-            "Weekly Review",
-            "保存自动生成的 Weekly Reflection 学习复盘。",
-            emoji="📝",
+        *(
+            _database_entry(
+                name,
+                description,
+                emoji=emoji,
+                database_id=container_ids.get(name, ""),
+            )
+            for name, description, emoji, _env_key in DATABASE_ENTRY_SPECS
         ),
         _text_block(
             "paragraph",
@@ -385,6 +444,173 @@ def count_guide_versions(blocks: Sequence[Mapping[str, Any]]) -> int:
     return sum(GUIDE_VERSION in _block_text(block) for block in blocks)
 
 
+def _data_source_title(payload: Mapping[str, Any]) -> str:
+    name = payload.get("name")
+    if isinstance(name, str) and name.strip():
+        return name.strip()
+    return _plain_text(payload.get("title")).strip()
+
+
+def resolve_database_container_ids(
+    notion: Any,
+    database_data_source_ids: Mapping[str, str],
+) -> dict[str, str]:
+    """Resolve each configured data source to its clickable database container."""
+    container_ids: dict[str, str] = {}
+    for name, _description, _emoji, env_key in DATABASE_ENTRY_SPECS:
+        data_source_id = str(
+            database_data_source_ids.get(name)
+            or database_data_source_ids.get(env_key)
+            or ""
+        ).strip()
+        if not data_source_id:
+            raise ParentPageGuideError(DATABASE_LINK_TARGET_INVALID)
+        try:
+            data_source = notion.data_sources.retrieve(
+                data_source_id=data_source_id,
+            )
+        except Exception:
+            raise ParentPageGuideError(DATABASE_LINK_TARGET_READ_FAILED) from None
+        if not isinstance(data_source, Mapping):
+            raise ParentPageGuideError(DATABASE_LINK_TARGET_INVALID)
+        if _data_source_title(data_source) != name:
+            raise ParentPageGuideError(DATABASE_LINK_TARGET_INVALID)
+        parent = data_source.get("parent")
+        if not isinstance(parent, Mapping) or parent.get("type") != "database_id":
+            raise ParentPageGuideError(DATABASE_LINK_TARGET_INVALID)
+        database_id = str(parent.get("database_id") or "").strip()
+        _database_page_url(database_id)
+        container_ids[name] = database_id
+    return container_ids
+
+
+def _database_entry_scope(
+    blocks: Sequence[Mapping[str, Any]],
+) -> Sequence[Mapping[str, Any]]:
+    entry_heading_indexes = [
+        index
+        for index, block in enumerate(blocks)
+        if block.get("type") == "heading_2" and _block_text(block) == "数据库入口"
+    ]
+    if len(entry_heading_indexes) != 1:
+        raise ParentPageGuideError(DATABASE_ENTRY_INVALID)
+    entry_heading_index = entry_heading_indexes[0]
+    start_indexes = [
+        index
+        for index, block in enumerate(blocks)
+        if index > entry_heading_index
+        and block.get("type") == "heading_2"
+        and _block_text(block) == "从这里开始"
+    ]
+    if len(start_indexes) != 1:
+        raise ParentPageGuideError(DATABASE_ENTRY_INVALID)
+    return blocks[entry_heading_index + 1 : start_indexes[0]]
+
+
+def _database_entry_link_updates(
+    blocks: Sequence[Mapping[str, Any]],
+    database_container_ids: Mapping[str, str],
+) -> list[tuple[str, dict[str, Any]]]:
+    scope = _database_entry_scope(blocks)
+    updates: list[tuple[str, dict[str, Any]]] = []
+
+    for name, description, emoji, _env_key in DATABASE_ENTRY_SPECS:
+        expected_text = f"{name}\n{description}"
+        matches = [
+            block
+            for block in scope
+            if block.get("type") == "callout"
+            and _block_text(block) == expected_text
+        ]
+        if len(matches) != 1:
+            raise ParentPageGuideError(DATABASE_ENTRY_INVALID)
+        block = matches[0]
+        block_id = str(block.get("id") or "").strip()
+        if not block_id:
+            raise ParentPageGuideError(DATABASE_ENTRY_INVALID)
+        desired = _database_entry(
+            name,
+            description,
+            emoji=emoji,
+            database_id=database_container_ids.get(name, ""),
+        )["callout"]
+        current_payload = block.get("callout")
+        if not isinstance(current_payload, Mapping):
+            raise ParentPageGuideError(DATABASE_ENTRY_INVALID)
+        rich_text = current_payload.get("rich_text")
+        first_item = (
+            rich_text[0]
+            if isinstance(rich_text, list) and rich_text
+            else None
+        )
+        text = first_item.get("text") if isinstance(first_item, Mapping) else None
+        link = text.get("link") if isinstance(text, Mapping) else None
+        current_url = link.get("url") if isinstance(link, Mapping) else ""
+        expected_id = _database_id_from_page_url(
+            _database_page_url(database_container_ids.get(name, "")),
+        )
+        if _database_id_from_page_url(current_url) == expected_id:
+            continue
+        updates.append((block_id, {"rich_text": desired["rich_text"]}))
+    return updates
+
+
+def _apply_database_entry_link_updates(
+    notion: Any,
+    updates: Sequence[tuple[str, Mapping[str, Any]]],
+) -> None:
+    write_attempted = False
+    try:
+        for block_id, callout in updates:
+            write_attempted = True
+            notion.blocks.update(
+                block_id=block_id,
+                callout=dict(callout),
+            )
+    except Exception:
+        raise ParentPageGuideError(
+            WRITE_FAILED,
+            write_attempted=write_attempted,
+        ) from None
+
+
+def ensure_parent_page_database_links(
+    notion: Any,
+    parent_page_id: str,
+    database_data_source_ids: Mapping[str, str],
+    *,
+    dry_run: bool = False,
+) -> int:
+    """Idempotently link the four guide callouts to their real databases."""
+    container_ids = resolve_database_container_ids(
+        notion,
+        database_data_source_ids,
+    )
+    existing_blocks = list_parent_page_blocks(notion, parent_page_id)
+    if count_guide_versions(existing_blocks) != 1:
+        raise ParentPageGuideError(DATABASE_ENTRY_INVALID)
+    updates = _database_entry_link_updates(existing_blocks, container_ids)
+    if dry_run or not updates:
+        return len(updates)
+
+    before_fingerprint = _parent_snapshot_fingerprint(existing_blocks)
+    current_blocks = list_parent_page_blocks(notion, parent_page_id)
+    if _parent_snapshot_fingerprint(current_blocks) != before_fingerprint:
+        raise ParentPageGuideError(PARENT_STATE_CHANGED)
+
+    _apply_database_entry_link_updates(notion, updates)
+    try:
+        verified_blocks = list_parent_page_blocks(notion, parent_page_id)
+    except ParentPageGuideError as exc:
+        raise ParentPageGuideError(exc.code, write_attempted=True) from None
+    if _database_entry_link_updates(verified_blocks, container_ids):
+        raise ParentPageGuideError(
+            POST_WRITE_VALIDATION_FAILED,
+            write_attempted=True,
+        )
+    return len(updates)
+
+
 def _parent_snapshot_fingerprint(
     blocks: Sequence[Mapping[str, Any]],
 ) -> str:
@@ -428,6 +654,7 @@ def _append_guide(
 def _verify_after_append(
     notion: Any,
     parent_page_id: str,
+    database_container_ids: Optional[Mapping[str, str]] = None,
 ) -> None:
     try:
         verified_blocks = list_parent_page_blocks(notion, parent_page_id)
@@ -437,6 +664,14 @@ def _verify_after_append(
             write_attempted=True,
         ) from None
     if count_guide_versions(verified_blocks) != 1:
+        raise ParentPageGuideError(
+            POST_WRITE_VALIDATION_FAILED,
+            write_attempted=True,
+        )
+    if database_container_ids is not None and _database_entry_link_updates(
+        verified_blocks,
+        database_container_ids,
+    ):
         raise ParentPageGuideError(
             POST_WRITE_VALIDATION_FAILED,
             write_attempted=True,
@@ -486,6 +721,16 @@ def run_parent_page_guide(
             raise ParentPageGuideError(CONFIRMATION_INVALID)
 
     binding = validate_notion_target_binding(notion, config)
+    database_data_source_ids = {
+        "Podcast Library": config.podcast_database_id,
+        "Expression Database": config.expression_database_id,
+        "Vocabulary Database": config.vocabulary_database_id,
+        "Weekly Review": config.weekly_database_id,
+    }
+    database_container_ids = resolve_database_container_ids(
+        notion,
+        database_data_source_ids,
+    )
     existing_blocks = list_parent_page_blocks(
         notion,
         config.target_parent_page_id,
@@ -495,8 +740,13 @@ def run_parent_page_guide(
         raise ParentPageGuideError(DUPLICATE_VERSION)
 
     guide_exists = version_count == 1
-    guide_blocks = build_parent_page_guide_blocks()
-    planned_writes = 0 if guide_exists else 1
+    guide_blocks = build_parent_page_guide_blocks(database_container_ids)
+    link_updates = (
+        _database_entry_link_updates(existing_blocks, database_container_ids)
+        if guide_exists
+        else []
+    )
+    planned_writes = len(link_updates) if guide_exists else 1
     report_kwargs = {
         "target_binding_pass": binding.valid,
         "guide_version": GUIDE_VERSION,
@@ -513,7 +763,7 @@ def run_parent_page_guide(
         "manual_move_to_top": bool(existing_blocks) and not guide_exists,
     }
 
-    if guide_exists:
+    if guide_exists and not link_updates:
         return ParentPageGuideReport(
             status="already_exists",
             real_notion_writes=0,
@@ -534,14 +784,34 @@ def run_parent_page_guide(
     if _parent_snapshot_fingerprint(current_blocks) != before_fingerprint:
         raise ParentPageGuideError(PARENT_STATE_CHANGED)
 
-    _append_guide(
-        notion,
-        config.target_parent_page_id,
-        guide_blocks,
-    )
+    if guide_exists:
+        _apply_database_entry_link_updates(notion, link_updates)
+        try:
+            verified_blocks = list_parent_page_blocks(
+                notion,
+                config.target_parent_page_id,
+            )
+        except ParentPageGuideError as exc:
+            raise ParentPageGuideError(exc.code, write_attempted=True) from None
+        if _database_entry_link_updates(
+            verified_blocks,
+            database_container_ids,
+        ):
+            raise ParentPageGuideError(
+                POST_WRITE_VALIDATION_FAILED,
+                write_attempted=True,
+            )
+        return ParentPageGuideReport(
+            status="repaired",
+            real_notion_writes=len(link_updates),
+            **report_kwargs,
+        )
+
+    _append_guide(notion, config.target_parent_page_id, guide_blocks)
     _verify_after_append(
         notion,
         config.target_parent_page_id,
+        database_container_ids,
     )
 
     return ParentPageGuideReport(

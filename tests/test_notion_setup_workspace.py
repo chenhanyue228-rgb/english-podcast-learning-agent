@@ -293,7 +293,7 @@ def test_create_base_databases_uses_fixed_product_order(monkeypatch) -> None:
     ]
 
 
-def test_setup_workspace_creates_guide_before_databases(monkeypatch) -> None:
+def test_setup_workspace_creates_guide_then_links_entries(monkeypatch) -> None:
     from src.notion import parent_page_guide
 
     calls: list[str] = []
@@ -303,6 +303,11 @@ def test_setup_workspace_creates_guide_before_databases(monkeypatch) -> None:
         parent_page_guide,
         "ensure_parent_page_guide_for_setup",
         lambda _notion, _parent: calls.append("guide") or True,
+    )
+    monkeypatch.setattr(
+        parent_page_guide,
+        "ensure_parent_page_database_links",
+        lambda _notion, _parent, _ids: calls.append("links") or 4,
     )
     monkeypatch.setattr(
         setup_workspace,
@@ -338,6 +343,7 @@ def test_setup_workspace_creates_guide_before_databases(monkeypatch) -> None:
         "databases",
         "schema",
         "relations",
+        "links",
         "env",
     ]
 
