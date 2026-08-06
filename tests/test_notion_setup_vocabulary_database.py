@@ -100,8 +100,13 @@ def test_sync_updates_only_bound_vocabulary_schema_with_single_relation(
         "single_property": {},
     }
     assert "dual_property" not in relation
-    assert "Name" in update["properties"]
-    assert "Word" not in update["properties"]
+    assert set(update["properties"]) == {
+        "Name",
+        "First Seen",
+        "Last Review",
+        "Review Status",
+        "Source",
+    }
     assert notion.databases.create_calls == []
     assert notion.databases.update_calls == []
 

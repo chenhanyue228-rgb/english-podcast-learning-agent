@@ -36,7 +36,7 @@ from src.notion.schema import (
     EXPRESSION_REVIEW_STATUS_SELECT_COLORS,
     REVIEW_STATUSES,
     SOURCE_TYPES,
-    VOCABULARY_CATEGORIES,
+    VOCABULARY_REVIEW_STATUS_SELECT_COLORS,
     WORKSPACE_DATABASE_ORDER,
 )
 
@@ -159,16 +159,13 @@ def expression_database_properties(podcast_library_id: str) -> dict[str, Any]:
 def vocabulary_database_properties(podcast_library_id: str) -> dict[str, Any]:
     return {
         "Name": title_property(),
-        "Original Context": rich_text_property(),
-        "Meaning": rich_text_property(),
-        "Professional Category": select_property(VOCABULARY_CATEGORIES),
         "Source": relation_property(podcast_library_id),
-        "Source Page ID": rich_text_property(),
         "First Seen": {"date": {}},
-        "Review Status": select_property(REVIEW_STATUSES),
+        "Review Status": select_property(
+            REVIEW_STATUSES,
+            option_colors=VOCABULARY_REVIEW_STATUS_SELECT_COLORS,
+        ),
         "Last Review": {"date": {}},
-        "Usage Example": rich_text_property(),
-        "Personal Note": rich_text_property(),
     }
 
 
@@ -612,7 +609,10 @@ def update_env_file(values: dict[str, str], path: Path = ENV_PATH) -> None:
 
 
 def setup_workspace(parent_page_id: str, notion: Optional[Client] = None) -> dict[str, str]:
-    from src.notion.parent_page_guide import ensure_parent_page_guide_for_setup
+    from src.notion.parent_page_guide import (
+        ensure_parent_page_database_links,
+        ensure_parent_page_guide_for_setup,
+    )
 
     if os.getenv(SETUP_STATE_ENV, "").strip() == SETUP_STATE_COMPLETE:
         raise WorkspaceSetupError(
@@ -636,6 +636,11 @@ def setup_workspace(parent_page_id: str, notion: Optional[Client] = None) -> dic
     database_ids = create_base_databases(notion_client, normalized_parent_page_id)
     reconcile_workspace_schema(notion_client, database_ids)
     wire_database_relations(notion_client, database_ids)
+    ensure_parent_page_database_links(
+        notion_client,
+        normalized_parent_page_id,
+        database_ids,
+    )
     update_env_file(database_ids)
     return database_ids
 

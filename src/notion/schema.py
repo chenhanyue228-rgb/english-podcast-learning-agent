@@ -30,7 +30,6 @@ EXPRESSION_CATEGORIES = [
 ]
 REVIEW_STATUSES = ["New", "Reviewing", "Mastered"]
 COMMONNESS_LEVELS = ["High", "Medium", "Low"]
-VOCABULARY_CATEGORIES = ["Word", "Phrase", "Term"]
 
 CATEGORY_COLORS = {
     "Native Expression": "Green",
@@ -50,6 +49,11 @@ EXPRESSION_COMMONNESS_SELECT_COLORS = {
     "Low": "gray",
 }
 EXPRESSION_REVIEW_STATUS_SELECT_COLORS = {
+    "New": "blue",
+    "Reviewing": "yellow",
+    "Mastered": "green",
+}
+VOCABULARY_REVIEW_STATUS_SELECT_COLORS = {
     "New": "blue",
     "Reviewing": "yellow",
     "Mastered": "green",
@@ -87,16 +91,10 @@ REQUIRED_DATABASE_PROPERTIES: dict[str, dict[str, str]] = {
     },
     VOCABULARY_DATABASE: {
         "Name": "title",
-        "Original Context": "rich_text",
-        "Meaning": "rich_text",
-        "Professional Category": "select",
         "Source": "relation",
-        "Source Page ID": "rich_text",
         "First Seen": "date",
         "Review Status": "select",
         "Last Review": "date",
-        "Usage Example": "rich_text",
-        "Personal Note": "rich_text",
     },
 }
 

@@ -18,12 +18,24 @@ USER_GUIDE_PATH = (
 )
 CONFIG = NotionConfig(
     token="test-token",
-    podcast_database_id="podcast-db",
-    expression_database_id="expression-db",
-    weekly_database_id="weekly-db",
-    vocabulary_database_id="vocabulary-db",
+    podcast_database_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    expression_database_id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    weekly_database_id="cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    vocabulary_database_id="dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     target_parent_page_id=PARENT_ID,
 )
+DATABASE_CONTAINER_IDS = {
+    "Podcast Library": "11111111-1111-4111-8111-111111111111",
+    "Expression Database": "22222222-2222-4222-8222-222222222222",
+    "Vocabulary Database": "33333333-3333-4333-8333-333333333333",
+    "Weekly Review": "44444444-4444-4444-8444-444444444444",
+}
+DATA_SOURCE_NAMES = {
+    CONFIG.podcast_database_id: "Podcast Library",
+    CONFIG.expression_database_id: "Expression Database",
+    CONFIG.vocabulary_database_id: "Vocabulary Database",
+    CONFIG.weekly_database_id: "Weekly Review",
+}
 
 
 def _canonical_prompt(heading: str) -> str:
@@ -133,12 +145,52 @@ class ForbiddenEndpoint:
         raise AssertionError("database or record delete is forbidden")
 
 
+class FakeDataSources(ForbiddenEndpoint):
+    def __init__(self) -> None:
+        super().__init__()
+        self.retrieve_calls: list[dict] = []
+
+    def retrieve(self, **kwargs):
+        self.retrieve_calls.append(deepcopy(kwargs))
+        data_source_id = kwargs["data_source_id"]
+        name = DATA_SOURCE_NAMES[data_source_id]
+        return {
+            "id": data_source_id,
+            "name": name,
+            "parent": {
+                "type": "database_id",
+                "database_id": DATABASE_CONTAINER_IDS[name],
+            },
+        }
+
+
+class FakeBlocks:
+    def __init__(self, blocks: list[dict] | None = None) -> None:
+        self.children = FakeChildren(blocks)
+        self.update_calls: list[dict] = []
+        self.fail_update = False
+
+    def update(self, **kwargs):
+        self.update_calls.append(deepcopy(kwargs))
+        if self.fail_update:
+            raise RuntimeError("private update failure")
+        block_id = kwargs["block_id"]
+        block = next(
+            item for item in self.children.blocks if item.get("id") == block_id
+        )
+        callout = deepcopy(kwargs["callout"])
+        for item in callout["rich_text"]:
+            item["plain_text"] = item["text"]["content"]
+        block["callout"].update(callout)
+        return deepcopy(block)
+
+
 class FakeNotion:
     def __init__(self, blocks: list[dict] | None = None) -> None:
-        self.blocks = SimpleNamespace(children=FakeChildren(blocks))
+        self.blocks = FakeBlocks(blocks)
         self.pages = ForbiddenEndpoint()
         self.databases = ForbiddenEndpoint()
-        self.data_sources = ForbiddenEndpoint()
+        self.data_sources = FakeDataSources()
 
 
 @pytest.fixture(autouse=True)
@@ -318,6 +370,23 @@ def test_database_entries_precede_instructions_with_icons_and_names_unchanged() 
     )
 
 
+def test_database_entries_link_to_database_containers_not_data_sources() -> None:
+    blocks = parent_page_guide.build_parent_page_guide_blocks(
+        DATABASE_CONTAINER_IDS,
+    )
+    entries = [block for block in blocks if block.get("type") == "callout"]
+
+    assert len(entries) == 4
+    for entry, name in zip(entries, DATABASE_CONTAINER_IDS):
+        link = entry["callout"]["rich_text"][0]["text"]["link"]["url"]
+        expected_id = DATABASE_CONTAINER_IDS[name].replace("-", "")
+        assert link == f"https://app.notion.com/p/{expected_id}"
+        assert all(
+            data_source_id.replace("-", "") not in link
+            for data_source_id in DATA_SOURCE_NAMES
+        )
+
+
 def test_dry_run_plans_parent_write_and_performs_zero_writes() -> None:
     notion = FakeNotion([_api_block("Existing owner text")])
 
@@ -413,10 +482,18 @@ def test_exact_retry_adds_zero_blocks_and_preserves_existing_content() -> None:
 
 
 def test_existing_version_is_idempotent_with_other_blocks() -> None:
+    linked_guide = [
+        _stored_block(block, index)
+        for index, block in enumerate(
+            parent_page_guide.build_parent_page_guide_blocks(
+                DATABASE_CONTAINER_IDS,
+            )
+        )
+    ]
     notion = FakeNotion(
         [
             _api_block("Manual callout", block_type="callout"),
-            _api_block(parent_page_guide.GUIDE_VERSION),
+            *linked_guide,
             _api_block("Image placeholder"),
         ]
     )
@@ -431,6 +508,55 @@ def test_existing_version_is_idempotent_with_other_blocks() -> None:
     assert report.guide_already_exists is True
     assert report.real_notion_writes == 0
     assert notion.blocks.children.append_calls == []
+
+
+def test_existing_unlinked_entries_are_repaired_in_place() -> None:
+    guide = [
+        _stored_block(block, index)
+        for index, block in enumerate(
+            parent_page_guide.build_parent_page_guide_blocks()
+        )
+    ]
+    notion = FakeNotion(guide)
+
+    report = _run(
+        notion,
+        dry_run=False,
+        confirmation=parent_page_guide.WRITE_CONFIRMATION,
+    )
+
+    assert report.status == "repaired"
+    assert report.guide_already_exists is True
+    assert report.planned_parent_page_writes == 4
+    assert report.real_notion_writes == 4
+    assert notion.blocks.children.append_calls == []
+    assert len(notion.blocks.update_calls) == 4
+    assert parent_page_guide.ensure_parent_page_database_links(
+        notion,
+        PARENT_ID,
+        {
+            name: data_source_id
+            for data_source_id, name in DATA_SOURCE_NAMES.items()
+        },
+    ) == 0
+
+
+def test_existing_unlinked_entries_dry_run_reports_without_writing() -> None:
+    notion = FakeNotion(
+        [
+            _stored_block(block, index)
+            for index, block in enumerate(
+                parent_page_guide.build_parent_page_guide_blocks()
+            )
+        ]
+    )
+
+    report = _run(notion)
+
+    assert report.status == "dry_run_ready"
+    assert report.planned_parent_page_writes == 4
+    assert report.real_notion_writes == 0
+    assert notion.blocks.update_calls == []
 
 
 def test_duplicate_version_fails_closed_without_write() -> None:

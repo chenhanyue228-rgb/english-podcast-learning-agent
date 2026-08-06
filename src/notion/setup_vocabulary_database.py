@@ -16,12 +16,10 @@ from src.notion.config import NotionConfig, load_notion_config
 from src.notion.schema import (
     PODCAST_LIBRARY,
     REVIEW_STATUSES,
-    VOCABULARY_CATEGORIES,
     VOCABULARY_DATABASE,
 )
 from src.notion.setup_workspace import (
     create_notion_client,
-    rich_text_property,
     select_property,
     title_property,
 )
@@ -60,16 +58,10 @@ def _relation_property(target_data_source_id: str) -> dict[str, Any]:
 def _vocabulary_properties(podcast_library_id: str) -> dict[str, Any]:
     return {
         "Name": title_property(),
-        "Original Context": rich_text_property(),
-        "Meaning": rich_text_property(),
-        "Professional Category": select_property(VOCABULARY_CATEGORIES),
         "Source": _relation_property(podcast_library_id),
-        "Source Page ID": rich_text_property(),
         "First Seen": {"date": {}},
         "Review Status": select_property(REVIEW_STATUSES),
         "Last Review": {"date": {}},
-        "Usage Example": rich_text_property(),
-        "Personal Note": rich_text_property(),
     }
 
 

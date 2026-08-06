@@ -79,12 +79,6 @@ def _title_property(value: str) -> dict[str, Any]:
     return {"title": [{"type": "text", "text": {"content": value}}]}
 
 
-def _rich_text_property(value: str) -> dict[str, Any]:
-    if not value:
-        return {"rich_text": []}
-    return {"rich_text": [{"type": "text", "text": {"content": value}}]}
-
-
 def _select_property(value: str) -> dict[str, Any]:
     return {"select": {"name": value}} if value else {"select": None}
 
@@ -246,16 +240,10 @@ def vocabulary_page_properties(payload: VocabularyPublishPayload) -> dict[str, A
     """Build Vocabulary Database properties for a manual memory record."""
     return {
         "Name": _title_property(payload.word),
-        "Original Context": _rich_text_property(payload.original_context),
-        "Meaning": _rich_text_property(payload.meaning),
-        "Professional Category": _select_property(payload.professional_category),
         "Source": _relation_property(payload.source_page_id),
-        "Source Page ID": _rich_text_property(payload.source_page_id),
         "First Seen": _date_property(payload.first_seen),
         "Review Status": _select_property(payload.review_status or "New"),
         "Last Review": _date_property(payload.last_review),
-        "Usage Example": _rich_text_property(payload.usage_example),
-        "Personal Note": _rich_text_property(payload.personal_note),
     }
 
 
@@ -448,16 +436,10 @@ def _automatic_update_properties(
 ) -> dict[str, Any]:
     """Return only machine-managed properties for an automatic retry/update."""
     return {
-        "Original Context": _rich_text_property(payload.original_context),
-        "Meaning": _rich_text_property(payload.meaning),
-        "Professional Category": _select_property(
-            payload.professional_category
-        ),
         "Source": _merged_relation_property(
             existing_page,
             payload.source_page_id,
         ),
-        "Usage Example": _rich_text_property(payload.usage_example),
     }
 
 

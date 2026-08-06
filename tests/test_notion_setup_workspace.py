@@ -202,7 +202,24 @@ def test_expression_database_select_options_have_semantic_colors() -> None:
     ]
 
 
-def test_reconcile_does_not_rewrite_existing_expression_option_colors() -> None:
+def test_vocabulary_database_has_lean_schema_and_semantic_status_colors() -> None:
+    properties = setup_workspace.vocabulary_database_properties("podcast_db")
+
+    assert set(properties) == {
+        "Name",
+        "First Seen",
+        "Last Review",
+        "Review Status",
+        "Source",
+    }
+    assert properties["Review Status"]["select"]["options"] == [
+        {"name": "New", "color": "blue"},
+        {"name": "Reviewing", "color": "yellow"},
+        {"name": "Mastered", "color": "green"},
+    ]
+
+
+def test_reconcile_does_not_rewrite_existing_select_option_colors() -> None:
     expected_schemas = {
         "podcast_db": setup_workspace.podcast_library_properties(),
         "expression_db": setup_workspace.expression_database_properties(
@@ -229,6 +246,10 @@ def test_reconcile_does_not_rewrite_existing_expression_option_colors() -> None:
         ]["options"]
         for option in options:
             option["color"] = "default"
+    for option in schemas["vocabulary_db"]["properties"]["Review Status"][
+        "select"
+    ]["options"]:
+        option["color"] = "default"
 
     notion = FakeNotion(schemas)
     setup_workspace.reconcile_workspace_schema(notion, DATABASE_IDS)
@@ -272,7 +293,7 @@ def test_create_base_databases_uses_fixed_product_order(monkeypatch) -> None:
     ]
 
 
-def test_setup_workspace_creates_guide_before_databases(monkeypatch) -> None:
+def test_setup_workspace_creates_guide_then_links_entries(monkeypatch) -> None:
     from src.notion import parent_page_guide
 
     calls: list[str] = []
@@ -282,6 +303,11 @@ def test_setup_workspace_creates_guide_before_databases(monkeypatch) -> None:
         parent_page_guide,
         "ensure_parent_page_guide_for_setup",
         lambda _notion, _parent: calls.append("guide") or True,
+    )
+    monkeypatch.setattr(
+        parent_page_guide,
+        "ensure_parent_page_database_links",
+        lambda _notion, _parent, _ids: calls.append("links") or 4,
     )
     monkeypatch.setattr(
         setup_workspace,
@@ -317,6 +343,7 @@ def test_setup_workspace_creates_guide_before_databases(monkeypatch) -> None:
         "databases",
         "schema",
         "relations",
+        "links",
         "env",
     ]
 

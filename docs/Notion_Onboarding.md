@@ -128,9 +128,15 @@ Notion 插件只是可选的搜索、读取和辅助查看工具。
 新建的 `Expression Database` 会自动为 `Category`、`Commonness` 和
 `Review Status` 的现有选项设置语义颜色，选项名称保持不变。
 
+新建的 `Vocabulary Database` 只创建 `Name`、`First Seen`、
+`Last Review`、`Review Status` 和 `Source` 五个数据库属性。词义、上下文、
+例句和学习笔记保存在词汇页面正文中。`Review Status` 自动使用：
+`New`（蓝色）、`Reviewing`（黄色）、`Mastered`（绿色）。
+
 Notion 官方接口不能修改已有 Select option 的颜色。已经存在的
-`Expression Database` 应只在 Notion 界面中调整这些选项的颜色；不要删除、
-重建或重命名现有 options，也不要为了获得颜色而重建数据库。
+`Expression Database` 或 `Vocabulary Database` 应只在 Notion 界面中调整
+这些选项的颜色；不要删除、重建或重命名现有 options，也不要为了获得颜色
+而重建数据库。
 
 规范环境变量：
 

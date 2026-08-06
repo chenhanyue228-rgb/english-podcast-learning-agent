@@ -5,6 +5,18 @@ entries must be appended or clarified, not removed.
 
 ## [Unreleased]
 
+### Clickable Parent-Page Database Entries
+
+- Fixed the four visual database-entry callouts so each one links to its real
+  Notion database container instead of behaving like a non-interactive label.
+- Kept the parent-page layout and database creation order unchanged while
+  resolving the 2025-09-03 API data-source IDs to their database-container IDs.
+- Added idempotent in-place repair for existing V1 guides through the protected
+  parent-page guide command; retries update only missing or incorrect links and
+  never create, delete, archive, rename, or reorder databases.
+- Added post-write verification so first-time setup is marked complete only
+  after all four visible entries target the intended database group.
+
 ### Weekly Reflection Automatic Scheduling (Under Review)
 
 - Added a separate bounded macOS Weekly Reflection scheduler with a Saturday
